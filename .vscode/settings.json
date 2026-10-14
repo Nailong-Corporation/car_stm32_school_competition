@@ -1,0 +1,6 @@
+{
+    "clangd.enable": false,
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.default.intelliSenseMode": "macos-gcc-arm",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json"
+}

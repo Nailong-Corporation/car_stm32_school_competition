@@ -1,0 +1,29 @@
+#ifndef GRAY_SENSOR_H
+#define GRAY_SENSOR_H
+
+#include <stdbool.h>
+#include <stdint.h>
+#include "control_config.h"
+
+typedef enum { GRAY_VALID, GRAY_NONE, GRAY_AMBIGUOUS } GrayKind;
+typedef struct {
+    GrayKind kind;
+    uint8_t raw_mask; /* bit i = S_i; 1 background, 0 white */
+    uint8_t line_mask; /* bit i = S_i; 1 white, after exactly one inversion */
+    uint8_t selected_mask;
+    uint8_t white_count;
+    uint8_t region_count;
+    float position;
+} GrayObservation;
+typedef struct {
+    uint8_t history[SENSOR_FILTER_SAMPLES];
+    uint8_t next;
+    uint8_t count;
+} GraySensor;
+
+void gray_sensor_init(GraySensor *sensor);
+GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previous);
+GrayObservation gray_sensor_update(GraySensor *sensor, uint8_t raw_mask,
+                                   bool have_previous, float previous);
+
+#endif
