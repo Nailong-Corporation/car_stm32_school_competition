@@ -1,0 +1,1071 @@
+PROTEL NETLIST 2.0
+[
+DESIGNATOR
+J1
+FOOTPRINT
+HDR-TH_2P-P2.54-V-M-1
+PARTTYPE
+HDR-M_2.54_1x2P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge4
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+HDR-M_2.54_1x2P
+PCB Layer
+Default
+Symbol
+210S-1*2P L=11.6MMGold-plated black
+Designator
+J1
+Supplier Part
+C124375
+Supplier Footprint
+插件,P=2.54mm
+Name
+B-2100S02P-A110
+3D Model Title
+HDR-M-2.54_1x2
+Description
+
+Reuse Block
+
+Group ID
+
+Channel ID
+J1
+Manufacturer
+Ckmtw(灿科盟)
+Manufacturer Part
+B-2100S02P-A110
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+J2
+FOOTPRINT
+HDR-TH_2P-P2.54-V-M-1
+PARTTYPE
+HDR-M_2.54_1x2P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge5
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+HDR-M_2.54_1x2P
+PCB Layer
+Default
+Symbol
+210S-1*2P L=11.6MMGold-plated black
+Designator
+J2
+Supplier Part
+C124375
+Supplier Footprint
+插件,P=2.54mm
+Name
+B-2100S02P-A110
+3D Model Title
+HDR-M-2.54_1x2
+Description
+
+Reuse Block
+
+Group ID
+
+Channel ID
+
+Manufacturer
+Ckmtw(灿科盟)
+Manufacturer Part
+B-2100S02P-A110
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+J3
+FOOTPRINT
+HDR-TH_2P-P2.54-V-M-1
+PARTTYPE
+HDR-M_2.54_1x2P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge6
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+HDR-M_2.54_1x2P
+PCB Layer
+Default
+Symbol
+210S-1*2P L=11.6MMGold-plated black
+Designator
+J3
+Supplier Part
+C124375
+Supplier Footprint
+插件,P=2.54mm
+Name
+B-2100S02P-A110
+3D Model Title
+HDR-M-2.54_1x2
+Description
+
+Reuse Block
+
+Group ID
+
+Channel ID
+
+Manufacturer
+Ckmtw(灿科盟)
+Manufacturer Part
+B-2100S02P-A110
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+J4
+FOOTPRINT
+HDR-TH_2P-P2.54-V-M-1
+PARTTYPE
+HDR-M_2.54_1x2P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge7
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+HDR-M_2.54_1x2P
+PCB Layer
+Default
+Symbol
+210S-1*2P L=11.6MMGold-plated black
+Designator
+J4
+Supplier Part
+C124375
+Supplier Footprint
+插件,P=2.54mm
+Name
+B-2100S02P-A110
+3D Model Title
+HDR-M-2.54_1x2
+Description
+
+Reuse Block
+
+Group ID
+
+Channel ID
+
+Manufacturer
+Ckmtw(灿科盟)
+Manufacturer Part
+B-2100S02P-A110
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+SW1
+FOOTPRINT
+KEY-SMD_4P-L6.0-W6.0-P4.50-LS8.6
+PARTTYPE
+TS-1102S-C-B-B
+DESCRIPTION
+电路结构:单刀单掷;按钮形状:圆形按钮;作用力:2.6N;安装方式:立贴;开关长度:6mm;开关宽度:6mm;开关高度:4.5mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:无;工作寿命:30万次;
+Component Kind
+Standard
+Unique ID
+gge9
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+TS-1102S-C-B-B
+PCB Layer
+Default
+Symbol
+TS-1102S-C-B-B
+Designator
+SW1
+LCSC Part Name
+6*6*4.5mm 立贴 轻触开关
+Supplier Part
+C381041
+Manufacturer
+XKB Connection(中国星坤)
+Manufacturer Part
+TS-1102S-C-B-B
+Supplier Footprint
+SMD-4P,6x6mm
+JLCPCB Part Class
+Extended Part
+Datasheet
+https://item.szlcsc.com/datasheet/TS-1102S-C-B-B/353273.html
+Supplier
+LCSC
+3D Model Title
+KEY-SMD_4P-L6.0-W6.0-H5.0-LS10.0-P4.50
+Circuit
+单刀单掷
+Actuator Style
+圆形按钮
+Operating Force
+2.6N
+Mounting Type
+立贴
+Length
+6mm
+Width
+6mm
+Switch Height
+4.5mm
+with Bracket
+不带支架
+Contact Current
+50mA
+Voltage Rating
+12V
+Actuator/Cap Color
+黑色
+With Lamp
+无
+Life
+30万次
+Operating Temperature
+-20℃~+70℃
+Name
+TS-1102S-C-B-B
+Description
+电路结构:单刀单掷;按钮形状:圆形按钮;作用力:2.6N;安装方式:立贴;开关长度:6mm;开关宽度:6mm;开关高度:4.5mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:无;工作寿命:30万次;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+R1
+FOOTPRINT
+R0603
+PARTTYPE
+0603WAF1002T5E
+DESCRIPTION
+电阻类型:厚膜电阻;阻值:10kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;
+Component Kind
+Standard
+Unique ID
+gge10
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+0603WAF1002T5E
+PCB Layer
+Default
+Symbol
+0603WAF1002T5E
+Designator
+R1
+LCSC Part Name
+厚膜电阻 10kΩ ±1% 100mW
+Supplier Part
+C25804
+Manufacturer
+UNI-ROYAL(厚声)
+Manufacturer Part
+0603WAF1002T5E
+Supplier Footprint
+0603
+JLCPCB Part Class
+Basic Part
+Datasheet
+https://item.szlcsc.com/datasheet/0603WAF1002T5E/26547.html
+Supplier
+LCSC
+3D Model Title
+R0603
+Type
+厚膜电阻
+Value
+10kΩ
+Tolerance
+±1%
+Power(Watts)
+100mW
+Voltage-Supply(Max)
+75V
+Temperature Coefficient
+±100ppm/℃
+Operating Temperature
+-55℃~+155℃
+Name
+10kΩ
+Description
+电阻类型:厚膜电阻;阻值:10kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+C1
+FOOTPRINT
+C0603
+PARTTYPE
+CC0603KRX7R9BB104
+DESCRIPTION
+容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;
+Component Kind
+Standard
+Unique ID
+gge11
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+CC0603KRX7R9BB104
+PCB Layer
+Default
+Name
+100nF
+Designator
+C1
+Symbol
+CC0603KRX7R9BB104
+LCSC Part Name
+100nF ±10% 50V
+Supplier Part
+C14663
+Manufacturer
+YAGEO(国巨)
+Manufacturer Part
+CC0603KRX7R9BB104
+Supplier Footprint
+0603
+JLCPCB Part Class
+Basic Part
+Datasheet
+https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html
+Supplier
+LCSC
+3D Model Title
+C0603_L1.6-W0.8-H0.8
+Value
+100nF
+Tolerance
+±10%
+Voltage Rating
+50V
+Temperature Coefficient
+X7R
+Description
+容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+C2
+FOOTPRINT
+C0805
+PARTTYPE
+CL21A106KAYNNNE_C15850
+DESCRIPTION
+容值:10uF;精度:±10%;额定电压:25V;温度系数:X5R;
+Component Kind
+Standard
+Unique ID
+gge12
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+CL21A106KAYNNNE_C15850
+PCB Layer
+Default
+Symbol
+CL21A106KAYNNNE
+Designator
+C2
+LCSC Part Name
+10uF ±10% 25V
+Supplier Part
+C15850
+Manufacturer
+SAMSUNG(三星)
+Manufacturer Part
+CL21A106KAYNNNE
+Supplier Footprint
+0805
+JLCPCB Part Class
+Basic Part
+Datasheet
+https://item.szlcsc.com/datasheet/CL21A106KAYNNNE/16532.html
+Supplier
+LCSC
+3D Model Title
+C0805_L2.0-W1.3-H1.3
+Value
+10uF
+Tolerance
+±10%
+Voltage Rating
+25V
+Temperature Coefficient
+X5R
+Name
+10uF
+Description
+容值:10uF;精度:±10%;额定电压:25V;温度系数:X5R;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+C3
+FOOTPRINT
+C0603
+PARTTYPE
+CC0603KRX7R9BB104
+DESCRIPTION
+容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;
+Component Kind
+Standard
+Unique ID
+gge13
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+CC0603KRX7R9BB104
+PCB Layer
+Default
+Name
+100nF
+Designator
+C3
+Symbol
+CC0603KRX7R9BB104
+LCSC Part Name
+100nF ±10% 50V
+Supplier Part
+C14663
+Manufacturer
+YAGEO(国巨)
+Manufacturer Part
+CC0603KRX7R9BB104
+Supplier Footprint
+0603
+JLCPCB Part Class
+Basic Part
+Datasheet
+https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html
+Supplier
+LCSC
+3D Model Title
+C0603_L1.6-W0.8-H0.8
+Value
+100nF
+Tolerance
+±10%
+Voltage Rating
+50V
+Temperature Coefficient
+X7R
+Description
+容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+C4
+FOOTPRINT
+C0805
+PARTTYPE
+CL21A106KAYNNNE_C15850
+DESCRIPTION
+容值:10uF;精度:±10%;额定电压:25V;温度系数:X5R;
+Component Kind
+Standard
+Unique ID
+gge14
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+CL21A106KAYNNNE_C15850
+PCB Layer
+Default
+Symbol
+CL21A106KAYNNNE
+Designator
+C4
+LCSC Part Name
+10uF ±10% 25V
+Supplier Part
+C15850
+Manufacturer
+SAMSUNG(三星)
+Manufacturer Part
+CL21A106KAYNNNE
+Supplier Footprint
+0805
+JLCPCB Part Class
+Basic Part
+Datasheet
+https://item.szlcsc.com/datasheet/CL21A106KAYNNNE/16532.html
+Supplier
+LCSC
+3D Model Title
+C0805_L2.0-W1.3-H1.3
+Value
+10uF
+Tolerance
+±10%
+Voltage Rating
+25V
+Temperature Coefficient
+X5R
+Name
+10uF
+Description
+容值:10uF;精度:±10%;额定电压:25V;温度系数:X5R;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+J6
+FOOTPRINT
+HDR-TH_20P-P2.54-V-F
+PARTTYPE
+HDR-F_2.54_1x20P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge15
+Add into BOM
+yes
+Convert to PCB
+yes
+Designator
+J6
+Device
+HDR-F_2.54_1x20P
+PCB Layer
+Default
+Symbol
+HDR-F_2.54_1x20P
+Supplier Part
+C50984
+Supplier Footprint
+插件,P=2.54mm
+3D Model Title
+HDR-F-2.54_1x20
+Description
+
+Name
+2.54-1*20P母
+Reuse Block
+
+Group ID
+
+Channel ID
+
+Manufacturer
+BOOMELE(博穆精密)
+Manufacturer Part
+2.54-1*20P母
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+J7
+FOOTPRINT
+HDR-TH_20P-P2.54-V-F
+PARTTYPE
+HDR-F_2.54_1x20P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge16
+Add into BOM
+yes
+Convert to PCB
+yes
+Designator
+J7
+Device
+HDR-F_2.54_1x20P
+PCB Layer
+Default
+Symbol
+HDR-F_2.54_1x20P
+Supplier Part
+C50984
+Supplier Footprint
+插件,P=2.54mm
+3D Model Title
+HDR-F-2.54_1x20
+Description
+
+Name
+2.54-1*20P母
+Reuse Block
+
+Group ID
+
+Channel ID
+
+Manufacturer
+BOOMELE(博穆精密)
+Manufacturer Part
+2.54-1*20P母
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+J10
+FOOTPRINT
+HDR-TH_10P-P2.54-V-F
+PARTTYPE
+HDR-F_2.54_1x10P
+DESCRIPTION
+
+Component Kind
+Standard
+Unique ID
+gge19
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+HDR-F_2.54_1x10P
+PCB Layer
+Default
+Symbol
+X5511FV-10-C70D30-1000
+Designator
+J10
+Supplier Part
+C2684744
+Supplier Footprint
+插件,P=2.54mm
+3D Model Title
+HDR-TH_10P-P2.54-F-LI-1X10P
+Description
+
+Name
+X5511FV-10-C70D30-1000
+Reuse Block
+
+Group ID
+
+Channel ID
+
+Manufacturer
+XKB Connection(中国星坤)
+Manufacturer Part
+X5511FV-10-C70D30-1000
+Supplier
+LCSC
+
+*
+]
+[
+DESIGNATOR
+J8
+FOOTPRINT
+HDR-TH_8P-P2.54-V-F
+PARTTYPE
+2.54-1*8P母环保
+DESCRIPTION
+插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;
+Component Kind
+Standard
+Unique ID
+gge20
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+2.54-1*8P母环保
+PCB Layer
+Default
+Symbol
+Header-Female-2.54_1x8
+Designator
+J8
+LCSC Part Name
+1x8P 间距:2.54mm 直插
+Supplier Part
+C27438
+Manufacturer
+BOOMELE(博穆精密)
+Manufacturer Part
+2.54-1*8P母环保
+Supplier Footprint
+插件,P=2.54mm
+JLCPCB Part Class
+Extended Part
+Datasheet
+https://item.szlcsc.com/datasheet/2.54-1*8P%25E6%25AF%258D%25E7%258E%25AF%25E4%25BF%259D/28187.html
+Supplier
+LCSC
+3D Model Title
+HDR-TH_8P-P2.54-V-F
+Holes Structure
+1x8P
+Pitch
+2.54mm
+Row Spacing
+-
+Circular Hole / Square Hole
+方孔
+Mounting Type
+直插
+Number of Rows
+单排
+Number of Positions
+8P
+Current Rating
+3A
+Holes Direction
+顶部
+Insulation Height
+8.5mm
+Contact Material
+黄铜
+Contact Plating
+金
+Operating Temperature
+-55℃~+105℃
+PIN Length
+3.2mm
+Name
+2.54-1*8P母环保
+Description
+插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+[
+DESIGNATOR
+J9
+FOOTPRINT
+HDR-TH_8P-P2.54-V-F
+PARTTYPE
+2.54-1*8P母环保
+DESCRIPTION
+插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;
+Component Kind
+Standard
+Unique ID
+gge21
+Add into BOM
+yes
+Convert to PCB
+yes
+Device
+2.54-1*8P母环保
+PCB Layer
+Default
+Symbol
+Header-Female-2.54_1x8
+Designator
+J9
+LCSC Part Name
+1x8P 间距:2.54mm 直插
+Supplier Part
+C27438
+Manufacturer
+BOOMELE(博穆精密)
+Manufacturer Part
+2.54-1*8P母环保
+Supplier Footprint
+插件,P=2.54mm
+JLCPCB Part Class
+Extended Part
+Datasheet
+https://item.szlcsc.com/datasheet/2.54-1*8P%25E6%25AF%258D%25E7%258E%25AF%25E4%25BF%259D/28187.html
+Supplier
+LCSC
+3D Model Title
+HDR-TH_8P-P2.54-V-F
+Holes Structure
+1x8P
+Pitch
+2.54mm
+Row Spacing
+-
+Circular Hole / Square Hole
+方孔
+Mounting Type
+直插
+Number of Rows
+单排
+Number of Positions
+8P
+Current Rating
+3A
+Holes Direction
+顶部
+Insulation Height
+8.5mm
+Contact Material
+黄铜
+Contact Plating
+金
+Operating Temperature
+-55℃~+105℃
+PIN Length
+3.2mm
+Name
+2.54-1*8P母环保
+Description
+插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;
+Reuse Block
+
+Group ID
+
+Channel ID
+
+
+*
+]
+(
++5V 
+J1-1 HDR-M_2.54_1x2P-1 Passive 
+J7-18 HDR-F_2.54_1x20P-18 Input   
+)
+(
+GND 
+J1-2 HDR-M_2.54_1x2P-2 Passive 
+J2-2 HDR-M_2.54_1x2P-2 Passive 
+SW1-3 TS-1102S-C-B-B-3 Passive 
+SW1-4 TS-1102S-C-B-B-4 Passive 
+R1-2 0603WAF1002T5E-2 Input   
+C1-2 CC0603KRX7R9BB104-2 Passive 
+C2-2 CL21A106KAYNNNE_C15850-2 Passive 
+C3-2 CC0603KRX7R9BB104-2 Passive 
+C4-2 CL21A106KAYNNNE_C15850-2 Passive 
+J6-19 HDR-F_2.54_1x20P-19 Input   
+J6-20 HDR-F_2.54_1x20P-20 Input   
+J7-19 HDR-F_2.54_1x20P-19 Input   
+J10-2 HDR-F_2.54_1x10P-2 Passive 
+J8-3 2.54-1*8P母环保-3 Passive 
+J8-8 2.54-1*8P母环保-8 Passive 
+J9-8 2.54-1*8P母环保-8 Passive 
+)
+(
+VM 
+J2-1 HDR-M_2.54_1x2P-1 Passive 
+C1-1 CC0603KRX7R9BB104-1 Passive 
+C2-1 CL21A106KAYNNNE_C15850-1 Passive 
+J8-1 2.54-1*8P母环保-1 Passive 
+)
+(
+AO1 
+J3-1 HDR-M_2.54_1x2P-1 Passive 
+J8-4 2.54-1*8P母环保-4 Passive 
+)
+(
+AO2 
+J3-2 HDR-M_2.54_1x2P-2 Passive 
+J8-5 2.54-1*8P母环保-5 Passive 
+)
+(
+BO1 
+J4-1 HDR-M_2.54_1x2P-1 Passive 
+J8-7 2.54-1*8P母环保-7 Passive 
+)
+(
+BO2 
+J4-2 HDR-M_2.54_1x2P-2 Passive 
+J8-6 2.54-1*8P母环保-6 Passive 
+)
+(
+BTN 
+SW1-1 TS-1102S-C-B-B-1 Passive 
+SW1-2 TS-1102S-C-B-B-2 Passive 
+J6-15 HDR-F_2.54_1x20P-15 Input   
+)
+(
+STBY 
+R1-1 0603WAF1002T5E-1 Input   
+J7-13 HDR-F_2.54_1x20P-13 Input   
+J9-4 2.54-1*8P母环保-4 Passive 
+)
+(
++3V3 
+C3-1 CC0603KRX7R9BB104-1 Passive 
+C4-1 CL21A106KAYNNNE_C15850-1 Passive 
+J6-18 HDR-F_2.54_1x20P-18 Input   
+J7-20 HDR-F_2.54_1x20P-20 Input   
+J10-1 HDR-F_2.54_1x10P-1 Passive 
+J8-2 2.54-1*8P母环保-2 Passive 
+)
+(
+S0 
+J6-5 HDR-F_2.54_1x20P-5 Input   
+J10-3 HDR-F_2.54_1x10P-3 Passive 
+)
+(
+S1 
+J6-6 HDR-F_2.54_1x20P-6 Input   
+J10-4 HDR-F_2.54_1x10P-4 Passive 
+)
+(
+S2 
+J6-7 HDR-F_2.54_1x20P-7 Input   
+J10-5 HDR-F_2.54_1x10P-5 Passive 
+)
+(
+S3 
+J6-8 HDR-F_2.54_1x20P-8 Input   
+J10-6 HDR-F_2.54_1x10P-6 Passive 
+)
+(
+S4 
+J6-9 HDR-F_2.54_1x20P-9 Input   
+J10-7 HDR-F_2.54_1x10P-7 Passive 
+)
+(
+S5 
+J6-10 HDR-F_2.54_1x20P-10 Input   
+J10-8 HDR-F_2.54_1x10P-8 Passive 
+)
+(
+PWMA 
+J6-11 HDR-F_2.54_1x20P-11 Input   
+J9-1 2.54-1*8P母环保-1 Passive 
+)
+(
+PWMB 
+J6-12 HDR-F_2.54_1x20P-12 Input   
+J9-7 2.54-1*8P母环保-7 Passive 
+)
+(
+S6 
+J6-13 HDR-F_2.54_1x20P-13 Input   
+J10-9 HDR-F_2.54_1x10P-9 Passive 
+)
+(
+S7 
+J6-14 HDR-F_2.54_1x20P-14 Input   
+J10-10 HDR-F_2.54_1x10P-10 Passive 
+)
+(
+AIN1 
+J7-1 HDR-F_2.54_1x20P-1 Input   
+J9-3 2.54-1*8P母环保-3 Passive 
+)
+(
+AIN2 
+J7-2 HDR-F_2.54_1x20P-2 Input   
+J9-2 2.54-1*8P母环保-2 Passive 
+)
+(
+BIN1 
+J7-3 HDR-F_2.54_1x20P-3 Input   
+J9-5 2.54-1*8P母环保-5 Passive 
+)
+(
+BIN2 
+J7-4 HDR-F_2.54_1x20P-4 Input   
+J9-6 2.54-1*8P母环保-6 Passive 
+)

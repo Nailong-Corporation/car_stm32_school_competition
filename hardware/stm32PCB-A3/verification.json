@@ -1,0 +1,54 @@
+{
+  "revision": "A3",
+  "date": "2026-10-16",
+  "board_components": 32,
+  "schematic_and_pcb_pin_assignments_checked": 143,
+  "connected_nets": 48,
+  "unused_mcu_pins_brought_out": 18,
+  "pcb_tracks": 463,
+  "pcb_vias": 62,
+  "ground_solid_regions": 6,
+  "board_size_mm": [
+    100,
+    90
+  ],
+  "socket_pitch_mm": 2.54,
+  "module_row_center_distance_mm": 15,
+  "connector_drills_from_gerber_mm": {
+    "J6": [
+      1.2
+    ],
+    "J7": [
+      1.2
+    ],
+    "J8": [
+      1.10002
+    ],
+    "J9": [
+      1.10002
+    ],
+    "J10": [
+      1.10002
+    ],
+    "J11": [
+      1.10002
+    ],
+    "J12": [
+      1.10002
+    ]
+  },
+  "schematic_drc_violations": 0,
+  "pcb_drc_violations": 0,
+  "input_voltage_design_range_V": [
+    7,
+    12
+  ],
+  "output_current_design_target_A_total": 3,
+  "pcb_routing_completed": true,
+  "gerber_archive_verified": true,
+  "module_mechanical_fit_verified": false,
+  "full_module_3d_collision_check_completed": false,
+  "power_load_and_thermal_test_completed": false,
+  "hardware_tested": false,
+  "fabrication_release_approved": false
+}
