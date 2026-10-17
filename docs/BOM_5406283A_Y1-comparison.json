@@ -1,0 +1,377 @@
+{
+  "date": "2026-10-16",
+  "source_bom": "/Users/zhendong/Downloads/BOM_5406283A_Y1.xls",
+  "bom_sha256": "90e9253fb32f4b5144e98b97a66215191a55f50da4c0a4fcd0f6567133b4cbcf",
+  "sheet": "BOM对比结果",
+  "groups": 19,
+  "components_per_board": 32,
+  "assembly_board_count_inferred": 2,
+  "assembled_total": 64,
+  "duplicate_designators": [],
+  "missing_designators": [],
+  "extra_designators": [],
+  "original_bom_matches_A5_netlist_and_pcb": true,
+  "pin_assignments_compared_between_A5_netlist_and_pcb": 143,
+  "saved_LCEDA_stm32PCB_component_identity_placement_and_pad_nets_match_A5": true,
+  "saved_LCEDA_stm32PCB_routing_matches_A5": "not claimed; native files differ",
+  "factory_supplier_substitutions": [
+    {
+      "excel_row": 6,
+      "designators": [
+        "J6",
+        "J7"
+      ],
+      "quantity_per_board": 2,
+      "original_supplier_part": "C50984",
+      "factory_supplier_part": "C41417332",
+      "original_model": "2.54-1*20P母",
+      "factory_model": "HX PM2.54-1x20P ZC",
+      "footprint": "HDR-TH_20P-P2.54-V-F",
+      "factory_description": "1x20P 间距:2.54mm 直插",
+      "factory_package": "插件,P=2.54mm",
+      "factory_category": "排母",
+      "assembly_total": 4,
+      "factory_supply_quantity": 4
+    }
+  ],
+  "hardware_tested": false,
+  "fabrication_release_approved": false,
+  "rows": [
+    {
+      "excel_row": 4,
+      "designators": [
+        "C11"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C282074",
+      "factory_supplier_part": "C282074",
+      "original_model": "CC0603JRNPO9BN750",
+      "factory_model": "CC0603JRNPO9BN750",
+      "footprint": "C0603",
+      "factory_description": "75pF ±5% 50V",
+      "factory_package": "0603",
+      "factory_category": "贴片电容(MLCC)",
+      "assembly_total": 2,
+      "factory_supply_quantity": 20
+    },
+    {
+      "excel_row": 5,
+      "designators": [
+        "L1"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C780184",
+      "factory_supplier_part": "C780184",
+      "original_model": "SRP1038A-100M",
+      "factory_model": "SRP1038A-100M",
+      "footprint": "IND-SMD_L11.0-W10.0",
+      "factory_description": "10uH ±20% 12A",
+      "factory_package": "SMD,11x10mm",
+      "factory_category": "功率电感",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 6,
+      "designators": [
+        "J6",
+        "J7"
+      ],
+      "quantity_per_board": 2,
+      "original_supplier_part": "C50984",
+      "factory_supplier_part": "C41417332",
+      "original_model": "2.54-1*20P母",
+      "factory_model": "HX PM2.54-1x20P ZC",
+      "footprint": "HDR-TH_20P-P2.54-V-F",
+      "factory_description": "1x20P 间距:2.54mm 直插",
+      "factory_package": "插件,P=2.54mm",
+      "factory_category": "排母",
+      "assembly_total": 4,
+      "factory_supply_quantity": 4
+    },
+    {
+      "excel_row": 7,
+      "designators": [
+        "J11",
+        "J12"
+      ],
+      "quantity_per_board": 2,
+      "original_supplier_part": "C57369",
+      "factory_supplier_part": "C57369",
+      "original_model": "2.54-1*10P针",
+      "factory_model": "2.54-1*10P针",
+      "footprint": "HDR-TH_10P-P2.54-V-M-1",
+      "factory_description": "1x10P 间距:2.54mm 方针 直插 【排针】",
+      "factory_package": "插件,P=2.54mm",
+      "factory_category": "排针",
+      "assembly_total": 4,
+      "factory_supply_quantity": 4
+    },
+    {
+      "excel_row": 8,
+      "designators": [
+        "D1"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C397626",
+      "factory_supplier_part": "C397626",
+      "original_model": "SS54-C",
+      "factory_model": "SS54-C",
+      "footprint": "SMC_L6.9-W5.9-LS7.9-RD",
+      "factory_description": "SS54-C",
+      "factory_package": "SMC(DO-214AB)",
+      "factory_category": "肖特基二极管",
+      "assembly_total": 2,
+      "factory_supply_quantity": 3
+    },
+    {
+      "excel_row": 9,
+      "designators": [
+        "C2",
+        "C4"
+      ],
+      "quantity_per_board": 2,
+      "original_supplier_part": "C15850",
+      "factory_supplier_part": "C15850",
+      "original_model": "CL21A106KAYNNNE",
+      "factory_model": "CL21A106KAYNNNE",
+      "footprint": "C0805",
+      "factory_description": "10uF ±10% 25V",
+      "factory_package": "0805",
+      "factory_category": "贴片电容(MLCC)",
+      "assembly_total": 4,
+      "factory_supply_quantity": 4
+    },
+    {
+      "excel_row": 10,
+      "designators": [
+        "J10"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C2684744",
+      "factory_supplier_part": "C2684744",
+      "original_model": "X5511FV-10-C70D30-1000",
+      "factory_model": "X5511FV-10-C70D30-1000",
+      "footprint": "HDR-TH_10P-P2.54-V-F",
+      "factory_description": "间距:2.54mm 1x10P 直插 【排针】",
+      "factory_package": "插件,P=2.54mm",
+      "factory_category": "排母",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 11,
+      "designators": [
+        "R4"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C17888",
+      "factory_supplier_part": "C17888",
+      "original_model": "1206W4F0000T5E",
+      "factory_model": "1206W4F0000T5E",
+      "footprint": "R1206",
+      "factory_description": "厚膜电阻 0Ω ±1% 250mW",
+      "factory_package": "1206",
+      "factory_category": "贴片电阻",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 12,
+      "designators": [
+        "SW1"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C381041",
+      "factory_supplier_part": "C381041",
+      "original_model": "TS-1102S-C-B-B",
+      "factory_model": "TS-1102S-C-B-B",
+      "footprint": "KEY-SMD_4P-L6.0-W6.0-P4.50-LS8.6",
+      "factory_description": "6*6*4.5mm 立贴 轻触开关",
+      "factory_package": "SMD-4P,6x6mm",
+      "factory_category": "轻触开关",
+      "assembly_total": 2,
+      "factory_supply_quantity": 5
+    },
+    {
+      "excel_row": 13,
+      "designators": [
+        "F1"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C39831901",
+      "factory_supplier_part": "C39831901",
+      "original_model": "SMD2920P300TF/24",
+      "factory_model": "SMD2920P300TF/24",
+      "footprint": "F2920",
+      "factory_description": "24V 3A",
+      "factory_package": "2920",
+      "factory_category": "自恢复保险丝",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 14,
+      "designators": [
+        "C1",
+        "C3",
+        "C7",
+        "C8"
+      ],
+      "quantity_per_board": 4,
+      "original_supplier_part": "C14663",
+      "factory_supplier_part": "C14663",
+      "original_model": "CC0603KRX7R9BB104",
+      "factory_model": "CC0603KRX7R9BB104",
+      "footprint": "C0603",
+      "factory_description": "100nF ±10% 50V",
+      "factory_package": "0603",
+      "factory_category": "贴片电容(MLCC)",
+      "assembly_total": 8,
+      "factory_supply_quantity": 8
+    },
+    {
+      "excel_row": 15,
+      "designators": [
+        "C5",
+        "C6",
+        "C9",
+        "C10"
+      ],
+      "quantity_per_board": 4,
+      "original_supplier_part": "C12891",
+      "factory_supplier_part": "C12891",
+      "original_model": "CL31A226KAHNNNE",
+      "factory_model": "CL31A226KAHNNNE",
+      "footprint": "C1206",
+      "factory_description": "22uF ±10% 25V",
+      "factory_package": "1206",
+      "factory_category": "贴片电容(MLCC)",
+      "assembly_total": 8,
+      "factory_supply_quantity": 8
+    },
+    {
+      "excel_row": 16,
+      "designators": [
+        "J1",
+        "J2",
+        "J3",
+        "J4"
+      ],
+      "quantity_per_board": 4,
+      "original_supplier_part": "C124375",
+      "factory_supplier_part": "C124375",
+      "original_model": "B-2100S02P-A110",
+      "factory_model": "B-2100S02P-A110",
+      "footprint": "HDR-TH_2P-P2.54-V-M-1",
+      "factory_description": "1x2P 间距:2.54mm 方针 直插 【排针】",
+      "factory_package": "插件,P=2.54mm",
+      "factory_category": "排针",
+      "assembly_total": 8,
+      "factory_supply_quantity": 13
+    },
+    {
+      "excel_row": 17,
+      "designators": [
+        "U4"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C311983",
+      "factory_supplier_part": "C311983",
+      "original_model": "TPS54302DDCR",
+      "factory_model": "TPS54302DDCR",
+      "footprint": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+      "factory_description": "降压型 3A 4.5V~28V",
+      "factory_package": "TSOT-23-6",
+      "factory_category": "DC-DC电源芯片",
+      "assembly_total": 2,
+      "factory_supply_quantity": 5
+    },
+    {
+      "excel_row": 18,
+      "designators": [
+        "R1"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C25804",
+      "factory_supplier_part": "C25804",
+      "original_model": "0603WAF1002T5E",
+      "factory_model": "0603WAF1002T5E",
+      "footprint": "R0603",
+      "factory_description": "厚膜电阻 10kΩ ±1% 100mW",
+      "factory_package": "0603",
+      "factory_category": "贴片电阻",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 19,
+      "designators": [
+        "J13"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C381116",
+      "factory_supplier_part": "C381116",
+      "original_model": "DC-005-5A-2.0",
+      "factory_model": "DC-005-5A-2.0",
+      "footprint": "DC-IN-TH_DC-005-5A-2.0",
+      "factory_description": "DC电源插座 内径:2mm 外径:6.2mm 【插件】",
+      "factory_package": "插件",
+      "factory_category": "DC电源连接器",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 20,
+      "designators": [
+        "R2"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C25803",
+      "factory_supplier_part": "C25803",
+      "original_model": "0603WAF1003T5E",
+      "factory_model": "0603WAF1003T5E",
+      "footprint": "R0603",
+      "factory_description": "厚膜电阻 100kΩ ±1% 100mW",
+      "factory_package": "0603",
+      "factory_category": "贴片电阻",
+      "assembly_total": 2,
+      "factory_supply_quantity": 2
+    },
+    {
+      "excel_row": 21,
+      "designators": [
+        "J8",
+        "J9"
+      ],
+      "quantity_per_board": 2,
+      "original_supplier_part": "C27438",
+      "factory_supplier_part": "C27438",
+      "original_model": "2.54-1*8P母环保",
+      "factory_model": "2.54-1*8P母环保",
+      "footprint": "HDR-TH_8P-P2.54-V-F",
+      "factory_description": "【插件】1x8P 间距:2.54mm 直插",
+      "factory_package": "插件,P=2.54mm",
+      "factory_category": "排母",
+      "assembly_total": 4,
+      "factory_supply_quantity": 4
+    },
+    {
+      "excel_row": 22,
+      "designators": [
+        "R3"
+      ],
+      "quantity_per_board": 1,
+      "original_supplier_part": "C25952",
+      "factory_supplier_part": "C25952",
+      "original_model": "0603WAF1332T5E",
+      "factory_model": "0603WAF1332T5E",
+      "footprint": "R0603",
+      "factory_description": "厚膜电阻 13.3kΩ ±1% 100mW",
+      "factory_package": "0603",
+      "factory_category": "贴片电阻",
+      "assembly_total": 2,
+      "factory_supply_quantity": 20
+    }
+  ]
+}

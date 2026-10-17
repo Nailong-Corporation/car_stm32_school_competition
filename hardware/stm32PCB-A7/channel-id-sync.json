@@ -1,0 +1,97 @@
+[
+  {
+    "designator": "C1",
+    "before": "$1I8",
+    "after": "$1I7"
+  },
+  {
+    "designator": "C2",
+    "before": "$1I9",
+    "after": "$1I8"
+  },
+  {
+    "designator": "C3",
+    "before": "$1I10",
+    "after": "$1I9"
+  },
+  {
+    "designator": "C4",
+    "before": "$1I11",
+    "after": "$1I10"
+  },
+  {
+    "designator": "R1",
+    "before": "$1I147",
+    "after": "$1I146"
+  },
+  {
+    "designator": "SW1",
+    "before": "$1I7",
+    "after": "$1I150"
+  },
+  {
+    "designator": "C5",
+    "before": "$3I6",
+    "after": "$3I5"
+  },
+  {
+    "designator": "C6",
+    "before": "$3I7",
+    "after": "$3I6"
+  },
+  {
+    "designator": "C7",
+    "before": "$3I8",
+    "after": "$3I7"
+  },
+  {
+    "designator": "C8",
+    "before": "$3I9",
+    "after": "$3I8"
+  },
+  {
+    "designator": "C9",
+    "before": "$3I47",
+    "after": "$3I46"
+  },
+  {
+    "designator": "C10",
+    "before": "$3I52",
+    "after": "$3I51"
+  },
+  {
+    "designator": "C11",
+    "before": "$3I12",
+    "after": "$3I11"
+  },
+  {
+    "designator": "D1",
+    "before": "$3I42",
+    "after": "$3I41"
+  },
+  {
+    "designator": "L1",
+    "before": "$3I5",
+    "after": "$3I4"
+  },
+  {
+    "designator": "R2",
+    "before": "$3I10",
+    "after": "$3I9"
+  },
+  {
+    "designator": "R3",
+    "before": "$3I11",
+    "after": "$3I10"
+  },
+  {
+    "designator": "R4",
+    "before": "$3I39",
+    "after": "$3I38"
+  },
+  {
+    "designator": "U4",
+    "before": "$3I4",
+    "after": "$3I56"
+  }
+]

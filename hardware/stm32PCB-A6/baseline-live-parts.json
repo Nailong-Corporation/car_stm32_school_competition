@@ -1,0 +1,2555 @@
+[
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 417.3274,
+    "y": 2663.3355,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "DC-005-5A-2.0",
+        "source": "",
+        "uuid": "157e30971a217545"
+      }
+    },
+    "primitiveId": "bb675b11af76b6df",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "933803f53a5c1523",
+      "name": "DC-IN-TH_DC-005-5A-2.0"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "a22f313e2e2f40b7840423482609346e|0819f05c4eef4c71ace90d822a990e87",
+      "name": "DC-IN-TH_L14.4-W9.0-H11.0"
+    },
+    "designator": "J13",
+    "pads": [
+      {
+        "primitiveId": "e15",
+        "net": "DC_RAW",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e16",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e17",
+        "net": "",
+        "padNumber": "3"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge24",
+    "manufacturer": "XKB Connection(中国星坤)",
+    "manufacturerId": "DC-005-5A-2.0",
+    "supplier": "LCSC",
+    "supplierId": "C381116",
+    "otherProperty": {
+      "Footprint": "DC-IN-TH_DC-005-5A-2.0",
+      "LCSC Part Name": "DC电源插座 内径:2mm 外径:6.2mm",
+      "Supplier Footprint": "插件",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/DC-005-5A-2.0/353348.html",
+      "3D Model": "a22f313e2e2f40b7840423482609346e|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "DC-IN-TH_L14.4-W9.0-H11.0",
+      "3D Model Transform": "366.141,566.928,0,270,0,0,-143.701,86.614,-157.48",
+      "Connector Type": "DC电源插座",
+      "Mounting Type": "弯插",
+      "Inside Contact Diameter": "2mm",
+      "Outside Contact Diameter": "6.2mm",
+      "Current Rating": "5A",
+      "Voltage Rating (Max)": "24V",
+      "Body Height": "11mm",
+      "Length": "14mm",
+      "Width": "9mm",
+      "Operating Temperature": "-20℃~+70℃",
+      "Description": "连接器类型:DC电源插座;安装方式:弯插;触点内径:2mm;触点外径:6.2mm;额定电流:5A;额定电压:24V;工作温度:-20℃~+70℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I2"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 326.80369999999994,
+    "y": 2401.6048,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "SMD2920P300TF/24",
+        "source": "",
+        "uuid": "e0bbde4ff3476ac9"
+      }
+    },
+    "primitiveId": "f17717134c83caee",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "47281b85f2373d12",
+      "name": "F2920"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "c20979b6eed84fe694c25fdbe1326c05|0819f05c4eef4c71ace90d822a990e87",
+      "name": "F2920-1"
+    },
+    "designator": "F1",
+    "pads": [
+      {
+        "primitiveId": "e12",
+        "net": "DC_RAW",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e13",
+        "net": "DC_FUSED",
+        "padNumber": "2"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge25",
+    "manufacturer": "RUILON(瑞隆源)",
+    "manufacturerId": "SMD2920P300TF/24",
+    "supplier": "LCSC",
+    "supplierId": "C39831901",
+    "otherProperty": {
+      "Footprint": "F2920",
+      "LCSC Part Name": "24V 3A",
+      "Supplier Footprint": "2920",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/SMD2920P300TF%252F24/41556431.html",
+      "3D Model": "c20979b6eed84fe694c25fdbe1326c05|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "F2920-1",
+      "3D Model Transform": "289.7632,201.5744,0,0,0,0,0,0,0",
+      "Voltage - Max": "24V",
+      "Current - Max": "40A",
+      "Hold Current": "3A",
+      "Trip Current": "6A",
+      "Power Dissipation": "12mW",
+      "Resistance - Initial (Ri) (Min)": "48mΩ",
+      "Resistance - Post Trip (R1) (Max)": "48mΩ",
+      "Time to Trip(Max)": "20s",
+      "Operating Temperature": "-40℃~+85℃",
+      "Length": "7.98mm",
+      "Width": "5.44mm",
+      "Height": "1.6mm",
+      "Pitch": "-",
+      "Description": "耐压(Vmax):24V;最大电流(Imax):40A;保持电流(Ihold):3A;跳闸电流(Itrip):6A;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I3"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 719.3323,
+    "y": 3070.8213,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-M_2.54_1x2P",
+        "source": "",
+        "uuid": "8ceeac63de570b89"
+      }
+    },
+    "primitiveId": "bf4a902bd8d9e690",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "58b80f838b008c20",
+      "name": "HDR-TH_2P-P2.54-V-M-1"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-M-2.54_1x2"
+    },
+    "designator": "J1",
+    "pads": [
+      {
+        "primitiveId": "e6",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e7",
+        "net": "+5V",
+        "padNumber": "1"
+      }
+    ],
+    "name": "B-2100S02P-A110",
+    "uniqueId": "gge4",
+    "manufacturer": "Ckmtw(灿科盟)",
+    "manufacturerId": "B-2100S02P-A110",
+    "supplier": "LCSC",
+    "supplierId": "C124375",
+    "otherProperty": {
+      "Footprint": "HDR-TH_2P-P2.54-V-M-1",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-M-2.54_1x2",
+      "3D Model Transform": "200,100,0,0,0,0,0,0,-118.11",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "J1"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1591.7588,
+    "y": 2716.5389,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "2.54-1*10P针",
+        "source": "",
+        "uuid": "54e39ea82b34d4d8"
+      }
+    },
+    "primitiveId": "df71116d063cd41a",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "66eacbafb6b3ed50",
+      "name": "HDR-TH_10P-P2.54-V-M-1"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "10f3d1cea59e4bb4ba116af9f09c2b9b|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR2.54-M-LI-1X10P"
+    },
+    "designator": "J11",
+    "pads": [
+      {
+        "primitiveId": "e18",
+        "net": "GND",
+        "padNumber": "10"
+      },
+      {
+        "primitiveId": "e19",
+        "net": "PA15",
+        "padNumber": "9"
+      },
+      {
+        "primitiveId": "e20",
+        "net": "PA12",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e21",
+        "net": "PA11",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e22",
+        "net": "PA10",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e23",
+        "net": "PA9",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e24",
+        "net": "PA8",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e25",
+        "net": "PC15",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e26",
+        "net": "PC14",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e27",
+        "net": "PC13",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge22",
+    "manufacturer": "BOOMELE(博穆精密)",
+    "manufacturerId": "2.54-1*10P针",
+    "supplier": "LCSC",
+    "supplierId": "C57369",
+    "otherProperty": {
+      "Footprint": "HDR-TH_10P-P2.54-V-M-1",
+      "LCSC Part Name": "1x10P 间距:2.54mm 方针 直插",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://atta.szlcsc.com/upload/public/pdf/source/20151109/1457707572883.pdf",
+      "3D Model": "10f3d1cea59e4bb4ba116af9f09c2b9b|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR2.54-M-LI-1X10P",
+      "3D Model Transform": "999.99796,100,0,0,0,0,0,0,-118.11",
+      "Pin Structure": "1x10P",
+      "Pitch": "2.54mm",
+      "Row Spacing": "-",
+      "Circluar Pins/Square Pins": "方针",
+      "Mounting Type": "直插",
+      "Number of Rows": "单排",
+      "Number of Pins": "10P",
+      "Current Rating": "3A",
+      "Voltage Rating (Max)": "-",
+      "Length of Mating Pin": "-",
+      "Insulation Height": "-",
+      "Length of End Connection Pin": "-",
+      "Contact Material": "-",
+      "Contact Plating": "-",
+      "Operating Temperature": "-40℃~+105℃",
+      "Color": "黑色",
+      "Description": "插针结构:1x10P;间距:2.54mm;行距:-;圆针/方针:方针;安装方式:直插;排数:单排;总PIN位数:10P;额定电流:3A;额定电压:-;配合针长度:-;塑高:-;端接针长度:-;触头材质:-;触头镀层:-;工作温度:-40℃~+105℃;颜色:黑色;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I93"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 2733.4749,
+    "y": 2716.5389,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "2.54-1*10P针",
+        "source": "",
+        "uuid": "54e39ea82b34d4d8"
+      }
+    },
+    "primitiveId": "46e66cf040578f7a",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "66eacbafb6b3ed50",
+      "name": "HDR-TH_10P-P2.54-V-M-1"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "10f3d1cea59e4bb4ba116af9f09c2b9b|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR2.54-M-LI-1X10P"
+    },
+    "designator": "J12",
+    "pads": [
+      {
+        "primitiveId": "e18",
+        "net": "+3V3",
+        "padNumber": "10"
+      },
+      {
+        "primitiveId": "e19",
+        "net": "VBAT_EXT",
+        "padNumber": "9"
+      },
+      {
+        "primitiveId": "e20",
+        "net": "NRST",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e21",
+        "net": "PB11",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e22",
+        "net": "PB9",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e23",
+        "net": "PB8",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e24",
+        "net": "PB7",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e25",
+        "net": "PB6",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e26",
+        "net": "PB4",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e27",
+        "net": "PB3",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge23",
+    "manufacturer": "BOOMELE(博穆精密)",
+    "manufacturerId": "2.54-1*10P针",
+    "supplier": "LCSC",
+    "supplierId": "C57369",
+    "otherProperty": {
+      "Footprint": "HDR-TH_10P-P2.54-V-M-1",
+      "LCSC Part Name": "1x10P 间距:2.54mm 方针 直插",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://atta.szlcsc.com/upload/public/pdf/source/20151109/1457707572883.pdf",
+      "3D Model": "10f3d1cea59e4bb4ba116af9f09c2b9b|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR2.54-M-LI-1X10P",
+      "3D Model Transform": "999.99796,100,0,0,0,0,0,0,-118.11",
+      "Pin Structure": "1x10P",
+      "Pitch": "2.54mm",
+      "Row Spacing": "-",
+      "Circluar Pins/Square Pins": "方针",
+      "Mounting Type": "直插",
+      "Number of Rows": "单排",
+      "Number of Pins": "10P",
+      "Current Rating": "3A",
+      "Voltage Rating (Max)": "-",
+      "Length of Mating Pin": "-",
+      "Insulation Height": "-",
+      "Length of End Connection Pin": "-",
+      "Contact Material": "-",
+      "Contact Plating": "-",
+      "Operating Temperature": "-40℃~+105℃",
+      "Color": "黑色",
+      "Description": "插针结构:1x10P;间距:2.54mm;行距:-;圆针/方针:方针;安装方式:直插;排数:单排;总PIN位数:10P;额定电流:3A;额定电压:-;配合针长度:-;塑高:-;端接针长度:-;触头材质:-;触头镀层:-;工作温度:-40℃~+105℃;颜色:黑色;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I104"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1543.3008,
+    "y": 1122.054,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CC0603KRX7R9BB104",
+        "source": "",
+        "uuid": "72172595996216f9"
+      }
+    },
+    "primitiveId": "5b0a4a53a0ad2d69",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "1e98543ada097e49",
+      "name": "C0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0603_L1.6-W0.8-H0.8"
+    },
+    "designator": "C1",
+    "pads": [
+      {
+        "primitiveId": "e14",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "100nF",
+    "uniqueId": "gge11",
+    "manufacturer": "YAGEO(国巨)",
+    "manufacturerId": "CC0603KRX7R9BB104",
+    "supplier": "LCSC",
+    "supplierId": "C14663",
+    "otherProperty": {
+      "Footprint": "C0603",
+      "LCSC Part Name": "100nF ±10% 50V",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html",
+      "3D Model": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+      "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+      "Value": "100nF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "50V",
+      "Temperature Coefficient": "X7R",
+      "Description": "容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I8"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1437.0272,
+    "y": 1220.4792,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CL21A106KAYNNNE_C15850",
+        "source": "",
+        "uuid": "fc73dee9136c7392"
+      }
+    },
+    "primitiveId": "20a68f38c518afbd",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "324ed1602436866f",
+      "name": "C0805"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "1ba041120af144c991958decab20d241|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0805_L2.0-W1.3-H1.3"
+    },
+    "designator": "C2",
+    "pads": [
+      {
+        "primitiveId": "e15",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e16",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "10uF",
+    "uniqueId": "gge12",
+    "manufacturer": "SAMSUNG(三星)",
+    "manufacturerId": "CL21A106KAYNNNE",
+    "supplier": "LCSC",
+    "supplierId": "C15850",
+    "otherProperty": {
+      "Footprint": "C0805",
+      "LCSC Part Name": "10uF ±10% 25V",
+      "Supplier Footprint": "0805",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CL21A106KAYNNNE/16532.html",
+      "3D Model": "1ba041120af144c991958decab20d241|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0805_L2.0-W1.3-H1.3",
+      "3D Model Transform": "78.74,51.181,0,0,0,0,0,0.0005,0",
+      "Value": "10uF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "25V",
+      "Temperature Coefficient": "X5R",
+      "Description": "容值:10uF;精度:±10%;额定电压:25V;温度系数:X5R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I9"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1748.0342,
+    "y": 1122.0737,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CC0603KRX7R9BB104",
+        "source": "",
+        "uuid": "72172595996216f9"
+      }
+    },
+    "primitiveId": "9ecf5da8b57ec1dc",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "1e98543ada097e49",
+      "name": "C0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0603_L1.6-W0.8-H0.8"
+    },
+    "designator": "C3",
+    "pads": [
+      {
+        "primitiveId": "e14",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "+3V3",
+        "padNumber": "1"
+      }
+    ],
+    "name": "100nF",
+    "uniqueId": "gge13",
+    "manufacturer": "YAGEO(国巨)",
+    "manufacturerId": "CC0603KRX7R9BB104",
+    "supplier": "LCSC",
+    "supplierId": "C14663",
+    "otherProperty": {
+      "Footprint": "C0603",
+      "LCSC Part Name": "100nF ±10% 50V",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html",
+      "3D Model": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+      "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+      "Value": "100nF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "50V",
+      "Temperature Coefficient": "X7R",
+      "Description": "容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I10"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1870.1071,
+    "y": 1220.4989,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CL21A106KAYNNNE_C15850",
+        "source": "",
+        "uuid": "fc73dee9136c7392"
+      }
+    },
+    "primitiveId": "39fa1388e63cf98b",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "324ed1602436866f",
+      "name": "C0805"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "1ba041120af144c991958decab20d241|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0805_L2.0-W1.3-H1.3"
+    },
+    "designator": "C4",
+    "pads": [
+      {
+        "primitiveId": "e15",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e16",
+        "net": "+3V3",
+        "padNumber": "1"
+      }
+    ],
+    "name": "10uF",
+    "uniqueId": "gge14",
+    "manufacturer": "SAMSUNG(三星)",
+    "manufacturerId": "CL21A106KAYNNNE",
+    "supplier": "LCSC",
+    "supplierId": "C15850",
+    "otherProperty": {
+      "Footprint": "C0805",
+      "LCSC Part Name": "10uF ±10% 25V",
+      "Supplier Footprint": "0805",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CL21A106KAYNNNE/16532.html",
+      "3D Model": "1ba041120af144c991958decab20d241|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0805_L2.0-W1.3-H1.3",
+      "3D Model Transform": "78.74,51.181,0,0,0,0,0,0.0005,0",
+      "Value": "10uF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "25V",
+      "Temperature Coefficient": "X5R",
+      "Description": "容值:10uF;精度:±10%;额定电压:25V;温度系数:X5R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I11"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 830.4109,
+    "y": 1413.4293,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CL31A226KAHNNNE",
+        "source": "",
+        "uuid": "8d8d6a970b39736c"
+      }
+    },
+    "primitiveId": "ecc08cb5735bd78b",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "9af8eb40f8196088",
+      "name": "C1206"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C1206_L3.2-W1.6-H1.3"
+    },
+    "designator": "C5",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "VIN_PROTECTED",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge29",
+    "manufacturer": "SAMSUNG(三星)",
+    "manufacturerId": "CL31A226KAHNNNE",
+    "supplier": "LCSC",
+    "supplierId": "C12891",
+    "otherProperty": {
+      "Footprint": "C1206",
+      "LCSC Part Name": "22uF ±10% 25V",
+      "Supplier Footprint": "1206",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CL31A226KAHNNNE/13537.html",
+      "3D Model": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C1206_L3.2-W1.6-H1.3",
+      "3D Model Transform": "125.984,62.992,0,0,0,0,0,0,0",
+      "Value": "22uF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "25V",
+      "Temperature Coefficient": "X5R",
+      "Description": "容值:22uF;精度:±10%;额定电压:25V;温度系数:X5R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I6"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 830.4539,
+    "y": 1311.0671,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CL31A226KAHNNNE",
+        "source": "",
+        "uuid": "8d8d6a970b39736c"
+      }
+    },
+    "primitiveId": "86c8465ab79c8be6",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "9af8eb40f8196088",
+      "name": "C1206"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C1206_L3.2-W1.6-H1.3"
+    },
+    "designator": "C6",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "VIN_PROTECTED",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge30",
+    "manufacturer": "SAMSUNG(三星)",
+    "manufacturerId": "CL31A226KAHNNNE",
+    "supplier": "LCSC",
+    "supplierId": "C12891",
+    "otherProperty": {
+      "Footprint": "C1206",
+      "LCSC Part Name": "22uF ±10% 25V",
+      "Supplier Footprint": "1206",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CL31A226KAHNNNE/13537.html",
+      "3D Model": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C1206_L3.2-W1.6-H1.3",
+      "3D Model Transform": "125.984,62.992,0,0,0,0,0,0,0",
+      "Value": "22uF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "25V",
+      "Temperature Coefficient": "X5R",
+      "Description": "容值:22uF;精度:±10%;额定电压:25V;温度系数:X5R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I7"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 736.2361,
+    "y": 1507.9065,
+    "rotation": -90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CC0603KRX7R9BB104",
+        "source": "",
+        "uuid": "72172595996216f9"
+      }
+    },
+    "primitiveId": "5a25c67cd558ae42",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "1e98543ada097e49",
+      "name": "C0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0603_L1.6-W0.8-H0.8"
+    },
+    "designator": "C7",
+    "pads": [
+      {
+        "primitiveId": "e14",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "VIN_PROTECTED",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge31",
+    "manufacturer": "YAGEO(国巨)",
+    "manufacturerId": "CC0603KRX7R9BB104",
+    "supplier": "LCSC",
+    "supplierId": "C14663",
+    "otherProperty": {
+      "Footprint": "C0603",
+      "LCSC Part Name": "100nF ±10% 50V",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html",
+      "3D Model": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+      "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+      "Value": "100nF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "50V",
+      "Temperature Coefficient": "X7R",
+      "Description": "容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I8"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 503.97890000000007,
+    "y": 1598.4142,
+    "rotation": -90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CC0603KRX7R9BB104",
+        "source": "",
+        "uuid": "72172595996216f9"
+      }
+    },
+    "primitiveId": "2d20fa7ac4e685ab",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "1e98543ada097e49",
+      "name": "C0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0603_L1.6-W0.8-H0.8"
+    },
+    "designator": "C8",
+    "pads": [
+      {
+        "primitiveId": "e14",
+        "net": "BUCK_SW",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "BUCK_BOOT",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge32",
+    "manufacturer": "YAGEO(国巨)",
+    "manufacturerId": "CC0603KRX7R9BB104",
+    "supplier": "LCSC",
+    "supplierId": "C14663",
+    "otherProperty": {
+      "Footprint": "C0603",
+      "LCSC Part Name": "100nF ±10% 50V",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html",
+      "3D Model": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+      "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+      "Value": "100nF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "50V",
+      "Temperature Coefficient": "X7R",
+      "Description": "容值:100nF;精度:±10%;额定电压:50V;温度系数:X7R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I9"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 771.3293,
+    "y": 826.8151,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CL31A226KAHNNNE",
+        "source": "",
+        "uuid": "8d8d6a970b39736c"
+      }
+    },
+    "primitiveId": "489609db32421c0f",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "9af8eb40f8196088",
+      "name": "C1206"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C1206_L3.2-W1.6-H1.3"
+    },
+    "designator": "C9",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge33",
+    "manufacturer": "SAMSUNG(三星)",
+    "manufacturerId": "CL31A226KAHNNNE",
+    "supplier": "LCSC",
+    "supplierId": "C12891",
+    "otherProperty": {
+      "Footprint": "C1206",
+      "LCSC Part Name": "22uF ±10% 25V",
+      "Supplier Footprint": "1206",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CL31A226KAHNNNE/13537.html",
+      "3D Model": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C1206_L3.2-W1.6-H1.3",
+      "3D Model Transform": "125.984,62.992,0,0,0,0,0,0,0",
+      "Value": "22uF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "25V",
+      "Temperature Coefficient": "X5R",
+      "Description": "容值:22uF;精度:±10%;额定电压:25V;温度系数:X5R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I47"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 771.3193,
+    "y": 716.5789,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CL31A226KAHNNNE",
+        "source": "",
+        "uuid": "8d8d6a970b39736c"
+      }
+    },
+    "primitiveId": "0afeb52441b190d6",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "9af8eb40f8196088",
+      "name": "C1206"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C1206_L3.2-W1.6-H1.3"
+    },
+    "designator": "C10",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge34",
+    "manufacturer": "SAMSUNG(三星)",
+    "manufacturerId": "CL31A226KAHNNNE",
+    "supplier": "LCSC",
+    "supplierId": "C12891",
+    "otherProperty": {
+      "Footprint": "C1206",
+      "LCSC Part Name": "22uF ±10% 25V",
+      "Supplier Footprint": "1206",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CL31A226KAHNNNE/13537.html",
+      "3D Model": "e4be705b945545a48e666415e3682bd8|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C1206_L3.2-W1.6-H1.3",
+      "3D Model Transform": "125.984,62.992,0,0,0,0,0,0,0",
+      "Value": "22uF",
+      "Tolerance": "±10%",
+      "Voltage Rating": "25V",
+      "Temperature Coefficient": "X5R",
+      "Description": "容值:22uF;精度:±10%;额定电压:25V;温度系数:X5R;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I52"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 936.9856,
+    "y": 1783.4546,
+    "rotation": -90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "CC0603JRNPO9BN750",
+        "source": "",
+        "uuid": "1fa075c80f9fd1f8"
+      }
+    },
+    "primitiveId": "3f6252c8da2f4040",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "1e98543ada097e49",
+      "name": "C0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "name": "C0603_L1.6-W0.8-H0.8"
+    },
+    "designator": "C11",
+    "pads": [
+      {
+        "primitiveId": "e14",
+        "net": "BUCK_FB",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge37",
+    "manufacturer": "YAGEO(国巨)",
+    "manufacturerId": "CC0603JRNPO9BN750",
+    "supplier": "LCSC",
+    "supplierId": "C282074",
+    "otherProperty": {
+      "Footprint": "C0603",
+      "LCSC Part Name": "75pF ±5% 50V",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/CC0603JRNPO9BN750/268161.html",
+      "3D Model": "ac125912035d415993ca9572d50418b1|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+      "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+      "Value": "75pF",
+      "Tolerance": "±5%",
+      "Voltage Rating": "50V",
+      "Temperature Coefficient": "NP0",
+      "Description": "容值:75pF;精度:±5%;额定电压:50V;温度系数:NP0;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I12"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 275.5414,
+    "y": 2034.8938,
+    "rotation": 90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "SS54-C",
+        "source": "",
+        "uuid": "a21df232e181fa59"
+      }
+    },
+    "primitiveId": "a73a89b54bb66a9e",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "80e2a660328472cb",
+      "name": "SMC_L6.9-W5.9-LS7.9-RD"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "181deed3e51b4528a83dd624c23bafda|0819f05c4eef4c71ace90d822a990e87",
+      "name": "SMC_L6.9-W5.9-LS7.9-RD"
+    },
+    "designator": "D1",
+    "pads": [
+      {
+        "primitiveId": "e20",
+        "net": "DC_FUSED",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e21",
+        "net": "VIN_PROTECTED",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge26",
+    "manufacturer": "AnBon(安邦)",
+    "manufacturerId": "SS54-C",
+    "supplier": "LCSC",
+    "supplierId": "C397626",
+    "otherProperty": {
+      "Footprint": "SMC_L6.9-W5.9-LS7.9-RD",
+      "LCSC Part Name": "5.0A 表面贴装肖特基整流二极管",
+      "Supplier Footprint": "SMC(DO-214AB)",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/SS54-C/379149.html",
+      "3D Model": "181deed3e51b4528a83dd624c23bafda|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "SMC_L6.9-W5.9-LS7.9-RD",
+      "3D Model Transform": "314.96,236.22,0,0,0,0,0,0,0",
+      "Diode Configuration": "独立式",
+      "Voltage - Forward(Vf@If)": "550mV@5A",
+      "Voltage - DC Reverse(Vr)": "40V",
+      "Current - Rectified": "5A",
+      "Reverse Leakage Current (Ir)": "500uA@40V",
+      "Non-Repetitive Peak Forward Surge Current": "120A",
+      "Description": "二极管配置:独立式;正向压降(Vf):550mV@5A;直流反向耐压(Vr):40V;整流电流:5A;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I42"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 522.4909,
+    "y": 551.2118,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-M_2.54_1x2P",
+        "source": "",
+        "uuid": "8ceeac63de570b89"
+      }
+    },
+    "primitiveId": "118ece01c617a0fd",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "58b80f838b008c20",
+      "name": "HDR-TH_2P-P2.54-V-M-1"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-M-2.54_1x2"
+    },
+    "designator": "J2",
+    "pads": [
+      {
+        "primitiveId": "e6",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e7",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "B-2100S02P-A110",
+    "uniqueId": "gge5",
+    "manufacturer": "Ckmtw(灿科盟)",
+    "manufacturerId": "B-2100S02P-A110",
+    "supplier": "LCSC",
+    "supplierId": "C124375",
+    "otherProperty": {
+      "Footprint": "HDR-TH_2P-P2.54-V-M-1",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-M-2.54_1x2",
+      "3D Model Transform": "200,100,0,0,0,0,0,0,-118.11",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I4"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1220.4724,
+    "y": 758.626,
+    "rotation": 90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-M_2.54_1x2P",
+        "source": "",
+        "uuid": "8ceeac63de570b89"
+      }
+    },
+    "primitiveId": "912559acd08ce230",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "58b80f838b008c20",
+      "name": "HDR-TH_2P-P2.54-V-M-1"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-M-2.54_1x2"
+    },
+    "designator": "J3",
+    "pads": [
+      {
+        "primitiveId": "e6",
+        "net": "AO2",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e7",
+        "net": "AO1",
+        "padNumber": "1"
+      }
+    ],
+    "name": "B-2100S02P-A110",
+    "uniqueId": "gge6",
+    "manufacturer": "Ckmtw(灿科盟)",
+    "manufacturerId": "B-2100S02P-A110",
+    "supplier": "LCSC",
+    "supplierId": "C124375",
+    "otherProperty": {
+      "Footprint": "HDR-TH_2P-P2.54-V-M-1",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-M-2.54_1x2",
+      "3D Model Transform": "200,100,0,0,0,0,0,0,-118.11",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I5"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 2716.5354,
+    "y": 758.641,
+    "rotation": 90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-M_2.54_1x2P",
+        "source": "",
+        "uuid": "8ceeac63de570b89"
+      }
+    },
+    "primitiveId": "fcf1c12a2f0b89e9",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "58b80f838b008c20",
+      "name": "HDR-TH_2P-P2.54-V-M-1"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-M-2.54_1x2"
+    },
+    "designator": "J4",
+    "pads": [
+      {
+        "primitiveId": "e6",
+        "net": "BO2",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e7",
+        "net": "BO1",
+        "padNumber": "1"
+      }
+    ],
+    "name": "B-2100S02P-A110",
+    "uniqueId": "gge7",
+    "manufacturer": "Ckmtw(灿科盟)",
+    "manufacturerId": "B-2100S02P-A110",
+    "supplier": "LCSC",
+    "supplierId": "C124375",
+    "otherProperty": {
+      "Footprint": "HDR-TH_2P-P2.54-V-M-1",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "79b2e9f2d70a4d68a1b7098f27c6d4c5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-M-2.54_1x2",
+      "3D Model Transform": "200,100,0,0,0,0,0,0,-118.11",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I6"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1968.5043,
+    "y": 3228.3641,
+    "rotation": 180,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-F_2.54_1x10P",
+        "source": "",
+        "uuid": "f0c5c23fd4d0618c"
+      }
+    },
+    "primitiveId": "e78e17c561b61e5a",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "790f6a4a6045d41a",
+      "name": "HDR-TH_10P-P2.54-V-F"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "08a5ee31ec6747838a696d2ac093ffa4|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-TH_10P-P2.54-F-LI-1X10P"
+    },
+    "designator": "J10",
+    "pads": [
+      {
+        "primitiveId": "e18",
+        "net": "S7",
+        "padNumber": "10"
+      },
+      {
+        "primitiveId": "e19",
+        "net": "S6",
+        "padNumber": "9"
+      },
+      {
+        "primitiveId": "e20",
+        "net": "S5",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e21",
+        "net": "S4",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e22",
+        "net": "S3",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e23",
+        "net": "S2",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e24",
+        "net": "S1",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e25",
+        "net": "S0",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e26",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e27",
+        "net": "+3V3",
+        "padNumber": "1"
+      }
+    ],
+    "name": "X5511FV-10-C70D30-1000",
+    "uniqueId": "gge19",
+    "manufacturer": "XKB Connection(中国星坤)",
+    "manufacturerId": "X5511FV-10-C70D30-1000",
+    "supplier": "LCSC",
+    "supplierId": "C2684744",
+    "otherProperty": {
+      "Footprint": "HDR-TH_10P-P2.54-V-F",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "08a5ee31ec6747838a696d2ac093ffa4|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-TH_10P-P2.54-F-LI-1X10P",
+      "3D Model Transform": "1009.87987,100,0,0,0,0,0,0,-125.984",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I42"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 627.9291,
+    "y": 1163.4077,
+    "rotation": -90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "SRP1038A-100M",
+        "source": "",
+        "uuid": "3b37530573f810b0"
+      }
+    },
+    "primitiveId": "d8eda56104134227",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "357b8fe2d4833678",
+      "name": "IND-SMD_L11.0-W10.0"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "ace82c4a2fd2489881d6a760dfc5f25c|0819f05c4eef4c71ace90d822a990e87",
+      "name": "IND-SMD_L11.0-W10.0-H4.0"
+    },
+    "designator": "L1",
+    "pads": [
+      {
+        "primitiveId": "e9",
+        "net": "BUCK_SW",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e10",
+        "net": "VM",
+        "padNumber": "2"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge28",
+    "manufacturer": "BOURNS",
+    "manufacturerId": "SRP1038A-100M",
+    "supplier": "LCSC",
+    "supplierId": "C780184",
+    "otherProperty": {
+      "Footprint": "IND-SMD_L11.0-W10.0",
+      "LCSC Part Name": "10uH ±20% 12A",
+      "Supplier Footprint": "SMD,11x10mm",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/SRP1038A-100M/832151.html",
+      "3D Model": "ace82c4a2fd2489881d6a760dfc5f25c|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "IND-SMD_L11.0-W10.0-H4.0",
+      "3D Model Transform": "433.07,393.704,0,0,0,0,0,0,0",
+      "Value": "10uH",
+      "Tolerance": "±20%",
+      "Current Rating": "7.5A",
+      "Current - Saturation(Isat)": "12A",
+      "DC Resistance(DCR)": "30mΩ",
+      "Type": "-",
+      "Ratings": "AEC-Q200",
+      "Description": "电感值:10uH;精度:±20%;额定电流:7.5A;饱和电流(Isat):12A;类型:-;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I5"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 2588.7041,
+    "y": 472.4235,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "0603WAF1002T5E",
+        "source": "",
+        "uuid": "5a9e95e922fa2156"
+      }
+    },
+    "primitiveId": "2dfd51a94504ec04",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "cf6ba76b0537a3f0",
+      "name": "R0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "fc143cca1e79419f9cd78b61e9279f08|0819f05c4eef4c71ace90d822a990e87",
+      "name": "R0603"
+    },
+    "designator": "R1",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "STBY",
+        "padNumber": "1"
+      }
+    ],
+    "name": "10kΩ",
+    "uniqueId": "gge10",
+    "manufacturer": "UNI-ROYAL(厚声)",
+    "manufacturerId": "0603WAF1002T5E",
+    "supplier": "LCSC",
+    "supplierId": "C25804",
+    "otherProperty": {
+      "Footprint": "R0603",
+      "LCSC Part Name": "厚膜电阻 10kΩ ±1% 100mW",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/0603WAF1002T5E/26547.html",
+      "3D Model": "fc143cca1e79419f9cd78b61e9279f08|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "R0603",
+      "3D Model Transform": "31.8897,63.7794,0,90,0,0,0,0,0",
+      "Type": "厚膜电阻",
+      "Value": "10kΩ",
+      "Tolerance": "±1%",
+      "Power(Watts)": "100mW",
+      "Voltage-Supply(Max)": "75V",
+      "Temperature Coefficient": "±100ppm/℃",
+      "Operating Temperature": "-55℃~+155℃",
+      "Description": "电阻类型:厚膜电阻;阻值:10kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I147"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 807.0561,
+    "y": 1781.3546,
+    "rotation": -90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "0603WAF1003T5E",
+        "source": "",
+        "uuid": "9ec05a2d3602ca41"
+      }
+    },
+    "primitiveId": "fcecd5cfbb385de0",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "cf6ba76b0537a3f0",
+      "name": "R0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "fc143cca1e79419f9cd78b61e9279f08|0819f05c4eef4c71ace90d822a990e87",
+      "name": "R0603"
+    },
+    "designator": "R2",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "BUCK_FB",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge35",
+    "manufacturer": "UNI-ROYAL(厚声)",
+    "manufacturerId": "0603WAF1003T5E",
+    "supplier": "LCSC",
+    "supplierId": "C25803",
+    "otherProperty": {
+      "Footprint": "R0603",
+      "LCSC Part Name": "厚膜电阻 100kΩ ±1%",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/0603WAF1003T5E/26546.html",
+      "3D Model": "fc143cca1e79419f9cd78b61e9279f08|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "R0603",
+      "3D Model Transform": "31.8897,63.7794,0,90,0,0,0,0,0",
+      "Type": "厚膜电阻",
+      "Value": "100kΩ",
+      "Tolerance": "±1%",
+      "Power(Watts)": "100mW",
+      "Voltage-Supply(Max)": "75V",
+      "Temperature Coefficient": "±100ppm/℃",
+      "Operating Temperature": "-55℃~+155℃",
+      "Description": "电阻类型:厚膜电阻;阻值:100kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I10"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 866.0963000000002,
+    "y": 1721.8758,
+    "rotation": -90,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "0603WAF1332T5E",
+        "source": "",
+        "uuid": "c4c2d2724a60aa55"
+      }
+    },
+    "primitiveId": "e7f9e3a0278cbdd4",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "cf6ba76b0537a3f0",
+      "name": "R0603"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "fc143cca1e79419f9cd78b61e9279f08|0819f05c4eef4c71ace90d822a990e87",
+      "name": "R0603"
+    },
+    "designator": "R3",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "BUCK_FB",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge36",
+    "manufacturer": "UNI-ROYAL(厚声)",
+    "manufacturerId": "0603WAF1332T5E",
+    "supplier": "LCSC",
+    "supplierId": "C25952",
+    "otherProperty": {
+      "Footprint": "R0603",
+      "LCSC Part Name": "13.3kΩ ±1% 100mW 厚膜电阻",
+      "Supplier Footprint": "0603",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/0603WAF1332T5E/26695.html",
+      "3D Model": "fc143cca1e79419f9cd78b61e9279f08|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "R0603",
+      "3D Model Transform": "31.8897,63.7794,0,90,0,0,0,0,0",
+      "Type": "厚膜电阻",
+      "Value": "13.3kΩ",
+      "Tolerance": "±1%",
+      "Power(Watts)": "100mW",
+      "Voltage-Supply(Max)": "75V",
+      "Temperature Coefficient": "±100ppm/℃",
+      "Operating Temperature": "-55℃~+155℃",
+      "Description": "电阻类型:厚膜电阻;阻值:13.3kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I11"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 727.5491999999999,
+    "y": 2913.4158,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "1206W4F0000T5E",
+        "source": "",
+        "uuid": "dd617e2c74c93198"
+      }
+    },
+    "primitiveId": "1dd4d0e7564f0a13",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "a4d7b7a64096bf72",
+      "name": "R1206"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "89a1f13db2384da588040e0b3c55bf66|0819f05c4eef4c71ace90d822a990e87",
+      "name": "R1206_L3.2-W1.6-H0.6"
+    },
+    "designator": "R4",
+    "pads": [
+      {
+        "primitiveId": "e11",
+        "net": "+5V",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e12",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Value}",
+    "uniqueId": "gge38",
+    "manufacturer": "UNI-ROYAL(厚声)",
+    "manufacturerId": "1206W4F0000T5E",
+    "supplier": "LCSC",
+    "supplierId": "C17888",
+    "otherProperty": {
+      "Footprint": "R1206",
+      "LCSC Part Name": "厚膜电阻 0Ω ±1%",
+      "Supplier Footprint": "1206",
+      "JLCPCB Part Class": "Basic Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/1206W4F0000T5E/18576.html",
+      "3D Model": "89a1f13db2384da588040e0b3c55bf66|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "R1206_L3.2-W1.6-H0.6",
+      "3D Model Transform": "125.984,62.992,0,0,0,0,0,0,0",
+      "Type": "厚膜电阻",
+      "Value": "0Ω",
+      "Tolerance": "±1%",
+      "Power(Watts)": "250mW",
+      "Voltage-Supply(Max)": "200V",
+      "Temperature Coefficient": "±800ppm/℃",
+      "Operating Temperature": "-55℃~+155℃",
+      "Description": "电阻类型:厚膜电阻;阻值:0Ω;精度:±1%;功率:250mW;工作电压:200V;温度系数:±800ppm/℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I39"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 3358.2384,
+    "y": 895.6345999999999,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "TS-1102S-C-B-B",
+        "source": "",
+        "uuid": "d1abb95af2c73cf3"
+      }
+    },
+    "primitiveId": "0787276ed7003132",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "38b1e01b0f5b4a4a",
+      "name": "KEY-SMD_4P-L6.0-W6.0-P4.50-LS8.6"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "689764239aad449abff2e0f183d7bcc5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "KEY-SMD_4P-L6.0-W6.0-H5.0-LS10.0-P4.50"
+    },
+    "designator": "SW1",
+    "pads": [
+      {
+        "primitiveId": "e11",
+        "net": "BTN",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e12",
+        "net": "BTN",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e13",
+        "net": "GND",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e14",
+        "net": "GND",
+        "padNumber": "4"
+      }
+    ],
+    "name": "TS-1102S-C-B-B",
+    "uniqueId": "gge9",
+    "manufacturer": "XKB Connection(中国星坤)",
+    "manufacturerId": "TS-1102S-C-B-B",
+    "supplier": "LCSC",
+    "supplierId": "C381041",
+    "otherProperty": {
+      "Footprint": "KEY-SMD_4P-L6.0-W6.0-P4.50-LS8.6",
+      "LCSC Part Name": "6*6*4.5mm 立贴 轻触开关",
+      "Supplier Footprint": "SMD-4P,6x6mm",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/TS-1102S-C-B-B/353273.html",
+      "3D Model": "689764239aad449abff2e0f183d7bcc5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "KEY-SMD_4P-L6.0-W6.0-H5.0-LS10.0-P4.50",
+      "3D Model Transform": "354.33,236.22,0,0,0,0,0,0.002,0",
+      "Circuit": "单刀单掷",
+      "Actuator Style": "圆形按钮",
+      "Operating Force": "2.6N",
+      "Mounting Type": "立贴",
+      "Length": "6mm",
+      "Width": "6mm",
+      "Switch Height": "4.5mm",
+      "with Bracket": "不带支架",
+      "Contact Current": "50mA",
+      "Voltage Rating": "12V",
+      "Actuator/Cap Color": "黑色",
+      "With Lamp": "无",
+      "Life": "30万次",
+      "Operating Temperature": "-20℃~+70℃",
+      "Description": "电路结构:单刀单掷;按钮形状:圆形按钮;作用力:2.6N;安装方式:立贴;开关长度:6mm;开关宽度:6mm;开关高度:4.5mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:无;工作寿命:30万次;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$1I7"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 627.962,
+    "y": 1580.6945999999998,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "TPS54302DDCR",
+        "source": "",
+        "uuid": "50b3bfa77264ab3f"
+      }
+    },
+    "primitiveId": "934eca40eb48af43",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "0fbfafe61e11ebe2",
+      "name": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "18da8f6c14a34920b3e136b5c401a119|0819f05c4eef4c71ace90d822a990e87",
+      "name": "SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95"
+    },
+    "designator": "U4",
+    "pads": [
+      {
+        "primitiveId": "e7",
+        "net": "GND",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e8",
+        "net": "BUCK_SW",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e9",
+        "net": "VIN_PROTECTED",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e10",
+        "net": "BUCK_FB",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e11",
+        "net": "",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e12",
+        "net": "BUCK_BOOT",
+        "padNumber": "6"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge27",
+    "manufacturer": "TI(德州仪器)",
+    "manufacturerId": "TPS54302DDCR",
+    "supplier": "LCSC",
+    "supplierId": "C311983",
+    "otherProperty": {
+      "Footprint": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+      "LCSC Part Name": "降压型 3A 4.5V~28V",
+      "Supplier Footprint": "TSOT-23-6",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://www.ti.com/cn/lit/ds/symlink/tps54302.pdf",
+      "3D Model": "18da8f6c14a34920b3e136b5c401a119|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95",
+      "3D Model Transform": "110.236,113.364,0,90,0,0,0.0005,0.0005,0",
+      "Function": "降压型",
+      "Voltage - Supply": "4.5V~28V",
+      "Output Voltage": "-",
+      "Output Current": "3A",
+      "Frequency - Switching": "400kHz",
+      "Operating Temperature": "-40℃~+125℃@(TJ)",
+      "Synchronous Rectifier": "是",
+      "Number of Outputs": "1",
+      "Topology": "降压式",
+      "Quiescent Current": "45uA",
+      "Switch tube (built-in/external)": "内置",
+      "Output Type": "可调",
+      "Features": "轻载高效模式；逐波限流；过流保护；EMI优化(抖频模式)；打嗝限流",
+      "Description": "功能类型:降压型;工作电压:4.5V~28V;输出电压:-;输出电流:3A;输出类型:可调;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$3I4"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1968.4572,
+    "y": 2283.4817,
+    "rotation": 180,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-F_2.54_1x20P",
+        "source": "",
+        "uuid": "7cb80cc4412f5659"
+      }
+    },
+    "primitiveId": "737c51b915db446e",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "0b7ae878ccd88d3a",
+      "name": "HDR-TH_20P-P2.54-V-F"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "db7015f7ad9d48b8a3b1188db02e3429|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-F-2.54_1x20"
+    },
+    "designator": "J6",
+    "pads": [
+      {
+        "primitiveId": "e28",
+        "net": "VBAT_EXT",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e29",
+        "net": "PC13",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e30",
+        "net": "PC14",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e31",
+        "net": "PC15",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e32",
+        "net": "S0",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e33",
+        "net": "S1",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e34",
+        "net": "S2",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e35",
+        "net": "S3",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e36",
+        "net": "S4",
+        "padNumber": "9"
+      },
+      {
+        "primitiveId": "e37",
+        "net": "S5",
+        "padNumber": "10"
+      },
+      {
+        "primitiveId": "e38",
+        "net": "PWMA",
+        "padNumber": "11"
+      },
+      {
+        "primitiveId": "e39",
+        "net": "PWMB",
+        "padNumber": "12"
+      },
+      {
+        "primitiveId": "e40",
+        "net": "S6",
+        "padNumber": "13"
+      },
+      {
+        "primitiveId": "e41",
+        "net": "S7",
+        "padNumber": "14"
+      },
+      {
+        "primitiveId": "e42",
+        "net": "BTN",
+        "padNumber": "15"
+      },
+      {
+        "primitiveId": "e43",
+        "net": "PB11",
+        "padNumber": "16"
+      },
+      {
+        "primitiveId": "e44",
+        "net": "NRST",
+        "padNumber": "17"
+      },
+      {
+        "primitiveId": "e45",
+        "net": "+3V3",
+        "padNumber": "18"
+      },
+      {
+        "primitiveId": "e46",
+        "net": "GND",
+        "padNumber": "19"
+      },
+      {
+        "primitiveId": "e47",
+        "net": "GND",
+        "padNumber": "20"
+      }
+    ],
+    "name": "2.54-1*20P母",
+    "uniqueId": "gge15",
+    "manufacturer": "BOOMELE(博穆精密)",
+    "manufacturerId": "2.54-1*20P母",
+    "supplier": "LCSC",
+    "supplierId": "C50984",
+    "otherProperty": {
+      "Footprint": "HDR-TH_20P-P2.54-V-F",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "db7015f7ad9d48b8a3b1188db02e3429|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-F-2.54_1x20",
+      "3D Model Transform": "1999.996,100,0,0,0,0,0,0,-118.11",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I2"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1968.5322,
+    "y": 1653.4992,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "HDR-F_2.54_1x20P",
+        "source": "",
+        "uuid": "7cb80cc4412f5659"
+      }
+    },
+    "primitiveId": "3ae742a5799ece4f",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "0b7ae878ccd88d3a",
+      "name": "HDR-TH_20P-P2.54-V-F"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "db7015f7ad9d48b8a3b1188db02e3429|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-F-2.54_1x20"
+    },
+    "designator": "J7",
+    "pads": [
+      {
+        "primitiveId": "e28",
+        "net": "AIN1",
+        "padNumber": "1"
+      },
+      {
+        "primitiveId": "e29",
+        "net": "AIN2",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e30",
+        "net": "BIN1",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e31",
+        "net": "BIN2",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e32",
+        "net": "PA8",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e33",
+        "net": "PA9",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e34",
+        "net": "PA10",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e35",
+        "net": "PA11",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e36",
+        "net": "PA12",
+        "padNumber": "9"
+      },
+      {
+        "primitiveId": "e37",
+        "net": "PA15",
+        "padNumber": "10"
+      },
+      {
+        "primitiveId": "e38",
+        "net": "PB3",
+        "padNumber": "11"
+      },
+      {
+        "primitiveId": "e39",
+        "net": "PB4",
+        "padNumber": "12"
+      },
+      {
+        "primitiveId": "e40",
+        "net": "STBY",
+        "padNumber": "13"
+      },
+      {
+        "primitiveId": "e41",
+        "net": "PB6",
+        "padNumber": "14"
+      },
+      {
+        "primitiveId": "e42",
+        "net": "PB7",
+        "padNumber": "15"
+      },
+      {
+        "primitiveId": "e43",
+        "net": "PB8",
+        "padNumber": "16"
+      },
+      {
+        "primitiveId": "e44",
+        "net": "PB9",
+        "padNumber": "17"
+      },
+      {
+        "primitiveId": "e45",
+        "net": "+5V",
+        "padNumber": "18"
+      },
+      {
+        "primitiveId": "e46",
+        "net": "GND",
+        "padNumber": "19"
+      },
+      {
+        "primitiveId": "e47",
+        "net": "+3V3",
+        "padNumber": "20"
+      }
+    ],
+    "name": "2.54-1*20P母",
+    "uniqueId": "gge16",
+    "manufacturer": "BOOMELE(博穆精密)",
+    "manufacturerId": "2.54-1*20P母",
+    "supplier": "LCSC",
+    "supplierId": "C50984",
+    "otherProperty": {
+      "Footprint": "HDR-TH_20P-P2.54-V-F",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "3D Model": "db7015f7ad9d48b8a3b1188db02e3429|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-F-2.54_1x20",
+      "3D Model Transform": "1999.996,100,0,0,0,0,0,0,-118.11",
+      "Description": "",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I17"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1968.4572,
+    "y": 1003.9686,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "2.54-1*8P母环保",
+        "source": "",
+        "uuid": "b5b927374d9ed737"
+      }
+    },
+    "primitiveId": "dcf163b51d6960d0",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "c6fa3c8b89455baa",
+      "name": "HDR-TH_8P-P2.54-V-F"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "6ab1dac21d924c3d8eea0dfa46d42ff5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-TH_8P-P2.54-V-F"
+    },
+    "designator": "J8",
+    "pads": [
+      {
+        "primitiveId": "e13",
+        "net": "GND",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e14",
+        "net": "BO1",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "BO2",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e16",
+        "net": "AO2",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e17",
+        "net": "AO1",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e18",
+        "net": "GND",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e19",
+        "net": "+3V3",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e20",
+        "net": "VM",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge20",
+    "manufacturer": "BOOMELE(博穆精密)",
+    "manufacturerId": "2.54-1*8P母环保",
+    "supplier": "LCSC",
+    "supplierId": "C27438",
+    "otherProperty": {
+      "Footprint": "HDR-TH_8P-P2.54-V-F",
+      "LCSC Part Name": "1x8P 间距:2.54mm 直插",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/2.54-1*8P%25E6%25AF%258D%25E7%258E%25AF%25E4%25BF%259D/28187.html",
+      "3D Model": "6ab1dac21d924c3d8eea0dfa46d42ff5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-TH_8P-P2.54-V-F",
+      "3D Model Transform": "819.723,98.425,0,0,0,0,0,0,-118.11",
+      "Holes Structure": "1x8P",
+      "Pitch": "2.54mm",
+      "Row Spacing": "-",
+      "Circular Hole / Square Hole": "方孔",
+      "Mounting Type": "直插",
+      "Number of Rows": "单排",
+      "Number of Positions": "8P",
+      "Current Rating": "3A",
+      "Holes Direction": "顶部",
+      "Insulation Height": "8.5mm",
+      "Contact Material": "黄铜",
+      "Contact Plating": "金",
+      "Operating Temperature": "-55℃~+105℃",
+      "PIN Length": "3.2mm",
+      "Description": "插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I71"
+    }
+  },
+  {
+    "async": true,
+    "primitiveType": "Component",
+    "layer": 1,
+    "x": 1968.5322,
+    "y": 373.9961,
+    "rotation": 0,
+    "primitiveLock": false,
+    "addIntoBom": true,
+    "component": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": {
+        "name": "2.54-1*8P母环保",
+        "source": "",
+        "uuid": "b5b927374d9ed737"
+      }
+    },
+    "primitiveId": "c5140c0985bfa4c4",
+    "footprint": {
+      "libraryUuid": "38dd70640a284ac2d76621f3a52a2da6b9a0aaa5c40ad40e8b3a8322907abf5f",
+      "uuid": "c6fa3c8b89455baa",
+      "name": "HDR-TH_8P-P2.54-V-F"
+    },
+    "model3D": {
+      "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+      "uuid": "6ab1dac21d924c3d8eea0dfa46d42ff5|0819f05c4eef4c71ace90d822a990e87",
+      "name": "HDR-TH_8P-P2.54-V-F"
+    },
+    "designator": "J9",
+    "pads": [
+      {
+        "primitiveId": "e13",
+        "net": "GND",
+        "padNumber": "8"
+      },
+      {
+        "primitiveId": "e14",
+        "net": "PWMB",
+        "padNumber": "7"
+      },
+      {
+        "primitiveId": "e15",
+        "net": "BIN2",
+        "padNumber": "6"
+      },
+      {
+        "primitiveId": "e16",
+        "net": "BIN1",
+        "padNumber": "5"
+      },
+      {
+        "primitiveId": "e17",
+        "net": "STBY",
+        "padNumber": "4"
+      },
+      {
+        "primitiveId": "e18",
+        "net": "AIN1",
+        "padNumber": "3"
+      },
+      {
+        "primitiveId": "e19",
+        "net": "AIN2",
+        "padNumber": "2"
+      },
+      {
+        "primitiveId": "e20",
+        "net": "PWMA",
+        "padNumber": "1"
+      }
+    ],
+    "name": "={Manufacturer Part}",
+    "uniqueId": "gge21",
+    "manufacturer": "BOOMELE(博穆精密)",
+    "manufacturerId": "2.54-1*8P母环保",
+    "supplier": "LCSC",
+    "supplierId": "C27438",
+    "otherProperty": {
+      "Footprint": "HDR-TH_8P-P2.54-V-F",
+      "LCSC Part Name": "1x8P 间距:2.54mm 直插",
+      "Supplier Footprint": "插件,P=2.54mm",
+      "JLCPCB Part Class": "Extended Part",
+      "Datasheet": "https://item.szlcsc.com/datasheet/2.54-1*8P%25E6%25AF%258D%25E7%258E%25AF%25E4%25BF%259D/28187.html",
+      "3D Model": "6ab1dac21d924c3d8eea0dfa46d42ff5|0819f05c4eef4c71ace90d822a990e87",
+      "3D Model Title": "HDR-TH_8P-P2.54-V-F",
+      "3D Model Transform": "819.723,98.425,0,0,0,0,0,0,-118.11",
+      "Holes Structure": "1x8P",
+      "Pitch": "2.54mm",
+      "Row Spacing": "-",
+      "Circular Hole / Square Hole": "方孔",
+      "Mounting Type": "直插",
+      "Number of Rows": "单排",
+      "Number of Positions": "8P",
+      "Current Rating": "3A",
+      "Holes Direction": "顶部",
+      "Insulation Height": "8.5mm",
+      "Contact Material": "黄铜",
+      "Contact Plating": "金",
+      "Operating Temperature": "-55℃~+105℃",
+      "PIN Length": "3.2mm",
+      "Description": "插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;",
+      "Reuse Block": "",
+      "Group ID": "",
+      "Channel ID": "$2I73"
+    }
+  }
+]

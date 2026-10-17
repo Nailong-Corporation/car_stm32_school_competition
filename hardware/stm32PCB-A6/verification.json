@@ -1,0 +1,27 @@
+{
+  "revision": "A6",
+  "components": 32,
+  "checked_pin_nets": 143,
+  "pcb_drc": [],
+  "design_rules_unchanged": true,
+  "changed_components": [
+    "L1"
+  ],
+  "changed_track_count": 4,
+  "clearances": {
+    "C5": {
+      "nominal_body_gap_mm": 2.5549369535729265,
+      "maximum_body_size_gap_mm": 2.304436859999999
+    },
+    "C6": {
+      "nominal_body_gap_mm": 2.555529059999998,
+      "maximum_body_size_gap_mm": 2.305529059999998
+    }
+  },
+  "schematics_byte_identical_to_A5": true,
+  "pnp_all_positions_match": true,
+  "gerber_L1_pad_positions_verified": true,
+  "native_archive_matches_disk": true,
+  "hardware_tested": false,
+  "factory_assembly_reviewed": false
+}

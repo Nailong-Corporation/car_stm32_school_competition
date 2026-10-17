@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-17",
+  "native_project": "/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/hardware/stm32PCB-A8/stm32PCB/stm32PCB.eprj3",
+  "fresh_session": "46e269ab-9cb4-4384-a29b-958fb69e8bbe",
+  "strict_pcb_drc": [],
+  "all_32_components_positions_rotation_footprints_supplier_and_manufacturer_part_ids_match": true,
+  "all_143_pads_match_export_snapshot": true,
+  "all_silkscreen_primitives_match_export_snapshot": true,
+  "all_tracks_match_saved_snapshot": true,
+  "all_vias_and_ground_regions_match_saved_snapshot": true
+}

@@ -1,0 +1,578 @@
+[
+  {
+    "supplierId": "C25952",
+    "results": [
+      {
+        "uuid": "553e14c5b19b4eeba650a5a603833375",
+        "ordinal": 1,
+        "name": "0603WAF1332T5E",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "0603WAF1332T5E",
+          "uuid": "f67e4b5bd8ef4a569c250acb4f201a5b"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "R0603",
+          "uuid": "50b4943912284dab97752312e589e9e2"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "R0603",
+          "uuid": "fc143cca1e79419f9cd78b61e9279f08",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20250802/204F6EED1E6AC99DD560805FD49DE7B4.jpg"
+        ],
+        "description": "电阻类型:厚膜电阻;阻值:13.3kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;",
+        "otherProperty": {
+          "LCSC Part Name": "13.3kΩ ±1% 100mW 厚膜电阻",
+          "Supplier Part": "C25952",
+          "Manufacturer": "UNI-ROYAL(厚声)",
+          "Manufacturer Part": "0603WAF1332T5E",
+          "Supplier Footprint": "0603",
+          "JLCPCB Part Class": "Extended Part",
+          "Datasheet": "https://item.szlcsc.com/datasheet/0603WAF1332T5E/26695.html",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "f67e4b5bd8ef4a569c250acb4f201a5b",
+          "Designator": "R?",
+          "Footprint": "50b4943912284dab97752312e589e9e2",
+          "3D Model": "fc143cca1e79419f9cd78b61e9279f08",
+          "3D Model Title": "R0603",
+          "3D Model Transform": "31.8897,63.7794,0,90,0,0,0,0,0",
+          "Type": "厚膜电阻",
+          "Value": "13.3kΩ",
+          "Tolerance": "±1%",
+          "Power(Watts)": "100mW",
+          "Voltage-Supply(Max)": "75V",
+          "Temperature Coefficient": "±100ppm/℃",
+          "Operating Temperature": "-55℃~+155℃",
+          "Name": "={Value}",
+          "Description": "电阻类型:厚膜电阻;阻值:13.3kΩ;精度:±1%;功率:100mW;工作电压:75V;温度系数:±100ppm/℃;"
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C282074",
+    "results": [
+      {
+        "uuid": "03689740de684235b850582800501be7",
+        "ordinal": 1,
+        "name": "CC0603JRNPO9BN750",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "CC0603JRNPO9BN750",
+          "uuid": "666e3d6649eb431295e48fafb04c72f4"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "C0603",
+          "uuid": "76d6c29a47804db487f8a92b2621751b"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "C0603_L1.6-W0.8-H0.8",
+          "uuid": "ac125912035d415993ca9572d50418b1",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20250522/CA848213F8E833423D03E9B44EBE1A97.jpg"
+        ],
+        "description": "容值:75pF;精度:±5%;额定电压:50V;温度系数:NP0;",
+        "otherProperty": {
+          "LCSC Part Name": "75pF ±5% 50V",
+          "Supplier Part": "C282074",
+          "Manufacturer": "YAGEO(国巨)",
+          "Manufacturer Part": "CC0603JRNPO9BN750",
+          "Supplier Footprint": "0603",
+          "JLCPCB Part Class": "Extended Part",
+          "Datasheet": "https://item.szlcsc.com/datasheet/CC0603JRNPO9BN750/268161.html",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "666e3d6649eb431295e48fafb04c72f4",
+          "Designator": "C?",
+          "Footprint": "76d6c29a47804db487f8a92b2621751b",
+          "3D Model": "ac125912035d415993ca9572d50418b1",
+          "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+          "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+          "Value": "75pF",
+          "Tolerance": "±5%",
+          "Voltage Rating": "50V",
+          "Temperature Coefficient": "NP0",
+          "Name": "={Value}",
+          "Description": "容值:75pF;精度:±5%;额定电压:50V;温度系数:NP0;"
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C318884",
+    "results": [
+      {
+        "uuid": "9b1d934c3e3a4920af227bab22a915b2",
+        "ordinal": 1,
+        "name": "TS-1187A-B-A-B",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "TS-1187A-B-A-B",
+          "uuid": "491952e4d57b4ee4a524a485d9ced403"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5",
+          "uuid": "854f05672a2643598f85fa536d86e40f"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5",
+          "uuid": "56992f66d31b474c84a0c3bd0a81f82f",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20230108/88172F1E1FCBE40FF10527789D18E309.jpg"
+        ],
+        "description": "电路结构:单刀单掷;按钮形状:圆形按钮;作用力:1.6N;安装方式:立贴;开关长度:5.1mm;开关宽度:5.1mm;开关高度:1.5mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:无;工作寿命:10万次;",
+        "otherProperty": {
+          "LCSC Part Name": "5.1*5.1*1.5mm 立贴 轻触开关",
+          "Supplier Part": "C318884",
+          "Manufacturer": "XKB Connection(中国星坤)",
+          "Manufacturer Part": "TS-1187A-B-A-B",
+          "Supplier Footprint": "SMD-4P,5.1x5.1mm",
+          "JLCPCB Part Class": "Basic Part",
+          "Datasheet": "https://item.szlcsc.com/datasheet/TS-1187A-B-A-B/299976.html",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "491952e4d57b4ee4a524a485d9ced403",
+          "Designator": "SW?",
+          "Footprint": "854f05672a2643598f85fa536d86e40f",
+          "3D Model": "56992f66d31b474c84a0c3bd0a81f82f",
+          "3D Model Title": "SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5",
+          "3D Model Transform": "255.905,204.76337,0,0,0,0,0,0,0",
+          "Circuit": "单刀单掷",
+          "Actuator Style": "圆形按钮",
+          "Operating Force": "1.6N",
+          "Mounting Type": "立贴",
+          "Length": "5.1mm",
+          "Width": "5.1mm",
+          "Switch Height": "1.5mm",
+          "with Bracket": "不带支架",
+          "Contact Current": "50mA",
+          "Voltage Rating": "12V",
+          "Actuator/Cap Color": "金色",
+          "With Lamp": "无",
+          "Life": "10万次",
+          "Operating Temperature": "-30℃~+85℃",
+          "Name": "={Manufacturer Part}",
+          "Description": "电路结构:单刀单掷;按钮形状:圆形按钮;作用力:1.6N;安装方式:立贴;开关长度:5.1mm;开关宽度:5.1mm;开关高度:1.5mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:无;工作寿命:10万次;"
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C720477",
+    "results": [
+      {
+        "uuid": "cff07d923b95482c818b184e98b80db7",
+        "ordinal": 1,
+        "name": "TS-1088-AR02016",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "TS-1088-AR02016",
+          "uuid": "723b3d91764742c3ad562eb3efe239b7"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "SW-SMD_L3.9-W3.0-P4.45",
+          "uuid": "9c6368306ce24298bf2ce130f6c4bcc6"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "SW-SMD_L3.9-W2.9-H2.0-LS4.8",
+          "uuid": "b26698b69f274ffabef8a26c7d0e5dd1",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20250918/9AF53489CAAD171E3A387F9DD9E1D50B.jpg"
+        ],
+        "description": "电路结构:单刀单掷;按钮形状:圆形按钮;作用力:1.6N;安装方式:立贴;开关长度:3.9mm;开关宽度:3mm;开关高度:2mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:-;工作寿命:10万次;",
+        "otherProperty": {
+          "LCSC Part Name": "3.9*3*2mm 立贴 轻触开关",
+          "Supplier Part": "C720477",
+          "Manufacturer": "XUNPU(讯普)",
+          "Manufacturer Part": "TS-1088-AR02016",
+          "Supplier Footprint": "SMD,4x3mm",
+          "JLCPCB Part Class": "Basic Part",
+          "Datasheet": "https://item.szlcsc.com/datasheet/TS-1088-AR02016/763484.html",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "723b3d91764742c3ad562eb3efe239b7",
+          "Designator": "SW?",
+          "Footprint": "9c6368306ce24298bf2ce130f6c4bcc6",
+          "3D Model": "b26698b69f274ffabef8a26c7d0e5dd1",
+          "3D Model Title": "SW-SMD_L3.9-W2.9-H2.0-LS4.8",
+          "3D Model Transform": "188.976,114.174,0,0,0,0,0,0,0",
+          "Circuit": "单刀单掷",
+          "Actuator Style": "圆形按钮",
+          "Operating Force": "1.6N",
+          "Mounting Type": "立贴",
+          "Length": "3.9mm",
+          "Width": "3mm",
+          "Switch Height": "2mm",
+          "with Bracket": "不带支架",
+          "Contact Current": "50mA",
+          "Voltage Rating": "12V",
+          "Actuator/Cap Color": "黑色",
+          "With Lamp": "-",
+          "IP Rating": "-",
+          "Termination Style": "SMD接片",
+          "Life": "10万次",
+          "Operating Temperature": "-30℃~+80℃",
+          "Name": "={Manufacturer Part}",
+          "Description": "电路结构:单刀单掷;按钮形状:圆形按钮;作用力:1.6N;安装方式:立贴;开关长度:3.9mm;开关宽度:3mm;开关高度:2mm;带支架:不带支架;触点电流:50mA;额定电压:12V;带灯:-;工作寿命:10万次;"
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C22452",
+    "results": [
+      {
+        "uuid": "7e4971a287384663bb1defa327c587af",
+        "ordinal": 1,
+        "name": "SS54_C22452",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "SS54_C22452",
+          "uuid": "27e3d247006e417cb0e356634270f781"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "SMA_L4.4-W2.8-LS5.4-R-RD",
+          "uuid": "3ff4843350454319b4348f6cc543ce2c"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "SMA_L4.4-W2.8-LS5.4-R-RD",
+          "uuid": "228de99b63224bd3982b21290755dd84",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20260709/E314C1FC9FB057C3BB21990D829D5D9A.jpg"
+        ],
+        "description": "二极管配置:独立式;正向压降(Vf):550mV@5A;直流反向耐压(Vr):40V;整流电流:5A;",
+        "otherProperty": {
+          "LCSC Part Name": "电压:40V 电流:5A",
+          "Supplier Part": "C22452",
+          "Manufacturer": "MDD(辰达半导体)",
+          "Manufacturer Part": "SS54",
+          "Supplier Footprint": "SMA(DO-214AC)",
+          "JLCPCB Part Class": "Basic Part",
+          "Datasheet": "https://item.szlcsc.com/datasheet/SS54/23178.html",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "27e3d247006e417cb0e356634270f781",
+          "Designator": "D?",
+          "Footprint": "3ff4843350454319b4348f6cc543ce2c",
+          "3D Model": "228de99b63224bd3982b21290755dd84",
+          "3D Model Title": "SMA_L4.4-W2.8-LS5.4-R-RD",
+          "3D Model Transform": "204.724,110.236,0,0,0,0,0,0,0",
+          "Diode Configuration": "独立式",
+          "Voltage - Forward(Vf@If)": "550mV@5A",
+          "Voltage - DC Reverse(Vr)": "40V",
+          "Current - Rectified": "5A",
+          "Reverse Leakage Current (Ir)": "1mA@40V",
+          "Operating Junction Temperature Range": "-55℃~+125℃",
+          "Name": "={Manufacturer Part}",
+          "Description": "二极管配置:独立式;正向压降(Vf):550mV@5A;直流反向耐压(Vr):40V;整流电流:5A;"
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C311983",
+    "results": [
+      {
+        "uuid": "09d09adf261f49f397dcf1784d04fb9a",
+        "ordinal": 1,
+        "name": "TPS54302DDCR",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "TPS54302DDCR_C311983",
+          "uuid": "96aea168472a4efa825dc33250aae7b8"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+          "uuid": "3c60dc918974420eb4105dc403eb98d3"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95",
+          "uuid": "18da8f6c14a34920b3e136b5c401a119",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20230109/A8FE9DCD32E186BBA00FB55AB7CC490D.jpg"
+        ],
+        "description": "功能类型:降压型;工作电压:4.5V~28V;输出电压:-;输出电流:3A;输出类型:可调;",
+        "otherProperty": {
+          "LCSC Part Name": "降压型 3A 4.5V~28V",
+          "Supplier Part": "C311983",
+          "Manufacturer": "TI(德州仪器)",
+          "Manufacturer Part": "TPS54302DDCR",
+          "Supplier Footprint": "TSOT-23-6",
+          "JLCPCB Part Class": "Extended Part",
+          "Datasheet": "https://www.ti.com/cn/lit/ds/symlink/tps54302.pdf",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "96aea168472a4efa825dc33250aae7b8",
+          "Designator": "U?",
+          "Footprint": "3c60dc918974420eb4105dc403eb98d3",
+          "3D Model": "18da8f6c14a34920b3e136b5c401a119",
+          "3D Model Title": "SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95",
+          "3D Model Transform": "110.236,113.364,0,90,0,0,0.0005,0.0005,0",
+          "Function": "降压型",
+          "Voltage - Supply": "4.5V~28V",
+          "Output Voltage": "-",
+          "Output Current": "3A",
+          "Frequency - Switching": "400kHz",
+          "Operating Temperature": "-40℃~+125℃@(TJ)",
+          "Synchronous Rectifier": "是",
+          "Number of Outputs": "1",
+          "Topology": "降压式",
+          "Quiescent Current": "45uA",
+          "Switch tube (built-in/external)": "内置",
+          "Output Type": "可调",
+          "Features": "轻载高效模式；逐波限流；过流保护；EMI优化(抖频模式)；打嗝限流",
+          "Name": "={Manufacturer Part}",
+          "Description": "功能类型:降压型;工作电压:4.5V~28V;输出电压:-;输出电流:3A;输出类型:可调;"
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C57369",
+    "results": [
+      {
+        "uuid": "c3066ced129943f69596e040c0f6e131",
+        "ordinal": 1,
+        "name": "2.54-1*10P针",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "Header-Male-2.54_1x10",
+          "uuid": "ef4919495f8842d398fcf19f8519b695"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "HDR-TH_10P-P2.54-V-M-1",
+          "uuid": "4091fabe311c4fb287e35995026ba840"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "HDR2.54-M-LI-1X10P",
+          "uuid": "10f3d1cea59e4bb4ba116af9f09c2b9b",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20221230/A610E1187AEF9615195945DF6FB43EF6.jpg"
+        ],
+        "description": "插针结构:1x10P;间距:2.54mm;行距:-;圆针/方针:方针;安装方式:直插;排数:单排;总PIN位数:10P;额定电流:3A;额定电压:-;配合针长度:-;塑高:-;端接针长度:-;触头材质:-;触头镀层:-;工作温度:-40℃~+105℃;颜色:黑色;",
+        "otherProperty": {
+          "LCSC Part Name": "1x10P 间距:2.54mm 方针 直插",
+          "Supplier Part": "C57369",
+          "Manufacturer": "BOOMELE(博穆精密)",
+          "Manufacturer Part": "2.54-1*10P针",
+          "Supplier Footprint": "插件,P=2.54mm",
+          "JLCPCB Part Class": "Extended Part",
+          "Datasheet": "https://atta.szlcsc.com/upload/public/pdf/source/20151109/1457707572883.pdf",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "ef4919495f8842d398fcf19f8519b695",
+          "Designator": "H?",
+          "Footprint": "4091fabe311c4fb287e35995026ba840",
+          "3D Model": "10f3d1cea59e4bb4ba116af9f09c2b9b",
+          "3D Model Title": "HDR2.54-M-LI-1X10P",
+          "3D Model Transform": "999.99796,100,0,0,0,0,0,0,-118.11",
+          "Pin Structure": "1x10P",
+          "Pitch": "2.54mm",
+          "Row Spacing": "-",
+          "Circluar Pins/Square Pins": "方针",
+          "Mounting Type": "直插",
+          "Number of Rows": "单排",
+          "Number of Pins": "10P",
+          "Current Rating": "3A",
+          "Voltage Rating (Max)": "-",
+          "Length of Mating Pin": "-",
+          "Insulation Height": "-",
+          "Length of End Connection Pin": "-",
+          "Contact Material": "-",
+          "Contact Plating": "-",
+          "Operating Temperature": "-40℃~+105℃",
+          "Color": "黑色",
+          "Name": "={Manufacturer Part}",
+          "Description": "插针结构:1x10P;间距:2.54mm;行距:-;圆针/方针:方针;安装方式:直插;排数:单排;总PIN位数:10P;额定电流:3A;额定电压:-;配合针长度:-;塑高:-;端接针长度:-;触头材质:-;触头镀层:-;工作温度:-40℃~+105℃;颜色:黑色;"
+        }
+      },
+      {
+        "uuid": "d84d73843ba145ae8d6de60ff1573066",
+        "ordinal": 2,
+        "name": "HDR-M_2.54_1x10P",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "Header-Male-2.54_1x10",
+          "uuid": "ef4919495f8842d398fcf19f8519b695"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "HDR-TH_10P-P2.54-V-M-1",
+          "uuid": "4091fabe311c4fb287e35995026ba840"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "HDR2.54-M-LI-1X10P",
+          "uuid": "10f3d1cea59e4bb4ba116af9f09c2b9b",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          ""
+        ],
+        "description": "",
+        "otherProperty": {
+          "Convert to PCB": "yes",
+          "Add into BOM": "yes",
+          "Designator": "H?",
+          "Supplier Part": "C57369",
+          "Supplier Footprint": "插件",
+          "Symbol": "ef4919495f8842d398fcf19f8519b695",
+          "Footprint": "4091fabe311c4fb287e35995026ba840",
+          "3D Model": "10f3d1cea59e4bb4ba116af9f09c2b9b",
+          "3D Model Title": "HDR2.54-M-LI-1X10P",
+          "3D Model Transform": "999.99796,100,0,0,0,0,0,0,-118.11",
+          "Description": ""
+        }
+      }
+    ]
+  },
+  {
+    "supplierId": "C27438",
+    "results": [
+      {
+        "uuid": "0a4d2569e740414d92321f53f6972245",
+        "ordinal": 1,
+        "name": "2.54-1*8P母环保",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "Header-Female-2.54_1x8",
+          "uuid": "ce31a55b632b45bcb7ca7debbd0500ce"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "HDR-TH_8P-P2.54-V-F",
+          "uuid": "b7c4b7552e0b4a3ea0ce0b3ecdec9181"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "HDR-TH_8P-P2.54-V-F",
+          "uuid": "6ab1dac21d924c3d8eea0dfa46d42ff5",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          "https://alimg.szlcsc.com/upload/public/product/middle/20251020/04F0C350B7237A7C26EF102B639F67AB.jpg"
+        ],
+        "description": "插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;",
+        "otherProperty": {
+          "LCSC Part Name": "1x8P 间距:2.54mm 直插",
+          "Supplier Part": "C27438",
+          "Manufacturer": "BOOMELE(博穆精密)",
+          "Manufacturer Part": "2.54-1*8P母环保",
+          "Supplier Footprint": "插件,P=2.54mm",
+          "JLCPCB Part Class": "Extended Part",
+          "Datasheet": "https://item.szlcsc.com/datasheet/2.54-1*8P%25E6%25AF%258D%25E7%258E%25AF%25E4%25BF%259D/28187.html",
+          "Supplier": "LCSC",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Symbol": "ce31a55b632b45bcb7ca7debbd0500ce",
+          "Designator": "P?",
+          "Footprint": "b7c4b7552e0b4a3ea0ce0b3ecdec9181",
+          "3D Model": "6ab1dac21d924c3d8eea0dfa46d42ff5",
+          "3D Model Title": "HDR-TH_8P-P2.54-V-F",
+          "3D Model Transform": "819.723,98.425,0,0,0,0,0,0,-118.11",
+          "Holes Structure": "1x8P",
+          "Pitch": "2.54mm",
+          "Row Spacing": "-",
+          "Circular Hole / Square Hole": "方孔",
+          "Mounting Type": "直插",
+          "Number of Rows": "单排",
+          "Number of Positions": "8P",
+          "Current Rating": "3A",
+          "Holes Direction": "顶部",
+          "Insulation Height": "8.5mm",
+          "Contact Material": "黄铜",
+          "Contact Plating": "金",
+          "Operating Temperature": "-55℃~+105℃",
+          "PIN Length": "3.2mm",
+          "Name": "={Manufacturer Part}",
+          "Description": "插孔结构:1x8P;间距:2.54mm;行距:-;圆孔/方孔:方孔;安装方式:直插;排数:单排;总孔位数:8P;额定电流:3A;插孔方向:顶部;塑高:8.5mm;触头材质:黄铜;触头镀层:金;工作温度:-55℃~+105℃;"
+        }
+      },
+      {
+        "uuid": "09ccf5acea794893af16623d8faa25ad",
+        "ordinal": 2,
+        "name": "HDR-F_2.54_1x8P",
+        "symbolName": "",
+        "symbolUuid": "",
+        "symbol": {
+          "name": "Header-Female-2.54_1x8",
+          "uuid": "ce31a55b632b45bcb7ca7debbd0500ce"
+        },
+        "footprintUuid": "",
+        "footprint": {
+          "name": "HDR-TH_8P-P2.54-V-F-1",
+          "uuid": "e3ab7ca476da45f69302b7d1ef287ec6"
+        },
+        "model3DUuid": "",
+        "model3D": {
+          "name": "HDR-F-2.54_1x8",
+          "uuid": "0f7e4d9227ef4fa08d5469c22cc70cdb",
+          "libraryUuid": ""
+        },
+        "imageUuid": [
+          ""
+        ],
+        "description": "",
+        "otherProperty": {
+          "Symbol": "ce31a55b632b45bcb7ca7debbd0500ce",
+          "Designator": "H?",
+          "Add into BOM": "yes",
+          "Convert to PCB": "yes",
+          "Footprint": "e3ab7ca476da45f69302b7d1ef287ec6",
+          "Supplier Part": "C27438",
+          "Supplier Footprint": "插件",
+          "3D Model": "0f7e4d9227ef4fa08d5469c22cc70cdb",
+          "3D Model Title": "HDR-F-2.54_1x8",
+          "3D Model Transform": "799.99844,100,0,0,0,0,0,0,-118.11",
+          "Description": ""
+        }
+      }
+    ]
+  }
+]

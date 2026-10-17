@@ -1,0 +1,27 @@
+[
+  {
+    "page": "P1",
+    "before": "STM32 八路数字灰度巡线载板 / 电气连接 A5",
+    "after": "STM32 八路数字灰度巡线载板 / 电气连接 A8"
+  },
+  {
+    "page": "P2-模块插座",
+    "before": "板上实际模块插座 / 2.54mm 针距 / 两排中心距 16.00mm",
+    "after": "板上实际模块插座 / 2.54mm 针距 / 两排中心距 15.24mm"
+  },
+  {
+    "page": "P2-模块插座",
+    "before": "PCB A5: 两模块排距16.00mm；STM32按照片反转左右针序，USB朝左、SWD朝右。",
+    "after": "PCB A8: 两模块排距15.24mm；STM32按照片反转左右针序，USB朝左、SWD朝右。"
+  },
+  {
+    "page": "P2-模块插座",
+    "before": "A5: 18 unused pins -> J11/J12 male headers. VBAT/NRST are not GPIO.",
+    "after": "A8: 18 unused pins -> J11/J12 male headers. VBAT/NRST are not GPIO."
+  },
+  {
+    "page": "P3-DC电源-5V3A",
+    "before": "A5 / DC5521 7-12V -> 5V / 3A TOTAL DESIGN TARGET",
+    "after": "A8 / DC5521 7-12V -> 5V / 3A TOTAL DESIGN TARGET"
+  }
+]

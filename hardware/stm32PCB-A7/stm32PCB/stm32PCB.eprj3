@@ -1,0 +1,114 @@
+{
+  "name": "stm32PCB",
+  "owner_uuid": "288de546a68a43fd9549384eebdc9552",
+  "creator_uuid": "288de546a68a43fd9549384eebdc9552",
+  "created_at": "2026-10-16 12:08:10",
+  "updated_at": "2026-10-16 12:08:10",
+  "modifier_uuid": "288de546a68a43fd9549384eebdc9552",
+  "content": "",
+  "archive": false,
+  "cbb_project": 0,
+  "thumb": "",
+  "ticket": 1,
+  "g_ticket": 1,
+  "boards": [],
+  "block_symbol_attrs_groups": {},
+  "default_sheet": "d761ba4b7588faa0",
+  "branch_uuid": "",
+  "pcb_count": 0,
+  "format": "folder",
+  "profile": {
+    "boards": {
+      "8e2b5bb1be1840a3": {
+        "uuid": "8e2b5bb1be1840a3",
+        "title": "Board1",
+        "zIndex": 1
+      }
+    },
+    "schematics": {
+      "decb3832a8d5be27": {
+        "uuid": "decb3832a8d5be27",
+        "name": "Schematic1",
+        "board": "8e2b5bb1be1840a3",
+        "source": "",
+        "version": "1792201307949",
+        "updateTime": 1792201307949
+      }
+    },
+    "sheets": {
+      "7f26454093ec3706": {
+        "uuid": "7f26454093ec3706",
+        "title": "P1",
+        "schematic_uuid": "decb3832a8d5be27",
+        "zIndex": 1,
+        "source": "",
+        "version": "1792201260751",
+        "updateTime": 1792201260751
+      },
+      "a249202961f558d3": {
+        "uuid": "a249202961f558d3",
+        "title": "P2-模块插座",
+        "schematic_uuid": "decb3832a8d5be27",
+        "zIndex": 2,
+        "source": "",
+        "version": "1792141442915",
+        "updateTime": 1792141442915
+      },
+      "236c9a1b5b8d0556": {
+        "uuid": "236c9a1b5b8d0556",
+        "title": "P3-DC电源-5V3A",
+        "schematic_uuid": "decb3832a8d5be27",
+        "zIndex": 3,
+        "source": "",
+        "version": "1792201307949",
+        "updateTime": 1792201307949
+      }
+    },
+    "pcbs": {
+      "61bda4b69072382c": {
+        "uuid": "61bda4b69072382c",
+        "title": "PCB1",
+        "board": "8e2b5bb1be1840a3",
+        "parent_uuid": "",
+        "source": "",
+        "version": "1792201197583",
+        "updateTime": 1792201197583
+      }
+    },
+    "panels": {
+      "dc9d69b38764a815": {
+        "uuid": "dc9d69b38764a815",
+        "title": "Panel1",
+        "zIndex": null
+      }
+    },
+    "blockSymbols": {},
+    "owner": {
+      "uuid": "288de546a68a43fd9549384eebdc9552"
+    },
+    "simSchematics": {},
+    "simulations": {}
+  },
+  "config": {
+    "defaultSheet": "d761ba4b7588faa0",
+    "settings": {
+      "UNIVERSAL": {
+        "dataType": "UNIVERSAL",
+        "data": {
+          "allowLibRename": true,
+          "defaultNetName": true,
+          "wireMultipleNet": true,
+          "netFlagCrossLayerConnection": true,
+          "netLabelCrossPageConnection": true,
+          "busGenerateNetClass": true,
+          "relevanceDisplayRow": "SINGLE",
+          "relevanceBelongSchPage": "NAME",
+          "relevanceLocation": "ZONE",
+          "multipartCrossLayer": true,
+          "nonElectronicAddIntoBom": false,
+          "nonElectronicUpdatePcb": false
+        }
+      }
+    }
+  }
+}
