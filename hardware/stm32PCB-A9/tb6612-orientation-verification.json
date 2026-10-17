@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-17",
+  "basis": "User correction: TB6612 upper/lower rows reversed; swap J8/J9; preserve left-to-right order.",
+  "view": "Top side, FRONT/GRAY at top",
+  "upper_header": "J9",
+  "lower_header": "J8",
+  "pitch_mm": 2.54,
+  "row_center_spacing_mm": 15.24,
+  "physical_trial_fit_performed": false,
+  "headers": {
+    "J9": [
+      {
+        "pin": "1",
+        "net": "PWMA",
+        "center_mm": [
+          41.1099,
+          24.7396
+        ]
+      },
+      {
+        "pin": "2",
+        "net": "AIN2",
+        "center_mm": [
+          43.6499,
+          24.7396
+        ]
+      },
+      {
+        "pin": "3",
+        "net": "AIN1",
+        "center_mm": [
+          46.1899,
+          24.7396
+        ]
+      },
+      {
+        "pin": "4",
+        "net": "STBY",
+        "center_mm": [
+          48.7299,
+          24.7396
+        ]
+      },
+      {
+        "pin": "5",
+        "net": "BIN1",
+        "center_mm": [
+          51.2699,
+          24.7396
+        ]
+      },
+      {
+        "pin": "6",
+        "net": "BIN2",
+        "center_mm": [
+          53.8099,
+          24.7396
+        ]
+      },
+      {
+        "pin": "7",
+        "net": "PWMB",
+        "center_mm": [
+          56.3499,
+          24.7396
+        ]
+      },
+      {
+        "pin": "8",
+        "net": "GND",
+        "center_mm": [
+          58.8899,
+          24.7396
+        ]
+      }
+    ],
+    "J8": [
+      {
+        "pin": "1",
+        "net": "VM",
+        "center_mm": [
+          41.1099,
+          9.4996
+        ]
+      },
+      {
+        "pin": "2",
+        "net": "+3V3",
+        "center_mm": [
+          43.6499,
+          9.4996
+        ]
+      },
+      {
+        "pin": "3",
+        "net": "GND",
+        "center_mm": [
+          46.1899,
+          9.4996
+        ]
+      },
+      {
+        "pin": "4",
+        "net": "AO1",
+        "center_mm": [
+          48.7299,
+          9.4996
+        ]
+      },
+      {
+        "pin": "5",
+        "net": "AO2",
+        "center_mm": [
+          51.2699,
+          9.4996
+        ]
+      },
+      {
+        "pin": "6",
+        "net": "BO2",
+        "center_mm": [
+          53.8099,
+          9.4996
+        ]
+      },
+      {
+        "pin": "7",
+        "net": "BO1",
+        "center_mm": [
+          56.3499,
+          9.4996
+        ]
+      },
+      {
+        "pin": "8",
+        "net": "GND",
+        "center_mm": [
+          58.8899,
+          9.4996
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "only_C2_component_position_changed": true,
+  "C2_translation_mm": [
+    -0.2,
+    -0.2
+  ],
+  "all_pad_networks_unchanged": true,
+  "removed_tracks": [
+    {
+      "id": "098c342442150baa",
+      "net": "GND"
+    },
+    {
+      "id": "965a0ff2215e1119",
+      "net": "GND"
+    },
+    {
+      "id": "e3b1fc88cadf576d",
+      "net": "GND"
+    },
+    {
+      "id": "f69515e1154b0ddd",
+      "net": "GND"
+    },
+    {
+      "id": "fc2d1e6b28c19417",
+      "net": "GND"
+    }
+  ],
+  "added_tracks": [],
+  "modified_tracks": [
+    "32852a46987a23f9"
+  ],
+  "all_vias_unchanged": true,
+  "all_AIN1_tracks_unchanged": true
+}

@@ -1,0 +1,35 @@
+{
+  "revision": "A10",
+  "units": "mm",
+  "minimum_required_cap_pad_to_foreign_copper": 0.25,
+  "pads": {
+    "C1.2": {
+      "net": "GND",
+      "minimum_clearance": 0.302268,
+      "nearest_object": "track:5be49454d02d3d2f",
+      "nearest_net": "AIN1"
+    },
+    "C1.1": {
+      "net": "VM",
+      "minimum_clearance": 0.299638,
+      "nearest_object": "fill:657d756cd1e7bdb0",
+      "nearest_net": "GND"
+    },
+    "C2.2": {
+      "net": "GND",
+      "minimum_clearance": 0.354508,
+      "nearest_object": "track:1f54f10ee886421e",
+      "nearest_net": "AIN1"
+    },
+    "C2.1": {
+      "net": "VM",
+      "minimum_clearance": 0.299638,
+      "nearest_object": "fill:657d756cd1e7bdb0",
+      "nearest_net": "GND"
+    }
+  },
+  "C2_GND_to_AIN1": 0.354508,
+  "C1_VM_to_GND": 0.299638,
+  "C1_C2_nearest_pad_gap": 1.178503,
+  "all_four_pads_pass": true
+}

@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-17",
+  "native_project": "/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/hardware/stm32PCB-A10/stm32PCB/stm32PCB.eprj3",
+  "fresh_session": "ed13f6fe-ebab-47cb-a855-456b0012646b",
+  "strict_pcb_drc": [],
+  "saved_reopened_matches": {
+    "parts": true,
+    "lines": true,
+    "vias": true,
+    "fills": true,
+    "strings": true
+  },
+  "comparison_coordinate_precision_mil": 0.0001
+}

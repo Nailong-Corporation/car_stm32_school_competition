@@ -1,0 +1,215 @@
+{
+  "revision": "A10",
+  "C2_translation_from_A9_mm": [
+    -0.2,
+    -0.2
+  ],
+  "C1_C2_gerber_pad_geometry_verified": true,
+  "C1_C2_pad_to_foreign_copper_target_mm": 0.25,
+  "local_clearance_report": {
+    "revision": "A10",
+    "units": "mm",
+    "minimum_required_cap_pad_to_foreign_copper": 0.25,
+    "pads": {
+      "C1.2": {
+        "net": "GND",
+        "minimum_clearance": 0.302268,
+        "nearest_object": "track:5be49454d02d3d2f",
+        "nearest_net": "AIN1"
+      },
+      "C1.1": {
+        "net": "VM",
+        "minimum_clearance": 0.299638,
+        "nearest_object": "fill:657d756cd1e7bdb0",
+        "nearest_net": "GND"
+      },
+      "C2.2": {
+        "net": "GND",
+        "minimum_clearance": 0.354508,
+        "nearest_object": "track:1f54f10ee886421e",
+        "nearest_net": "AIN1"
+      },
+      "C2.1": {
+        "net": "VM",
+        "minimum_clearance": 0.299638,
+        "nearest_object": "fill:657d756cd1e7bdb0",
+        "nearest_net": "GND"
+      }
+    },
+    "C2_GND_to_AIN1": 0.354508,
+    "C1_VM_to_GND": 0.299638,
+    "C1_C2_nearest_pad_gap": 1.178503,
+    "all_four_pads_pass": true
+  },
+  "tb6612_top_view_upper_header": "J9",
+  "tb6612_top_view_lower_header": "J8",
+  "tb6612_row_swap_basis": "User reported reversed upper/lower rows on 2026-10-17",
+  "tb6612_each_row_left_to_right_order_unchanged": true,
+  "date": "2026-10-17",
+  "power_trace_widths_mm": {
+    "DC_RAW": [
+      3.1
+    ],
+    "DC_FUSED": [
+      3.1
+    ],
+    "VIN_PROTECTED": [
+      0.9,
+      1.2,
+      1.5,
+      3.1
+    ],
+    "BUCK_SW": [
+      0.5,
+      0.55,
+      1.4,
+      3.1
+    ],
+    "VM": [
+      0.65,
+      1.0,
+      1.5,
+      1.5001,
+      3.1
+    ],
+    "+5V": [
+      0.95,
+      1.0
+    ],
+    "+3V3": [
+      0.5,
+      0.5001
+    ]
+  },
+  "motor_output_layer": "BottomLayer",
+  "motor_output_width_mm": 1.5,
+  "vin_parallel_via_bank_count": 2,
+  "vin_parallel_vias_per_bank": 3,
+  "mcu_5v_parallel_vias": 2,
+  "power_via_drill_mm_nominal": 0.4,
+  "board_components": 32,
+  "schematic_and_pcb_pin_assignments_checked": 143,
+  "connected_nets": 48,
+  "unused_mcu_pins_brought_out": 18,
+  "pcb_tracks": 359,
+  "pcb_vias": 65,
+  "ground_solid_regions": 4,
+  "board_size_mm": [
+    100,
+    90
+  ],
+  "socket_pitch_mm": 2.54,
+  "module_row_center_distance_mm": 15.24,
+  "actual_row_center_distance_mm": {
+    "stm32": 15.24,
+    "tb6612": 15.24
+  },
+  "connector_drills_from_gerber_mm": {
+    "J6": [
+      1.2
+    ],
+    "J7": [
+      1.2
+    ],
+    "J8": [
+      1.10002
+    ],
+    "J9": [
+      1.10002
+    ],
+    "J10": [
+      1.10002
+    ],
+    "J11": [
+      1.10002
+    ],
+    "J12": [
+      1.10002
+    ]
+  },
+  "all_opposite_header_drill_spacings_from_gerber_mm": {
+    "J6/J7": [
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24
+    ],
+    "J9/J8": [
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24,
+      15.24
+    ]
+  },
+  "schematic_drc": [
+    {
+      "type": "warn",
+      "rule": "ATTRMATCHCODE",
+      "primitives": [
+        {
+          "primitiveId": "e5b80e6c91cba157",
+          "sheet": "236c9a1b5b8d0556",
+          "name": "U4($3I56)"
+        }
+      ]
+    }
+  ],
+  "pcb_drc_violations": 0,
+  "input_voltage_design_range_V": [
+    7,
+    12
+  ],
+  "output_current_design_target_A_total": 3,
+  "pcb_routing_completed": true,
+  "stm32_photo_pin_order_verified": true,
+  "stm32_top_view_usb_side": "left",
+  "stm32_top_view_swd_side": "right",
+  "gerber_archive_verified": true,
+  "u4_sw1_l1_gerber_pad_geometry_verified": true,
+  "placement_rows_verified": 32,
+  "bom_groups_verified": 19,
+  "native_and_smt_bom_supplier_ids_verified": true,
+  "project_zip_matches_native_files": true,
+  "saved_project_fresh_session_readback_verified": true,
+  "u4_pad_mm": [
+    0.6,
+    1.1
+  ],
+  "u4_row_center_spacing_mm": 2.7,
+  "u4_pitch_mm": 0.95,
+  "sw1_supplier_id": "C318884",
+  "sw1_height_mm": 1.5,
+  "sw1_pad_mm": [
+    1,
+    0.75
+  ],
+  "sw1_pad_column_and_row_spacing_mm": [
+    6,
+    3.75
+  ],
+  "module_mechanical_fit_verified": false,
+  "full_module_3d_collision_check_completed": false,
+  "power_load_and_thermal_test_completed": false,
+  "hardware_tested": false,
+  "fabrication_release_approved": false
+}
