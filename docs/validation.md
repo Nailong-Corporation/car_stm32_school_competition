@@ -1,5 +1,16 @@
 # 首版验证记录
 
+## 2026-10-19 增量验证：霍尔编码器 GPIO
+
+本次为两个电机新增 `encoder_gpio_init()`：左轮 PA8/PA9、右轮 PB6/PB7，均为 `GPIO_MODE_INPUT` + `GPIO_NOPULL`，在 `main()` 初始化路径中调用。TIM1/TIM4 仅预留，尚未启用计数、采样或轮速反馈。
+
+- `sh test/run_host_tests.sh`：通过，原有逻辑套件 122332 次检查及 HAL 电机模拟套件通过，ASan/UBSan 未报告问题。这些用例为原控制链回归，不验证新增 GPIO 的真实电气行为。
+- `pio run -e genericSTM32F103C8`：SUCCESS，`src/encoder.c` 已参与编译与链接；Flash 9088 / 65536 字节，静态 RAM 272 / 20480 字节。应用源码无警告，框架 `stm32f1xx_ll_utils.c` 仍有原有 3 个 unused-parameter 警告。
+- 当前仓库 A10 网表核对：PA8 = J7.5 / J11.4，PA9 = J7.6 / J11.5，PB6 = J7.14 / J12.3，PB7 = J7.15 / J12.4，未与已有灰度/PWM/方向/按键/SWD 分配重叠。它是设计文件核对，未测量实物通断。
+- 接线、电平、编码器上拉、波形、计数方向及硬件运行均未验证；没有烧录或操作电机，`hardware_tested=false`。下一步先核对编码器供电与输出类型，再观察手动转轴时 A/B 电平变化。
+
+以下保留 2026-10-14 首版记录；其中大小、向量地址和 SHA-256 只对应当时的产物，不对应本次重新生成的固件。
+
 日期：2026-10-14（Asia/Shanghai）。本记录针对本次授权后的首版源码；修改代码或参数后需重新记录。实车验证状态：`hardware_tested=false`。
 
 ## 已执行：主机逻辑验证

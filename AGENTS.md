@@ -15,7 +15,7 @@
 ## 需求与控制结构
 
 - 8 路传感器必须分别使用 8 个 GPIO 数字输入，不擅自改成 ADC、I²C、SPI 或 GPIO 扩展器。
-- 当前阶段无编码器，无轮速反馈、速度 PID、双环或串级控制。
+- 2026-10-19 用户授权为两个霍尔编码器选择并初始化 A/B 相 GPIO；当前仅输入初始化，尚无编码器计数、轮速反馈、速度 PID、双环或串级控制。
 - 使用一个白线横向位置 PID，输出左右轮 PWM 差值。
 - 差速底层参考 `/Users/zhendong/Documents/RemoteCar_wifi/remote_car`，重点阅读 `src/main.c`、`include/main.h` 及其配置。
 - 可借鉴 `drive()`、`set_wheel()`、指令限幅和 PWM 映射；不要直接搬入遥控链路和串口命令超时逻辑作为巡线条件。
@@ -67,7 +67,7 @@
 
 ## 当前实现与验证入口
 
-- 固件使用 `gray_sensor`、`pid`、`motor_command`、`motor`、`line_follow` 分层；配置见 `board_config.h` 与 `control_config.h`。
+- 固件使用 `gray_sensor`、`pid`、`motor_command`、`motor`、`line_follow` 分层；`encoder` 当前仅初始化左轮 PA8/PA9、右轮 PB6/PB7 为无内部上下拉输入，预留 TIM1/TIM4，不启动计数；配置见 `board_config.h` 与 `control_config.h`。
 - 构建：`pio run -e genericSTM32F103C8`；主机逻辑测试：`sh test/run_host_tests.sh`，不需要连接开发板。
 - 上电为 `IDLE`，PB10 接地按键一次按下请求启动/停止；启动必须有连续有效白线。不增加自动启动。
 - 停车通过 STBY 拉低进入待机，不能称为已验证短刹；左右单轮零 PWM 与全车停车的电气行为不同。

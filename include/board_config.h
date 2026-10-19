@@ -28,4 +28,16 @@
 #define START_STOP_PIN GPIO_PIN_10
 /* PB10 button to GND; internal pull-up. SWD PA13/PA14 remains enabled. */
 
+/* Hall quadrature inputs. Reserve default TIM1_CH1/2 and TIM4_CH1/2;
+ * only GPIO input initialization is enabled at this stage, not counting. */
+#define ENCODER_LEFT_PORT GPIOA
+#define ENCODER_LEFT_A_PIN GPIO_PIN_8
+#define ENCODER_LEFT_B_PIN GPIO_PIN_9
+#define ENCODER_RIGHT_PORT GPIOB
+#define ENCODER_RIGHT_A_PIN GPIO_PIN_6
+#define ENCODER_RIGHT_B_PIN GPIO_PIN_7
+/* FT inputs: keep internal pulls disabled for signals above VDD + 0.3 V.
+ * Open-drain outputs need a verified external pull-up, preferably to 3.3 V. */
+#define ENCODER_INPUT_PULL GPIO_NOPULL
+
 #endif

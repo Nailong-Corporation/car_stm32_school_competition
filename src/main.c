@@ -1,6 +1,7 @@
 #include "main.h"
 #include "board_config.h"
 #include "control_config.h"
+#include "encoder.h"
 #include "motor.h"
 
 volatile uint32_t g_control_request;
@@ -100,6 +101,7 @@ int main(void)
     motor_safe_gpio_init();
     if (HAL_Init() != HAL_OK || !clock_init()) Error_Handler();
     sensor_gpio_init();
+    encoder_gpio_init();
     if (!motor_init()) Error_Handler();
     gray_sensor_init(&sensor);
     line_follow_init(&follow);
