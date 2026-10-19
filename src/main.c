@@ -110,7 +110,9 @@ int main(void)
     motor_safe_gpio_init();
     if (HAL_Init() != HAL_OK || !clock_init()) Error_Handler();
     sensor_gpio_init();
+#if ENCODER_CONTROL_ENABLED
     if (!encoder_init()) Error_Handler();
+#endif
     if (!motor_init()) Error_Handler();
     gray_sensor_init(&sensor);
     OdometryCalibration calibration = {
@@ -118,7 +120,13 @@ int main(void)
         LEFT_COUNTS_PER_WHEEL_REV, RIGHT_COUNTS_PER_WHEEL_REV, WHEEL_TRACK_CM,
         ENCODER_LEFT_SIGN, ENCODER_RIGHT_SIGN, ODOMETRY_CALIBRATION_CONFIRMED != 0
     };
-    line_follow_init(&follow, calibration, route, route_count, route_stop_callback, NULL);
+    line_follow_init(&follow, calibration,
+#if ENCODER_CONTROL_ENABLED
+                     route, route_count, route_stop_callback, NULL);
+#else
+                     NULL, 0, NULL, NULL);
+#endif
+    g_diagnostics.encoder_control_enabled = ENCODER_CONTROL_ENABLED != 0;
     g_diagnostics.odometry_ready = follow.odometry.ready;
     if (!watchdog_init()) Error_Handler();
     uint32_t last_control_ms = HAL_GetTick();
@@ -140,8 +148,10 @@ int main(void)
         uint32_t interval = (uint32_t)(now_ms - last_control_ms);
         if (interval >= CONTROL_PERIOD_MS) {
             last_control_ms = now_ms;
-            EncoderCounts counts;
+            EncoderCounts counts = {0};
+#if ENCODER_CONTROL_ENABLED
             if (!encoder_read(&counts)) Error_Handler();
+#endif
             GrayObservation observation = gray_sensor_update(&sensor, read_raw(),
                 line_follow_have_recent_position(&follow, now_ms), follow.reliable_position);
             line_follow_update(&follow, observation, counts, now_ms,
@@ -150,10 +160,12 @@ int main(void)
             uint32_t duration = (uint32_t)(HAL_GetTick() - now_ms);
             if (duration >= CONTROL_PERIOD_MS) line_follow_stop(&follow, LINE_STOP_FAULT);
             motor_apply(follow.command);
+#if ENCODER_CONTROL_ENABLED
             if (follow.stop_reason == LINE_STOP_ROUTE_COMPLETE) {
                 motor_stop();
                 route_dispatch_stop_callback(&follow.route);
             }
+#endif
             duration = (uint32_t)(HAL_GetTick() - now_ms);
             if (duration >= CONTROL_PERIOD_MS) {
                 line_follow_stop(&follow, LINE_STOP_FAULT);

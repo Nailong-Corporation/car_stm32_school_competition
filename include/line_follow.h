@@ -15,12 +15,13 @@ typedef struct {
     Odometry odometry;
     RoutePlanner route;
     SpeedControl speed;
-    Pid pid; /* outer white-line position controller, output cm/s difference */
-    MotorCommand command; /* inner speed loops' PWM output */
+    Pid pid; /* White-line position: PWM difference when open, cm/s when closed. */
+    MotorCommand command; /* Final PWM output in either mode. */
     bool have_reliable, abnormal;
     uint8_t valid_count;
     float reliable_position, base, correction, left_target_cm_s, right_target_cm_s;
     float hold_heading_rad, abnormal_origin_cm;
+    float held_pwm_correction; /* Open-loop interference hold, not measured heading. */
     uint32_t last_reliable_ms;
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,

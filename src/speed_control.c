@@ -3,6 +3,9 @@
 #include "motion_config.h"
 #include <math.h>
 
+/**
+ * @brief 清空左右速度 PID 历史及低速/堵转累计时间。
+ */
 void speed_control_reset(SpeedControl *s)
 {
     pid_reset(&s->left);
@@ -10,6 +13,9 @@ void speed_control_reset(SpeedControl *s)
     s->left_stall_s = s->right_stall_s = 0.0f;
 }
 
+/**
+ * @brief 用集中参数初始化左右独立速度 PID，并清空反馈保护状态。
+ */
 void speed_control_init(SpeedControl *s)
 {
     PidConfig c = {SPEED_KP, SPEED_KI, SPEED_KD, SPEED_INTEGRAL_LIMIT, PID_DERIVATIVE_TAU_S};
@@ -18,6 +24,11 @@ void speed_control_init(SpeedControl *s)
     speed_control_reset(s);
 }
 
+/**
+ * @brief 根据单轮目标/实测速度（cm/s）与 dt（秒）生成限幅 PWM。
+ * 目标为零时复位并输出零；反向反馈、低速持续超限或非法值返回 false。
+ * stall 保存低速累计秒数，pwm 接收含前馈及抗饱和 PID 的输出。
+ */
 static bool wheel(Pid *pid, float target, float measured, float dt, float *stall, float *pwm)
 {
     if (!isfinite(target) || target < 0.0f || target > WHEEL_TARGET_MAX_CM_S ||
@@ -34,6 +45,10 @@ static bool wheel(Pid *pid, float target, float measured, float dt, float *stall
                               target * SPEED_FEEDFORWARD, pwm);
 }
 
+/**
+ * @brief 执行左右轮速度内环，将最终 PWM 写入 command。
+ * 任一轮反馈或计算失败时保持禁用零输出、清空两轮历史并返回 false。
+ */
 bool speed_control_update(SpeedControl *s, float lt, float rt, float lm, float rm,
                           float dt, MotorCommand *command)
 {

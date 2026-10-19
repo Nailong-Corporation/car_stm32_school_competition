@@ -1,6 +1,9 @@
 #include "pid.h"
 #include <math.h>
 
+/**
+ * @brief 将 value 对称限制在 [-limit, +limit]，供积分限幅使用。
+ */
 static float clamp(float value, float limit)
 {
     if (value > limit) return limit;
@@ -8,6 +11,9 @@ static float clamp(float value, float limit)
     return value;
 }
 
+/**
+ * @brief 清空积分、前次误差和微分滤波状态，使下一帧不产生历史微分冲击。
+ */
 void pid_reset(Pid *pid)
 {
     pid->integral = 0.0f;
@@ -16,17 +22,29 @@ void pid_reset(Pid *pid)
     pid->primed = false;
 }
 
+/**
+ * @brief 保存 PID 参数并复位历史，供位置环和左右速度环共用。
+ */
 void pid_init(Pid *pid, PidConfig config)
 {
     pid->config = config;
     pid_reset(pid);
 }
 
+/**
+ * @brief 按实际 dt 计算无前馈的对称限幅 PID，将结果写入 output。
+ * limit 为输出幅值上限；参数非法时返回 false，并复位 PID 历史。
+ */
 bool pid_update(Pid *pid, float error, float dt, float limit, float *output)
 {
     return pid_update_bounded(pid, error, dt, -limit, limit, 0.0f, output);
 }
 
+/**
+ * @brief 计算含前馈、微分低通及积分抗饱和的 PID，输出限制在 [low, high]。
+ * error 与 dt 分别为本周期误差和秒数；按前馈加 PID 的总输出判断是否接受积分。
+ * output 必须可写；参数或结果非法时输出零、复位历史并返回 false。
+ */
 bool pid_update_bounded(Pid *pid, float error, float dt, float low, float high,
                         float feedforward, float *output)
 {

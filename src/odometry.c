@@ -4,8 +4,15 @@
 #include <math.h>
 #include <string.h>
 
+/**
+ * @brief 判断标定量是否为有限正数，拒绝零值、负值和非有限数。
+ */
 static bool positive(float v) { return isfinite(v) && v > 0.0f; }
 
+/**
+ * @brief 校验尺寸、每输出轮四倍频计数、方向和标定确认，建立厘米换算比例。
+ * 同时检查最长采样间隔的半圈计数约束；未通过时 ready 为 false，禁止编码器模式启动。
+ */
 void odometry_init(Odometry *o, OdometryCalibration c)
 {
     memset(o, 0, sizeof(*o));
@@ -23,12 +30,21 @@ void odometry_init(Odometry *o, OdometryCalibration c)
         ODOMETRY_MAX_SPEED_CM_S * max_dt / o->right_cm_per_count + 4.0f < 32768.0f;
 }
 
+/**
+ * @brief 将两个 16 位计数快照的模差转换为有符号增量，兼容正常正反向回绕。
+ * 恰好半圈的差值返回 -32768，由调用者拒绝，因为此时无法判定方向。
+ */
 static int32_t delta(uint16_t now, uint16_t before)
 {
     uint32_t d = (uint16_t)(now - before);
     return d < 32768U ? (int32_t)d : (int32_t)d - 65536;
 }
 
+/**
+ * @brief 由计数增量和实际 dt 更新相对里程（cm）、航向（rad）和滤波轮速（cm/s）。
+ * 首帧只建立计数基准；右转航向为正，倒退保留距离符号。
+ * 标定无效、时序异常或计数跳变超限返回 false；不补偿打滑或多圈采样混叠。
+ */
 bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
 {
     if (!o->ready || !isfinite(dt) || dt <= 0.0f ||

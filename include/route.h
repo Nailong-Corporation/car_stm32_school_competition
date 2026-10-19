@@ -12,7 +12,7 @@ typedef struct {
 } RouteStep;
 typedef enum {
     ROUTE_FOLLOW, ROUTE_CANDIDATE, ROUTE_EXECUTING, ROUTE_CLEARING,
-    ROUTE_FINISHED, ROUTE_FAILED
+    ROUTE_FINISHED, ROUTE_FAILED, ROUTE_DISABLED
 } RouteState;
 typedef void (*RouteStopCallback)(size_t step_index, void *context);
 typedef struct {

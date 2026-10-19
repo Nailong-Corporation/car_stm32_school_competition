@@ -6,6 +6,10 @@
 static TIM_HandleTypeDef pwm_timer;
 static bool pwm_ready;
 
+/**
+ * @brief 先预装 STBY 和方向引脚低电平，再配置输出，建立上电停车状态。
+ * 在 HAL 与 PWM 初始化前调用，降低切换 GPIO 模式时误使能驱动的风险。
+ */
 void motor_safe_gpio_init(void)
 {
     __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -21,6 +25,10 @@ void motor_safe_gpio_init(void)
     HAL_GPIO_Init(GPIOB, &pins);
 }
 
+/**
+ * @brief 将 STBY 拉低、方向清零；PWM 已就绪时同时将两路占空比清零。
+ * 不依赖有效的定时器句柄即可请求待机，适用于初始化失败路径；不保证机械立即刹停。
+ */
 void motor_stop(void)
 {
     /* Independent of the TIM handle: safe even when PWM initialization failed. */
@@ -34,6 +42,10 @@ void motor_stop(void)
                      GPIO_PIN_RESET);
 }
 
+/**
+ * @brief 初始化 TIM3 双通道 PWM，检查各步返回值，并保持电机停止。
+ * 全部配置和启动成功返回 true，失败返回 false，由调用者进入异常停车。
+ */
 bool motor_init(void)
 {
     motor_stop();
@@ -63,6 +75,10 @@ bool motor_init(void)
     return true;
 }
 
+/**
+ * @brief 将单轮非负 command 经增益、死区和限幅映射到指定 PWM 通道。
+ * in1/in2 与 in1_forward 决定前进极性；不负责 STBY，单轮零 PWM 不等于整车待机。
+ */
 static void set_wheel(uint16_t in1, uint16_t in2, uint32_t channel,
                       float command, float gain, float deadzone, bool in1_forward)
 {
@@ -73,6 +89,10 @@ static void set_wheel(uint16_t in1, uint16_t in2, uint32_t channel,
     __HAL_TIM_SET_COMPARE(&pwm_timer, channel, ccr);
 }
 
+/**
+ * @brief 检查双轮 PWM 命令并写入方向和占空比，最后使能 STBY。
+ * 未就绪、禁用、非法/负指令或双轮全零时走独立停车路径，不执行反转。
+ */
 void motor_apply(MotorCommand command)
 {
     if (!pwm_ready || !command.enabled || !isfinite(command.left) || !isfinite(command.right) ||

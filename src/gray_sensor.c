@@ -4,11 +4,19 @@
 
 static const float weights[8] = {-7.0f, -5.0f, -3.0f, -1.0f, 1.0f, 3.0f, 5.0f, 7.0f};
 
+/**
+ * @brief 清空灰度传感器的滤波历史、写入位置和有效样本数量。
+ */
 void gray_sensor_init(GraySensor *sensor)
 {
     memset(sensor, 0, sizeof(*sensor));
 }
 
+/**
+ * @brief 按白线掩码统计连续区域，并计算选中区域的加权横向位置。
+ * line_mask 的 1 表示白线；无白线或歧义观测不提供普通 PID 位置。
+ * 多区域可按 previous 的连续性选区，但上层仍会将多区域按干扰处理。
+ */
 GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previous)
 {
     GrayObservation result = {0};
@@ -60,6 +68,10 @@ GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previ
     return result;
 }
 
+/**
+ * @brief 对原始 GPIO 掩码执行一次反相、逐路多数滤波，再分类白线观测。
+ * raw_mask 中白色为 0；have_previous/previous 用于多区域连续性选择。
+ */
 GrayObservation gray_sensor_update(GraySensor *sensor, uint8_t raw_mask,
                                    bool have_previous, float previous)
 {

@@ -5,6 +5,10 @@
 static TIM_HandleTypeDef left_timer, right_timer;
 static bool ready;
 
+/**
+ * @brief 初始化左右编码器 A/B 相引脚为输入，内部上下拉由集中配置决定。
+ * 这里只配置 GPIO；启用定时器计数由 encoder_init() 完成。
+ */
 void encoder_gpio_init(void)
 {
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -18,6 +22,10 @@ void encoder_gpio_init(void)
     HAL_GPIO_Init(ENCODER_RIGHT_PORT, &pins);
 }
 
+/**
+ * @brief 将指定定时器配置为 16 位 TI12 正交编码器四倍频模式。
+ * timer 为待初始化句柄，instance 为 TIM1 或 TIM4；HAL 初始化成功返回 true。
+ */
 static bool timer_init(TIM_HandleTypeDef *timer, TIM_TypeDef *instance)
 {
     timer->Instance = instance;
@@ -34,6 +42,10 @@ static bool timer_init(TIM_HandleTypeDef *timer, TIM_TypeDef *instance)
     return HAL_TIM_Encoder_Init(timer, &config) == HAL_OK;
 }
 
+/**
+ * @brief 初始化并启动左右编码器计数，成功后才允许读取计数快照。
+ * 右路启动失败时停止已启动的左路并返回 false；主循环仅在编码器模式调用。
+ */
 bool encoder_init(void)
 {
     ready = false;
@@ -52,6 +64,10 @@ bool encoder_init(void)
     return true;
 }
 
+/**
+ * @brief 读取左右编码器当前 16 位原始计数，写入 counts。
+ * 未初始化或输出指针为空时返回 false；两路顺序读取，并非严格同步采样。
+ */
 bool encoder_read(EncoderCounts *counts)
 {
     if (!ready || counts == 0) return false;

@@ -12,7 +12,7 @@ typedef struct {
     LineStopReason stop_reason;
     float position, left_command, right_command;
     uint16_t left_encoder, right_encoder;
-    bool odometry_ready;
+    bool encoder_control_enabled, odometry_ready;
     float distance_cm, heading_rad, left_speed_cm_s, right_speed_cm_s;
     float left_target_cm_s, right_target_cm_s;
     RouteState route_state;

@@ -1,6 +1,32 @@
 # 首版验证记录
 
-## 2026-10-19 当前增量：双环、厘米路径、路口 FSM 与干扰保持
+## 2026-10-19 当前增量：编码器 / 双环与 PWM 模式开关
+
+`include/motion_config.h` 新增 `ENCODER_CONTROL_ENABLED` 编译开关，默认 0。0 使用独立 PWM 单位的白线位置 PID，不初始化/读取编码器，不运行厘米路径或 STOP callback；1 保留已实现的编码器、双环与路径，继续要求尺寸标定。PWM 模式启动无需轮径/计数/轮距，仍需明确请求与连续有效白线。
+
+已执行 `sh test/run_host_tests.sh`，全部通过，使用 C11、严格警告、ASan / UBSan：
+
+- 原传感器/PID/PWM 套件：120960 次检查通过。
+- 开启编码器的导航套件：5175 次检查通过，显式以开关 1 编译，未因默认值改变而跳过。
+- 新 PWM 模式套件：3827 次检查通过，显式以开关 0 编译；测试不链接里程和速度环模块。覆盖未知标定/无路径仍可启动、编码器异常计数被忽略、无编码器堵转误报、中心与左右 PWM、干扰冻结 PID/降速/历史差值衰减、连续恢复、孤立噪声不续时、超时点及毫秒回绕、手动停止、任务故障锁定、非法位置停车、不触发路径成功回调。
+- 电机及编码器 HAL 模拟套件均通过。
+
+已执行 `pio run -e genericSTM32F103C8 -e encoder_closed_loop`，两模式 SUCCESS：
+
+| 环境 / 模式 | PlatformIO Flash | 静态 RAM | BIN 长度 |
+| --- | --- | --- | --- |
+| `genericSTM32F103C8`，默认宏 0 | 9240 / 65536 B | 536 / 20480 B | 9516 B |
+| `encoder_closed_loop`，编译参数强制宏 1 | 12952 / 65536 B | 684 / 20480 B | 13228 B |
+
+实际 ELF 符号核对：默认模式不包含 `encoder_init`、`encoder_read`、`odometry_update`、`speed_control_update`、`route_update`、`route_dispatch_stop_callback`；开启模式包含以上函数。不是仅仅关闭反馈后继续因标定或编码器故障拒绝运行。静态 RAM 不含运行栈峰值，BIN 包含额外段/填充，不等同于 PlatformIO Flash 统计。
+
+`pio run -e genericSTM32F103C8 -t compiledb` 成功，编辑器数据库对应当前默认模式。应用源码无警告；首次构建仍有框架 `stm32f1xx_ll_utils.c` 原有 3 个 unused-parameter 警告。`git diff --check` 通过。README、模式 Mermaid、AGENTS 与控制说明同步。
+
+没有烧录或操作电机，`hardware_tested=false`。普通模式通过 PWM 调平均电压，不能保证实际轮速或航向；干扰使用限时历史差值，保留 400 ms 超时，但没有 8 cm 距离检测。厘米路径和路径 STOP 回调在该模式停用，PB10/调试停止及故障停车继续生效。
+
+以下双环与旧 GPIO 记录为之前阶段，默认行为、产物大小与当前版本以本节为准。
+
+## 2026-10-19 历史增量：双环、厘米路径、路口 FSM 与干扰保持
 
 用户本次授权实现白线位置外环 + 左右轮速度内环、预设路径和编码器定位、路口动作与 STOP callback。用户确认 STOP 也必须在距离窗口内检测到路口；轮径、编码器计数和轮距暂未知。
 

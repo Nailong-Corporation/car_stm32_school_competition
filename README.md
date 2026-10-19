@@ -2,7 +2,7 @@
 
 ## 当前进度与验证边界
 
-> **2026-10-19 双环与路径控制：** 已实现白线位置外环 → 左右轮速度内环，启用 PA8/PA9（TIM1）和 PB6/PB7（TIM4）的正交编码器计数；新增厘米路径表、路口有限状态机及 STOP 回调。STOP 同样要求在距离窗口内确认路口。元器件图形等未确认观测按丢线处理，降速保持编码器航向，超时停车。用户确认轮径、计数和轮距暂未知，因此默认标定参数为 0、禁止启动；不是可直接上赛道的已标定固件。详细设计见 [双环与路径说明](docs/navigation.md)，未烧录或验证硬件。
+> **2026-10-19 控制模式开关：** `include/motion_config.h` 的 `ENCODER_CONTROL_ENABLED` 默认 **0**：白线位置 PID 直接输出左右 PWM，不初始化/读取编码器，不依赖轮径标定。改为 **1** 后启用编码器、位置/速度双环、厘米路径与路口 STOP；该模式的尺寸参数仍未知，未标定禁止启动。关闭时路径距离和对应 STOP 回调停用，干扰仅做限时历史 PWM 差值保持。两模式均须明确启动，未烧录或验证硬件。详见下方开关说明与 [控制说明](docs/navigation.md)。
 
 > **2026-10-17 下单后终审：** 用户确认订单为 **A10 + SMT**，1×20 排母换料已接受。本次重新核查制造包、原生 PCB 的 32 个器件 / 143 个引脚及 48 个网络，未发现确定性电气接错、断路或异网短路。降压标称约 5.08 V；3.3 V 来自核心板。USB 供电前须拆 R4，电机启动电流、3.3 V 负载余量与降压动态/温升尚未验证。详见 [A10 电气终审](docs/A10-final-electrical-review.md)。
 
@@ -14,7 +14,7 @@
 
 2026-10-14 用户明确授权进入固件编码阶段，确认 MCU 为 **STM32F103C8T6**、驱动器为 **TB6612FNG**、八路灰度模块为 **GPIO 数字输出**，并授权决定接线。首版 C / STM32Cube HAL 固件已实现，可交叉构建；尚未烧录、接线验证、架空测试或实车调参。
 
-目标是在深蓝底、白线（含虚线）赛道上按预设路径巡线。8 路分别占用 8 个 GPIO。白线位置外环输出左右目标速度差（cm/s），两轮各自的速度 PID 通过霍尔编码器反馈输出 PWM。路径距离使用厘米，编码器提供相对里程和航向估计；打滑会产生累计误差，不能视为绝对定位。倒车与原地旋转仍不在本次实现范围内。
+目标是在深蓝底、白线（含虚线）赛道上按预设路径巡线。8 路分别占用 8 个 GPIO。编码器模式下，白线位置外环输出左右目标速度差（cm/s），两轮各自的速度 PID 通过霍尔编码器反馈输出 PWM；默认 PWM 模式由白线位置 PID 直接输出左右 PWM。路径距离使用厘米，编码器提供相对里程和航向估计；打滑会产生累计误差，不能视为绝对定位。倒车与原地旋转仍不在本次实现范围内。
 
 | 项目 | 当前状态 |
 | --- | --- |
@@ -22,8 +22,8 @@
 | HAL 时钟、GPIO、TIM3 PWM、IWDG、调度 | 已实现源码，交叉构建通过；板上行为待验证 |
 | MCU / 电机驱动 / 灰度接口类型 | 用户确认，尚未核对实际板与模块 |
 | 引脚选择 | 已落实到固件；实际接线待确认 |
-| 双轮霍尔编码器 | TIM1/TIM4 TI12 四倍频计数；电平、方向与比例待实物标定 |
-| 双环 / 路径 / 路口 / STOP | 已实现并做主机验证；真实尺寸未知，默认禁止启动 |
+| 双轮霍尔编码器 | 开关为 1 时启用 TIM1/TIM4；默认不初始化或读取 |
+| 控制模式 | 默认 0：PWM 开环调速；1：双环/厘米路径，未标定拒绝启动 |
 | 模块供电与输出电平、输入上下拉 | 用户确认灰度为 3.3 V 供电；输出电平、输出类型及上下拉仍待实物确认 |
 | 深蓝底识别、轮向、停车、电量变化、赛道效果 | 未验证 |
 | PID / PWM / 丢线与路口时限 | 未标定初值 |
@@ -37,12 +37,46 @@
 | 系统时钟 | 内部 HSI 8 MHz / 2 × PLL16 = 名义 64 MHz |
 | APB1 / APB2 | 32 MHz / 64 MHz，TIM3 时钟名义 64 MHz |
 | TIM3 PWM | PSC=0、ARR=6399，名义 10 kHz，两路 PWM1 |
-| TIM1 / TIM4 编码器 | PSC=0、ARR=65535、TI12 四倍频，输入滤波 6，无计数中断 |
+| TIM1 / TIM4 编码器 | 仅开关为 1：PSC=0、ARR=65535、TI12 四倍频，输入滤波 6 |
 | 控制周期 | 5 ms，PID 使用实际控制间隔 `dt` |
 
 晶振未知，因此不依赖外部 HSE。[ST 数据手册](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)给出 HSI 作为 PLL 输入时最高系统时钟为 64 MHz；RC 时钟存在误差，实际 PWM/周期仍待测量。开发板环境沿用 [PlatformIO 的 genericSTM32F103C8 定义](https://docs.platformio.org/en/latest/boards/ststm32/genericSTM32F103C8.html)，没有改成 `bluepill_f103c8`。
 
 电机底层只读参考 `/Users/zhendong/Documents/RemoteCar_wifi/remote_car` 的 `src/main.c`、`include/main.h`、`platformio.ini`、HAL 配置与中断文件。借鉴双轮接口、单轮方向输出、指令限幅及 PWM 映射；新工程重新处理初始化返回值、零输出、轮向配置和异常停车，没有引入 Wi-Fi、串口遥控协议或 300 ms 遥控超时。
+
+## 控制模式开关
+
+在 `include/motion_config.h` 修改一个宏后重新编译：
+
+```c
+#define ENCODER_CONTROL_ENABLED 0  // 0：普通 PWM；1：编码器 + 双环 + 厘米路径
+```
+
+| 行为 | 0（当前默认） | 1 |
+| --- | --- | --- |
+| 电机调速 | 白线位置 PID → 左右 PWM，调节平均电压 | 位置 PID → 目标 cm/s → 双轮速度 PID → PWM |
+| 编码器 | 不初始化/读取 TIM1/TIM4，不依赖编码器接线 | 初始化并读取，检查计数/反馈故障 |
+| 标定门禁 | 不要求轮径/计数/轮距 | 须填写尺寸、方向并确认标定 |
+| 路径与 STOP | `ROUTE_DISABLED`，距离导航及表中 STOP callback 停用 | 保留原距离窗口、路口 FSM 和一次性 STOP callback |
+| 干扰/丢线 | 降低 PWM，冻结位置 PID，保留并衰减历史 PWM 差值 | 降速并使用编码器反馈保持估计航向 |
+| 停止条件 | PB10/调试停止、丢线 400 ms、任务异常 | 另含里程上限、路径异常及编码器反馈故障 |
+
+普通模式的 `OPEN_LOOP_BASE_PWM=55`、弯道基础值 40、干扰上限 35、位置 PID 初值 8/0/0.08 均集中在同一个配置文件，指令使用 255 标尺且受 PWM 上限 100 约束。它们不是 cm/s，`RouteStep.speed` 不会被挪作 PWM 使用。电机开环调速通过 PWM 占空比改变驱动平均电压，实际速度受负载、电量等影响；没有编码器就不能测量并纠正航向或按厘米定位。
+
+```mermaid
+flowchart LR
+    GPIO["8 路灰度 / 位置"] --> SELECT{"编译开关"}
+    SELECT -->|0| POSITION["位置 PID<br/>输出 PWM 差值"]
+    POSITION --> PWM["非负 PWM 限幅 → TIM3 → 电机"]
+    SELECT -->|1| CASCADE["编码器与位置/速度双环<br/>厘米路径 / 路口 FSM"]
+    CASCADE --> PWM
+    GPIO --> BAD["丢线 / 干扰"]
+    BAD --> HOLD["0：历史 PWM 差值衰减<br/>1：编码器航向保持"]
+    HOLD --> PWM
+    STOP["明确停止 / 超时 / 故障<br/>STBY 低"] --> PWM
+```
+
+`pio run -e genericSTM32F103C8` 使用代码中的开关；当前默认构建为 PWM 模式。另提供 `pio run -e encoder_closed_loop` 验证环境，使用同一 MCU 配置并以编译参数强制开关为 1，输出到独立目录。不要用这个强制环境判断宏为 0 的默认行为。`g_diagnostics.encoder_control_enabled` 显示实际构建模式；PWM 模式的里程/轮速字段为 0，不代表已测得零速。
 
 ## 接线方案
 
@@ -64,8 +98,8 @@
 | 右轮方向 | PB14、PB15 | BIN1、BIN2；BO1/BO2 接右电机 |
 | 电机使能 | PB5 | STBY，由 MCU 控制，不固定接高 |
 | 启动 / 停止按键 | PB10 | 常开按键另一端接 GND，内部上拉 |
-| 左轮编码器 A / B | PA8、PA9 | TIM1_CH1 / TIM1_CH2，TI12 编码器输入 |
-| 右轮编码器 A / B | PB6、PB7 | TIM4_CH1 / TIM4_CH2，TI12 编码器输入 |
+| 左轮编码器 A / B | PA8、PA9 | 开关为 1 时使用 TIM1_CH1 / TIM1_CH2 |
+| 右轮编码器 A / B | PB6、PB7 | 开关为 1 时使用 TIM4_CH1 / TIM4_CH2 |
 | SWD | PA13、PA14 | 保留 SWDIO / SWCLK，另接调试器 GND |
 | 原调试串口预留变更 | PA9 已分配给编码器，PA10 仍未使用 | 不再将 PA9/PA10 作为可用的完整 USART1 默认接线对 |
 
@@ -79,7 +113,7 @@
 
 其他引脚有附带条件：PA15/PB3/PB4 复位后用于 JTAG，需要配置 SWJ 才能作为普通 GPIO，当前不改；PA13/PA14 保留 SWD。PB2 涉及 BOOT1，当前载板 J6.15 为 PB10 按键，并未引出 PB2。PC13/PC14/PC15 涉及核心板 LED / 低速晶振的可能连接，须核对实物；PD0/PD1 留给外部高速晶振，不因固件使用 HSI 就视作可用排针。
 
-选择 PA8/PA9 和 PB6/PB7 是因为两组均对应同一定时器的 CH1/CH2 默认映射，现分别用于正交编码器计数，无需修改现有 TIM3 PWM 或关闭 JTAG/SWD。[ST 数据手册表 5](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)列出这些引脚及其 FT 属性；TIM1 的互补输出也与 PB13/PB14 等复用，当前编码器初始化不配置这些电机方向引脚或互补输出。
+选择 PA8/PA9 和 PB6/PB7 是因为两组均对应同一定时器的 CH1/CH2 默认映射，开关为 1 时分别用于正交编码器计数，无需修改现有 TIM3 PWM 或关闭 JTAG/SWD。[ST 数据手册表 5](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)列出这些引脚及其 FT 属性；TIM1 的互补输出也与 PB13/PB14 等复用，当前编码器初始化不配置这些电机方向引脚或互补输出。
 
 按用户提供图片中的 **霍尔编码器款**，每个电机六线定义如下。图中的编号是连接器针序，不能按未知线色推断，也不能混用右侧 GMR 的线序。
 
@@ -94,7 +128,7 @@
 
 TB6612 电机输出为 H 桥两端，不是固定电源正负；电机线极性和车体前进方向需架空确认。A10 接口编号来自本仓库 `PCB design/stm32PCB-A10/stm32PCB-A10.netlist.json`：J11.4/5 与 J7.5/6 同网，J12.3/4 与 J7.14/15 同网；接线按实物丝印找针，不按照片观看方向数针。这是已存设计文件核对，未证明实物连通。
 
-初始化入口为 `encoder_init()`，在传感器 GPIO 初始化之后、PWM 初始化之前执行。内部先以 `GPIO_MODE_INPUT` + `GPIO_NOPULL` 配置四个输入，再启动 TIM1 / TIM4 的 TI12 四倍频计数。主循环每 5 ms 顺序读取两个 16 位计数器，计算有符号回绕增量；不用 EXTI 或逐脉冲中断。计数方式依据 [ST HAL 编码器接口](https://github.com/STMicroelectronics/stm32f1xx-hal-driver/blob/master/Src/stm32f1xx_hal_tim.c)与 [RM0008](https://www.st.com/resource/en/reference_manual/cd00171190.pdf)。即使标定尚未填写，仍可在停车状态通过 `g_diagnostics.left_encoder/right_encoder` 观察手动转轮计数。
+开关为 1 时，初始化入口为 `encoder_init()`，在传感器 GPIO 初始化之后、PWM 初始化之前执行。内部先以 `GPIO_MODE_INPUT` + `GPIO_NOPULL` 配置四个输入，再启动 TIM1 / TIM4 的 TI12 四倍频计数。主循环每 5 ms 顺序读取两个 16 位计数器，计算有符号回绕增量；不用 EXTI 或逐脉冲中断。计数方式依据 [ST HAL 编码器接口](https://github.com/STMicroelectronics/stm32f1xx-hal-driver/blob/master/Src/stm32f1xx_hal_tim.c)与 [RM0008](https://www.st.com/resource/en/reference_manual/cd00171190.pdf)。在编码器模式下，即使标定尚未填写，仍可在停车状态通过 `g_diagnostics.left_encoder/right_encoder` 观察手动转轮计数。
 
 **供电电压与信号高电平分别确认。** 默认关闭内部上下拉，是为了兼容后续核实后的 FT 输入使用条件；[ST 数据手册 §5.3.1 / §5.3.13](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)要求输入超过 VDD+0.3 V 时禁用内部上下拉。若为开漏且没有已有上拉，输入会浮空，应根据模块规格增加外部上拉，优先采用兼容的 3.3 V 信号方案。若模块自带上拉，先确认其接到哪条电源。不能仅凭“霍尔编码器”认定 A/B 为 3.3 V 或 5 V，也不能仅凭 FT 属性认定电源时序、噪声与整个模块接口已经验证。PCB 电源已预留，本次不改动电源或制造文件。
 
@@ -115,11 +149,15 @@ TB6612 电机输出为 H 桥两端，不是固定电源正负；电机线极性�
 ```text
 position = Σ(w[i] × line[i]) / 选定区域白线路数
 error = position - 0
+# 编码器模式（开关 1）：
 left_target_cm_s = base_cm_s + correction_cm_s
 right_target_cm_s = base_cm_s - correction_cm_s
+# PWM 模式（开关 0）：
+left_pwm = base_pwm + correction_pwm
+right_pwm = base_pwm - correction_pwm
 ```
 
-正误差表示白线在右侧；正修正使左轮目标速度较大、右轮较小，期望向右转。两轮“正指令均向前”仍需架空确认，可通过 `board_config.h` 的左右轮方向配置修正。
+正误差表示白线在右侧；正修正在编码器模式使左轮目标速度较大、右轮较小，在 PWM 模式使左轮 PWM 较大、右轮较小，期望向右转。两轮“正指令均向前”仍需架空确认，可通过 `board_config.h` 的左右轮方向配置修正。
 
 以下字符串按 S0→S7 排列；代码掩码使用 **bit0=S0、bit7=S7**，因此调试器二进制显示从高位到低位时顺序与表中字符串相反。
 
@@ -134,7 +172,9 @@ right_target_cm_s = base_cm_s - correction_cm_s
 
 单个连续区域宽度不超过 4 路时可作为目标；任一区域宽度超过 4 路则为歧义。多个窄区域时，只有最近可靠位置存在、最近区域距离不超过 3 个权重单位，且它比次近区域至少近 1 个单位，才选择该区域。但本次导航层采用更保守的规则：多区域即使在传感器层选出了一个区域，也不进入普通位置 PID；与宽线、无白线一起先交给路径/路口判断，否则按丢线保持航向。这些阈值属于未标定初值。
 
-## 总体架构（Mermaid）
+## 编码器模式总体架构（Mermaid）
+
+以下图示及厘米路径/路口章节仅适用于 `ENCODER_CONTROL_ENABLED=1`；默认 PWM 模式见上方开关说明。
 
 ```mermaid
 flowchart LR
@@ -190,7 +230,7 @@ const RouteStep route[] = {
 
 `main.c` 提供 `route_stop_callback(size_t step_index, void *context)`，默认仅记录 `g_diagnostics.route_stop_events` 与 `route_stopped_step`。主循环先下发停车、再消费一次性回调；回调中不得延时、阻塞输出或重新使能电机。普通按键停车、丢线和故障停车不调用这条路径成功回调。
 
-尺寸配置集中在 `include/motion_config.h`。用户确认参数暂未知，左右轮直径、每输出轮一圈四倍频计数及轮距均保留 0，`ODOMETRY_CALIBRATION_CONFIRMED=0`。未确认前可看原始计数，但启动请求被拒绝并报告 `LINE_STOP_CALIBRATION`。换算公式、标定步骤和各阈值见 [双环与路径说明](docs/navigation.md)。
+尺寸配置集中在 `include/motion_config.h`。用户确认参数暂未知，左右轮直径、每输出轮一圈四倍频计数及轮距均保留 0，`ODOMETRY_CALIBRATION_CONFIRMED=0`。编码器模式下未确认前可看原始计数，但启动请求被拒绝并报告 `LINE_STOP_CALIBRATION`。换算公式、标定步骤和各阈值见 [双环与路径说明](docs/navigation.md)。
 
 全车停车沿用 STBY=0、PWM=0、方向引脚=0 的待机路径；不能把软件停车当成已验证机械刹停。左右增益与死区补偿仍是开环静态校正，轮速闭环来自新的编码器反馈。
 
@@ -247,7 +287,7 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
 | --- | --- |
 | `include/board_config.h` | 引脚、轮向、输入上下拉、时钟与 PWM |
 | `include/control_config.h` | 周期、PWM、滤波与连续性初值 |
-| `include/motion_config.h` | 尺寸与计数标定、双环参数、航向/路口/路径超时 |
+| `include/motion_config.h` | 模式开关、PWM 模式参数、尺寸标定、双环与导航参数 |
 | `src/gray_sensor.c` | 一次反相、逐路滤波、区域分类及位置 |
 | `src/pid.c` | PID、条件积分抗饱和、微分滤波及复位 |
 | `src/motor_command.c` | 可在主机测试的差速限幅与 PWM 映射 |
@@ -258,13 +298,15 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
 | `src/line_follow.c` | 位置外环、路径/航向模式选择、运行状态与独立停车 |
 | `src/main.c`、`src/stm32f1xx_it.c` | 初始化、调度、按钮、诊断、看门狗与异常入口 |
 | `include/stm32f1xx_hal_conf.h` | HAL 模块配置；DMA 是 TIM HAL 类型依赖，不用于灰度采样 |
-| `test/test_logic.c`、`test/test_navigation.c` | 传感器/PID/PWM、里程/双环/路口/干扰/路径逻辑 |
+| `test/test_logic.c`、`test/test_navigation.c`、`test/test_open_loop.c` | 传感器/PID/PWM、双环导航及关闭编码器后的 PWM 控制 |
 | `test/test_motor_hal.c`、`test/test_encoder_hal.c`、`test/run_host_tests.sh` | 外设 HAL 模拟及主机验证入口，ASan / UBSan |
 
 ```sh
 # 在工程目录执行，均无需接板
 sh test/run_host_tests.sh
 pio run -e genericSTM32F103C8
+# 独立验证开启模式（强制宏为 1）
+pio run -e encoder_closed_loop
 ```
 
 输出产物为 `.pio/build/genericSTM32F103C8/firmware.elf` 与 `firmware.bin`。主机测试不执行真实外设中断或电机；HAL 电机输出测试采用模拟接口，不代表电气行为已验证。交叉构建不等于板上运行通过。当前构建使用已有 ststm32 19.7.1 / STM32CubeF1 1.8.6 / GCC Arm 7.2.1，无新增第三方应用依赖。
