@@ -2,7 +2,7 @@
 
 ## 当前进度与验证边界
 
-> **2026-10-19 霍尔编码器接口：** 用户授权为两个电机选择并初始化编码器引脚。左轮 A/B 相使用 **PA8 / PA9**，右轮 A/B 相使用 **PB6 / PB7**；上电仅初始化为无内部上下拉的 GPIO 输入，预留后续 TIM1 / TIM4 编码器模式。尚未启动计数或接入轮速反馈，仍使用单环白线位置 PID。编码器电源由用户已预留的 PCB 接口提供，供电电压和 A/B 输出电平需确认，未烧录或进行硬件验证。
+> **2026-10-19 双环与路径控制：** 已实现白线位置外环 → 左右轮速度内环，启用 PA8/PA9（TIM1）和 PB6/PB7（TIM4）的正交编码器计数；新增厘米路径表、路口有限状态机及 STOP 回调。STOP 同样要求在距离窗口内确认路口。元器件图形等未确认观测按丢线处理，降速保持编码器航向，超时停车。用户确认轮径、计数和轮距暂未知，因此默认标定参数为 0、禁止启动；不是可直接上赛道的已标定固件。详细设计见 [双环与路径说明](docs/navigation.md)，未烧录或验证硬件。
 
 > **2026-10-17 下单后终审：** 用户确认订单为 **A10 + SMT**，1×20 排母换料已接受。本次重新核查制造包、原生 PCB 的 32 个器件 / 143 个引脚及 48 个网络，未发现确定性电气接错、断路或异网短路。降压标称约 5.08 V；3.3 V 来自核心板。USB 供电前须拆 R4，电机启动电流、3.3 V 负载余量与降压动态/温升尚未验证。详见 [A10 电气终审](docs/A10-final-electrical-review.md)。
 
@@ -14,7 +14,7 @@
 
 2026-10-14 用户明确授权进入固件编码阶段，确认 MCU 为 **STM32F103C8T6**、驱动器为 **TB6612FNG**、八路灰度模块为 **GPIO 数字输出**，并授权决定接线。首版 C / STM32Cube HAL 固件已实现，可交叉构建；尚未烧录、接线验证、架空测试或实车调参。
 
-目标是在深蓝底、白线（含虚线）赛道上巡线。8 路分别占用 8 个 GPIO；一个白线横向位置 PID 输出左右轮 PWM 差值。当前编码器仅完成 A/B 相 GPIO 输入初始化，无编码器计数、轮速反馈、速度 PID、双环或串级控制。PWM 是驱动强度，不能代表已知速度或精确距离。路口选路、终点识别、倒车与原地旋转不在首版范围内。
+目标是在深蓝底、白线（含虚线）赛道上按预设路径巡线。8 路分别占用 8 个 GPIO。白线位置外环输出左右目标速度差（cm/s），两轮各自的速度 PID 通过霍尔编码器反馈输出 PWM。路径距离使用厘米，编码器提供相对里程和航向估计；打滑会产生累计误差，不能视为绝对定位。倒车与原地旋转仍不在本次实现范围内。
 
 | 项目 | 当前状态 |
 | --- | --- |
@@ -22,10 +22,11 @@
 | HAL 时钟、GPIO、TIM3 PWM、IWDG、调度 | 已实现源码，交叉构建通过；板上行为待验证 |
 | MCU / 电机驱动 / 灰度接口类型 | 用户确认，尚未核对实际板与模块 |
 | 引脚选择 | 已落实到固件；实际接线待确认 |
-| 双轮霍尔编码器 | PA8/PA9、PB6/PB7 输入初始化；计数、方向、轮速及电平待验证 |
+| 双轮霍尔编码器 | TIM1/TIM4 TI12 四倍频计数；电平、方向与比例待实物标定 |
+| 双环 / 路径 / 路口 / STOP | 已实现并做主机验证；真实尺寸未知，默认禁止启动 |
 | 模块供电与输出电平、输入上下拉 | 用户确认灰度为 3.3 V 供电；输出电平、输出类型及上下拉仍待实物确认 |
 | 深蓝底识别、轮向、停车、电量变化、赛道效果 | 未验证 |
-| PID / PWM / 虚线时限 | 未标定初值 |
+| PID / PWM / 丢线与路口时限 | 未标定初值 |
 
 ## 工程配置与参考来源
 
@@ -36,6 +37,7 @@
 | 系统时钟 | 内部 HSI 8 MHz / 2 × PLL16 = 名义 64 MHz |
 | APB1 / APB2 | 32 MHz / 64 MHz，TIM3 时钟名义 64 MHz |
 | TIM3 PWM | PSC=0、ARR=6399，名义 10 kHz，两路 PWM1 |
+| TIM1 / TIM4 编码器 | PSC=0、ARR=65535、TI12 四倍频，输入滤波 6，无计数中断 |
 | 控制周期 | 5 ms，PID 使用实际控制间隔 `dt` |
 
 晶振未知，因此不依赖外部 HSE。[ST 数据手册](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)给出 HSI 作为 PLL 输入时最高系统时钟为 64 MHz；RC 时钟存在误差，实际 PWM/周期仍待测量。开发板环境沿用 [PlatformIO 的 genericSTM32F103C8 定义](https://docs.platformio.org/en/latest/boards/ststm32/genericSTM32F103C8.html)，没有改成 `bluepill_f103c8`。
@@ -62,8 +64,8 @@
 | 右轮方向 | PB14、PB15 | BIN1、BIN2；BO1/BO2 接右电机 |
 | 电机使能 | PB5 | STBY，由 MCU 控制，不固定接高 |
 | 启动 / 停止按键 | PB10 | 常开按键另一端接 GND，内部上拉 |
-| 左轮编码器 A / B | PA8、PA9 | 当前 GPIO 输入；后续可用 TIM1_CH1 / TIM1_CH2 |
-| 右轮编码器 A / B | PB6、PB7 | 当前 GPIO 输入；后续可用 TIM4_CH1 / TIM4_CH2 |
+| 左轮编码器 A / B | PA8、PA9 | TIM1_CH1 / TIM1_CH2，TI12 编码器输入 |
+| 右轮编码器 A / B | PB6、PB7 | TIM4_CH1 / TIM4_CH2，TI12 编码器输入 |
 | SWD | PA13、PA14 | 保留 SWDIO / SWCLK，另接调试器 GND |
 | 原调试串口预留变更 | PA9 已分配给编码器，PA10 仍未使用 | 不再将 PA9/PA10 作为可用的完整 USART1 默认接线对 |
 
@@ -77,7 +79,7 @@
 
 其他引脚有附带条件：PA15/PB3/PB4 复位后用于 JTAG，需要配置 SWJ 才能作为普通 GPIO，当前不改；PA13/PA14 保留 SWD。PB2 涉及 BOOT1，当前载板 J6.15 为 PB10 按键，并未引出 PB2。PC13/PC14/PC15 涉及核心板 LED / 低速晶振的可能连接，须核对实物；PD0/PD1 留给外部高速晶振，不因固件使用 HSI 就视作可用排针。
 
-选择 PA8/PA9 和 PB6/PB7 是因为两组均对应同一定时器的 CH1/CH2 默认映射，后续可分别用于正交编码器计数，无需修改现有 TIM3 PWM 或关闭 JTAG/SWD。[ST 数据手册表 5](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)列出这些引脚及其 FT 属性；TIM1 的互补输出也与 PB13/PB14 等复用，后续配置编码器时不能初始化这些电机方向引脚为互补输出。
+选择 PA8/PA9 和 PB6/PB7 是因为两组均对应同一定时器的 CH1/CH2 默认映射，现分别用于正交编码器计数，无需修改现有 TIM3 PWM 或关闭 JTAG/SWD。[ST 数据手册表 5](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)列出这些引脚及其 FT 属性；TIM1 的互补输出也与 PB13/PB14 等复用，当前编码器初始化不配置这些电机方向引脚或互补输出。
 
 按用户提供图片中的 **霍尔编码器款**，每个电机六线定义如下。图中的编号是连接器针序，不能按未知线色推断，也不能混用右侧 GMR 的线序。
 
@@ -92,7 +94,7 @@
 
 TB6612 电机输出为 H 桥两端，不是固定电源正负；电机线极性和车体前进方向需架空确认。A10 接口编号来自本仓库 `PCB design/stm32PCB-A10/stm32PCB-A10.netlist.json`：J11.4/5 与 J7.5/6 同网，J12.3/4 与 J7.14/15 同网；接线按实物丝印找针，不按照片观看方向数针。这是已存设计文件核对，未证明实物连通。
 
-初始化入口为 `encoder_gpio_init()`，在 `main()` 的传感器 GPIO 初始化之后、PWM 初始化之前执行；四个输入均为 `GPIO_MODE_INPUT` + `GPIO_NOPULL`。不启用 EXTI、不启用 TIM1/TIM4、不读取脉冲或计算转速，不改变原巡线与停车策略。可在硬件确认阶段观察 GPIOA IDR 的 bit8/9 和 GPIOB IDR 的 bit6/7；主循环 5 ms 采样不能替代高速脉冲计数。
+初始化入口为 `encoder_init()`，在传感器 GPIO 初始化之后、PWM 初始化之前执行。内部先以 `GPIO_MODE_INPUT` + `GPIO_NOPULL` 配置四个输入，再启动 TIM1 / TIM4 的 TI12 四倍频计数。主循环每 5 ms 顺序读取两个 16 位计数器，计算有符号回绕增量；不用 EXTI 或逐脉冲中断。计数方式依据 [ST HAL 编码器接口](https://github.com/STMicroelectronics/stm32f1xx-hal-driver/blob/master/Src/stm32f1xx_hal_tim.c)与 [RM0008](https://www.st.com/resource/en/reference_manual/cd00171190.pdf)。即使标定尚未填写，仍可在停车状态通过 `g_diagnostics.left_encoder/right_encoder` 观察手动转轮计数。
 
 **供电电压与信号高电平分别确认。** 默认关闭内部上下拉，是为了兼容后续核实后的 FT 输入使用条件；[ST 数据手册 §5.3.1 / §5.3.13](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)要求输入超过 VDD+0.3 V 时禁用内部上下拉。若为开漏且没有已有上拉，输入会浮空，应根据模块规格增加外部上拉，优先采用兼容的 3.3 V 信号方案。若模块自带上拉，先确认其接到哪条电源。不能仅凭“霍尔编码器”认定 A/B 为 3.3 V 或 5 V，也不能仅凭 FT 属性认定电源时序、噪声与整个模块接口已经验证。PCB 电源已预留，本次不改动电源或制造文件。
 
@@ -113,11 +115,11 @@ TB6612 电机输出为 H 桥两端，不是固定电源正负；电机线极性�
 ```text
 position = Σ(w[i] × line[i]) / 选定区域白线路数
 error = position - 0
-left = base + correction
-right = base - correction
+left_target_cm_s = base_cm_s + correction_cm_s
+right_target_cm_s = base_cm_s - correction_cm_s
 ```
 
-正误差表示白线在右侧；正修正使左轮 PWM 较大、右轮较小，期望向右转。两轮“正指令均向前”仍需架空确认，可通过 `board_config.h` 的左右轮方向配置修正。
+正误差表示白线在右侧；正修正使左轮目标速度较大、右轮较小，期望向右转。两轮“正指令均向前”仍需架空确认，可通过 `board_config.h` 的左右轮方向配置修正。
 
 以下字符串按 S0→S7 排列；代码掩码使用 **bit0=S0、bit7=S7**，因此调试器二进制显示从高位到低位时顺序与表中字符串相反。
 
@@ -130,115 +132,113 @@ right = base - correction
 | `00000000` | `11111111` | 全白，`GRAY_AMBIGUOUS`，不能当成居中 |
 | `00111100` | `11000011` | 多区域；无可靠连续性时为歧义 |
 
-单个连续区域宽度不超过 4 路时可作为目标；任一区域宽度超过 4 路则为歧义。多个窄区域时，只有最近可靠位置存在、最近区域距离不超过 3 个权重单位，且它比次近区域至少近 1 个单位，才选择该区域。否则限时降速，超时停车。这些阈值属于未标定初值，不用于判断路口或终点。
+单个连续区域宽度不超过 4 路时可作为目标；任一区域宽度超过 4 路则为歧义。多个窄区域时，只有最近可靠位置存在、最近区域距离不超过 3 个权重单位，且它比次近区域至少近 1 个单位，才选择该区域。但本次导航层采用更保守的规则：多区域即使在传感器层选出了一个区域，也不进入普通位置 PID；与宽线、无白线一起先交给路径/路口判断，否则按丢线保持航向。这些阈值属于未标定初值。
 
 ## 总体架构（Mermaid）
 
 ```mermaid
 flowchart LR
-    TRACK["深蓝底 / 白线赛道"] --> GPIO["8 路独立 GPIO<br/>S0 至 S7：左到右"]
-    subgraph SENSOR["gray_sensor：传感器层"]
-        GPIO --> INVERT["一次反相：line = 1 - raw"]
-        INVERT --> FILTER["3 帧多数滤波"]
-        FILTER --> OBS["连续区域分类 / 选择<br/>有效 / 无白线 / 歧义"]
-    end
-    subgraph CONTROL["line_follow + pid：位置控制"]
-        STATE["运行状态 / 恢复确认 / 总时限"]
-        POSITION["选定白线位置<br/>error = position - 0"]
-        PID["单环位置 PID<br/>积分抗饱和 / 微分低通"]
-        HOLD["间隙 / 歧义保持 / 有限寻线<br/>冻结积分 / 有界历史方向"]
-        MIX["非负差速与限幅<br/>左 = base + correction<br/>右 = base - correction"]
-        STOP["独立停车<br/>清理历史 / STBY 低"]
-        STATE -->|正常有效观测| POSITION --> PID --> MIX
-        STATE -->|间隙或歧义| HOLD --> MIX
-        STATE -->|待机或停止| STOP
-    end
-    OBS --> STATE
-    MIX --> MOTOR["motor_command + motor<br/>开环校准 / 轮向 / TIM3 双 PWM"]
+    TRACK["白线 / 赛道"] --> GPIO["8 GPIO → 一次反相 → 多数滤波"]
+    GPIO --> OBS["区域分类 / 白线位置"]
+    TABLE["const RouteStep 路径表<br/>cm / cm/s / LEFT RIGHT STRAIGHT STOP"] --> FSM["路口 FSM<br/>距离窗口 + 分支 + 连续确认"]
+    OBS --> FSM
+    OBS --> OUTER["正常白线位置 PID 外环<br/>输出速度差 cm/s"]
+    FSM --> MODE["控制模式选择"]
+    OUTER --> MODE
+    HOLD["丢线 / 元器件干扰<br/>冻结位置 PID / 降速保持航向"] --> MODE
+    FSM -->|未确认图形| HOLD
+    MODE --> TARGET["左右非负目标速度<br/>左 = base + correction<br/>右 = base - correction"]
+    TARGET --> INNER["左右轮速度 PID 内环<br/>含前馈 / 输出抗饱和"]
+    INNER --> MOTOR["PWM 限幅 → TIM3 → TB6612"]
+    MOTOR --> CAR["左右电机 / 车体"]
+    CAR -->|改变相对白线位置| TRACK
+    CAR --> ENCODER["TIM1 / TIM4 编码器四倍频计数"]
+    ENCODER --> ODOM["有符号增量 / cm 里程<br/>cm/s 轮速 / 右转为正的航向"]
+    ODOM -->|轮速反馈| INNER
+    ODOM -->|里程与航向| FSM
+    ODOM -->|航向反馈| HOLD
+    FSM -->|STOP 路口确认| STOP["独立停车<br/>STBY 低 / 清理 PID"]
+    FAULT["停止请求 / 未标定 / 任务超时<br/>丢线超限 / 编码器或路径故障"] --> STOP
     STOP --> MOTOR
-    MOTOR --> VEHICLE["TB6612FNG / 左右电机 / 车体"]
-    VEHICLE -.-> HALL["双轮霍尔 A/B：encoder<br/>PA8/PA9、PB6/PB7 仅输入初始化<br/>未计数 / 未接入控制"]
-    VEHICLE -->|改变相对白线位置| TRACK
-    TICK["SysTick 1 ms / 主循环目标 5 ms"] -.-> GPIO
-    TICK -.-> STATE
-    SAFETY["停止请求 / 初始化失败 / 任务超时 / 异常总时限"] --> STOP
-    WATCHDOG["IWDG：任务卡死后复位<br/>复位后保持 IDLE"] -.-> VEHICLE
+    STOP -->|仅路径 STOP 确认| CALLBACK["确认停车后<br/>STOP callback 仅一次"]
 ```
 
-反馈来自白线位置，电机端没有轮速反馈。IWDG 路径依赖复位及 STBY 电气状态，实际断驱动效果待硬件验证；图中该虚线不代表独立硬件刹车。
+控制周期目标 5 ms，所有 PID 使用实际 `dt`。外环反馈来自白线位置，内环反馈来自左右轮速；干扰保持使用编码器推算的航向。IWDG 仍作为任务卡死后的复位退路，真实停车效果待板上验证。
 
-## PID、输出与停车
+## 双环、里程与路径表
 
-PID 初值为 `Kp=8`、`Ki=0`、`Kd=0.08`，积分限幅 20，微分低通时间常数 20 ms。调参先把 `Ki/Kd` 置 0 调 P，再加 D，确有持续偏差再加小 I；实现始终保留 PID 结构。
+位置外环初值 `Kp=1.8, Ki=0, Kd=0.025`，输出单位 cm/s；左右轮内环各使用 `Kp=2, Ki=8, Kd=0`，输出为 0…100 的 PWM 指令（255 标尺），加 `3 × 目标速度` 前馈。所有参数均待标定。速度目标上限 25 cm/s、基础速度上升斜率 40 cm/s²，降速与停止立即执行。内环抗饱和按前馈与 PID 相加后的 0…100 实际边界处理；目标速度为零时清空相应 PID 并输出零。
 
-积分采用限幅与条件积分抗饱和，修正量按当前基础 PWM 的可用空间限制。首帧及重获白线后重置微分历史，避免突跳。丢线/歧义期间不调用正常 PID，冻结积分；稳定恢复、停止和重启时重建历史。
+`src/route_table.c` 中只有一条行驶示例与一条停止项，编译进 Flash，不在运行中写 Flash：
 
-指令沿用 `0…255` 标尺，当前运行上限 100。基础 PWM 从中心 55 随偏差降低至 40；间隙/歧义 35，寻线 30，寻线修正 18。输出上涨斜率限制为每秒 200 指令单位，降速与停车立即执行。`motor_mix()` 同时限制修正和两轮输出，不默认倒车。
+```c
+typedef enum { LEFT, RIGHT, STRAIGHT, STOP } Action;
+typedef struct {
+    float distance;   // 到路口的预计路段长度，cm
+    float tolerance;  // 允许 ±cm
+    Action action;
+    int speed;        // 本路段目标速度，cm/s
+} RouteStep;
 
-左右轮增益初值均为 1，死区补偿为 0，集中放在 `control_config.h`；后续校准仍属于开环修正。零指令先于补偿处理，不能被补偿变为转动。PWM 映射按 `CCR = calibrated_command × (ARR+1) / 255` 取整，使用实际 TIM3 周期，避免沿用参考工程 ARR=99。
+const RouteStep route[] = {
+    {30.0f, 5.0f, LEFT, 12},
+    {20.0f, 4.0f, STOP, 8},
+};
+```
 
-**全车停车使用 STBY=0、PWM=0、方向引脚=0，选择待机高阻输出。** [TB6612FNG 真值表](https://toshiba.semicon-storage.com/info/datasheet_en_20141001.pdf?did=10660)中 STBY 低为待机；STBY 高、单轮 PWM 低则为短刹。因此运行中单轮零指令和整车停车的电气模式不同。停车命令不会保证车体立即静止，实际滑行距离与待机行为须架空及低速验证。
+第一段从明确启动的位置起算；之后每段从上一动作完成并离开路口消抖区的位置起算，不是全程累计里程。LEFT / RIGHT / STRAIGHT / STOP 均须在自己的距离窗口内确认路口；经过预计距离但没有路口不会触发 STOP callback，而会在越过窗口或路段超时时以路径异常停车。
 
-## 运行状态、虚线与歧义
+`main.c` 提供 `route_stop_callback(size_t step_index, void *context)`，默认仅记录 `g_diagnostics.route_stop_events` 与 `route_stopped_step`。主循环先下发停车、再消费一次性回调；回调中不得延时、阻塞输出或重新使能电机。普通按键停车、丢线和故障停车不调用这条路径成功回调。
 
-| 状态 | 行为 | 转移 |
-| --- | --- | --- |
-| `IDLE` | 上电停车，持续采样 | 明确启动且连续 3 次有效观测 → `TRACKING` |
-| `TRACKING` | 有效位置 PID，按偏差降速 | 无白线或歧义 → `GAP_HOLD` 的对应子模式 |
-| `GAP_HOLD` | 降速，衰减最后修正，冻结 PID | 稳定恢复 → `TRACKING`；无白线满 120 ms 且有可靠方向 → `SEARCH` |
-| `SEARCH` | 最近可靠方向的低速前进差速 | 稳定恢复 → `TRACKING`；总时限、无方向或故障 → `STOPPED` |
-| `STOPPED` | 持续停车、清除历史 | 普通停止需明确重启且观测稳定；任务故障需复位 |
+尺寸配置集中在 `include/motion_config.h`。用户确认参数暂未知，左右轮直径、每输出轮一圈四倍频计数及轮距均保留 0，`ODOMETRY_CALIBRATION_CONFIRMED=0`。未确认前可看原始计数，但启动请求被拒绝并报告 `LINE_STOP_CALIBRATION`。换算公式、标定步骤和各阈值见 [双环与路径说明](docs/navigation.md)。
+
+全车停车沿用 STBY=0、PWM=0、方向引脚=0 的待机路径；不能把软件停车当成已验证机械刹停。左右增益与死区补偿仍是开环静态校正，轮速闭环来自新的编码器反馈。
+
+## 路口、干扰与运行状态（Mermaid）
 
 ```mermaid
 flowchart TD
-    BOOT["上电 / 初始化 / 看门狗复位"] --> IDLE["IDLE：停车并采样"]
-    IDLE --> START{"一次启动请求<br/>且连续有效？"}
-    START -->|否：消费请求| IDLE
-    START -->|是| RESET["清理 PID 历史 / 限制输出上涨"]
-    RESET --> TRACKING["TRACKING：位置 PID"]
-    TRACKING --> OBS{"当前观测"}
-    OBS -->|有效| TRACKING
-    OBS -->|无白线| GAP["GAP_HOLD：降速与修正衰减"]
-    OBS -->|歧义| AMBIG["GAP_HOLD 歧义子模式<br/>更短异常预算 / 冻结 PID"]
-    GAP --> GC{"先检查截止时限<br/>再检查连续恢复"}
-    GC -->|连续有效且未超时| RESET
-    GC -->|未满 120 ms| GAP
-    GC -->|出现歧义：沿用原基准| AMBIG
-    GC -->|120 ms 且有近期方向| SEARCH["SEARCH：低速前进差速"]
-    GC -->|没有可靠方向| STOPPED["STOPPED：独立停车"]
-    SEARCH --> SC{"先检查截止时限<br/>再检查连续恢复"}
-    SC -->|连续有效且未超时| RESET
-    SC -->|未超时| SEARCH
-    SC -->|出现歧义：沿用原基准| AMBIG
-    SC -->|无白线总计 400 ms / 方向过期| STOPPED
-    AMBIG --> AC{"异常基准起 120 ms<br/>是否超时或稳定恢复？"}
-    AC -->|连续有效且未超时| RESET
-    AC -->|仍异常：包括无白线 / 孤立有效帧| AMBIG
-    AC -->|超时| STOPPED
-    FAULT["任意运行阶段<br/>停止请求 / 任务或计算故障"] --> STOPPED
-    STOPPED --> RESTART{"普通停止：明确重启<br/>且连续有效？"}
-    RESTART -->|否 / 故障锁定| STOPPED
-    RESTART -->|是| RESET
+    IDLE["IDLE / 上电停止"] --> START{"一次启动请求<br/>尺寸已标定 + 连续 3 帧窄白线？"}
+    START -->|否| IDLE
+    START -->|是| FOLLOW["TRACKING / ROUTE_FOLLOW<br/>位置外环 + 双轮速度内环"]
+    FOLLOW --> WINDOW{"距离窗口内<br/>中心白线 + 所需分支？"}
+    WINDOW -->|是| CANDIDATE["ROUTE_CANDIDATE<br/>降速保持航向 / 连续计数与运动确认"]
+    WINDOW -->|无白线或干扰图形| HOLD["GAP_HOLD<br/>冻结位置 PID / 编码器航向保持"]
+    HOLD -->|连续 3 帧窄白线且未超限| FOLLOW
+    HOLD -->|400 ms 或 8 cm 先到| STOPPED["STOPPED / STBY 低"]
+    CANDIDATE --> CONFIRM{"至少 3 帧 + 前进至少 0.1 cm<br/>100 ms 内且仍在距离窗口？"}
+    CONFIRM -->|图形消失| HOLD
+    CONFIRM -->|超限| STOPPED
+    CONFIRM -->|STOP 项确认| DONE["ROUTE_FINISHED<br/>停车后 callback 一次"]
+    DONE --> STOPPED
+    CONFIRM -->|LEFT / RIGHT / STRAIGHT| EXEC["LINE_JUNCTION / ROUTE_EXECUTING<br/>有限非反转差速 / 独立动作超时"]
+    EXEC -->|退出几何条件 + 连续窄白线| CLEAR["ROUTE_CLEARING<br/>恢复白线控制 / 继续离开至少 3 cm"]
+    CLEAR -->|连续窄白线 / 去重完成| NEXT["下一路径项 / 重置路段里程基准"]
+    NEXT --> FOLLOW
+    EXEC -->|2500 ms / 方向或转角异常| STOPPED
+    CLEAR -->|动作超时 / 干扰超限| STOPPED
+    ERR["任意阶段：按键停止 / 任务故障<br/>编码器故障 / 越过路口窗口 / 路段超时"] --> STOPPED
+    STOPPED -->|明确重启 + 连续窄白线<br/>任务与编码器故障需复位| START
 ```
 
-时限均使用 `uint32_t` 时间差，从最后一次连续稳定的有效观测计算，兼容时基回绕。无白线先保持 120 ms，再寻线最多 280 ms，累计 400 ms。出现歧义后，本次异常从同一基准使用 120 ms 更短预算，之后即使变成无白线也不恢复较长预算。若寻线中才出现歧义且该基准已超过 120 ms，立即停车。
+宽线、全白和多个分离区域只有通过路径窗口、目标分支、连续帧与运动距离联合确认后才是路口候选；其余按丢线/干扰处理。进入干扰时保存当前编码器航向，降低速度至不超过 6 cm/s，通过左右轮目标速度差纠正航向偏移；冻结位置 PID，不按图形位置拐弯，也不进入旧的 SEARCH 寻线。恢复需连续 3 帧单一窄白线，并重建 PID 历史。异常时限从最后稳定白线起算，先检查截止时限再接受恢复，孤立有效帧和异常种类切换不能续时。
 
-只有连续 3 次有效观测可结束异常；孤立有效帧不刷新基准、不更新正常 PID。截止时限优先于同周期恢复确认，不能在超时点用恢复帧延长输出。寻线方向来自最近非中心稳定误差，方向历史超过 500 ms 不再使用；没有可靠方向时停车。未检测到稳定白线不启动盲行，启动被拒绝后不会排队等待白线自行起步。
+左右转使用非负差速，目标转向修正 ±4 cm/s；编码器转角达到至少 1.0 rad 且中心窄白线连续 3 帧后进入离口阶段，超过 2.1 rad、反向超过 0.35 rad 或动作累计 2500 ms 则停车。直行需越过至少 3 cm 再确认中心线。离口再前进至少 3 cm 且连续窄白线后才推进表项，防止同一路口重复消费。
 
-这些时间值还未在真实虚线、弯道、运行 PWM 与电量变化下标定。过短可能在正常间隙停车，过长可能偏离后继续运动；必须记录实际通过耗时后调整，不能从 PWM 直接换算间隙距离。
+八路一维传感器不能识别元器件的语义。若图形恰好在窗口内产生相同分支和连续观测，仍可能误判；若是持续的单一窄图形，也可能看起来像白线。编码器航向会受轮胎打滑影响。所有尺寸、速度、确认距离与超时均需真实赛道标定。
 
 ## 调度、故障与操作入口
 
-`SysTick_Handler()` 只增加 HAL 毫秒时基。主循环按目标 5 ms 单次采样和控制，不阻塞延时、不输出串口日志、不补算多个旧观测；PID 使用本次实际间隔。间隔超过 15 ms、控制计算耗时达到 5 ms、无效位置/时间或初始化错误，进入故障停车。任务故障在本次运行中锁定，按键不能清除，需复位后检查原因。
+`SysTick_Handler()` 只增加 HAL 毫秒时基。主循环按目标 5 ms 单次采样和控制，不阻塞延时、不输出串口日志、不补算多个旧观测；PID 使用本次实际间隔。间隔超过 15 ms、控制计算耗时达到 5 ms、无效位置/时间或初始化错误，进入故障停车。任务故障及编码器反馈故障在本次运行中锁定，按键不能清除，需复位后检查原因。
 
-初始化先把 STBY 拉低，再初始化时钟与 PWM。HAL 初始化、PWM 配置/启动、看门狗初始化/刷新均检查返回值；停车路径不依赖已成功初始化的定时器句柄。HardFault 等异常进入相同停车路径。
+初始化先把 STBY 拉低，再初始化时钟与 PWM。HAL 初始化、编码器/PWM 配置与启动、看门狗初始化/刷新均检查返回值；停车路径不依赖已成功初始化的定时器句柄。HardFault 等异常进入相同停车路径。
 
 IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差和实际复位时限未测量。仅完成控制周期后喂狗，任务卡死或 SysTick 停滞后由独立看门狗复位，复位仍为 `IDLE`。它是软件时序检测之外的退路，不保证 15 ms 内处理卡死。调试器暂停时若看门狗未冻结，会复位；若调试器冻结 IWDG，则这条保护失效，须先停止电机再断点调试。
 
 操作入口：
 
 - PB10 常开按键接 GND，按下消抖 20 ms。待机/普通停止时请求启动，运行时请求停止；上电时已经按住不视为启动，必须松开再按。
-- 调试器可读 `g_diagnostics` 查看原始/滤波掩码、选中区域、观测状态、位置、左右指令、停止原因、控制间隔和计算耗时。
+- 调试器可读 `g_diagnostics` 查看灰度掩码、位置、左右 PWM、编码器原始计数、厘米里程、航向、轮速/目标轮速、路径项/状态、STOP 事件、停止原因和任务耗时。
 - 调试器可写 `g_control_request=1` 请求一次启动，写 `2` 停止。请求用后清零；该变量不是串口协议，也没有命令保活要求。诊断结构为主循环逐字段写入，先停止电机并暂停后检查，不要把运行时跨字段读取当成原子快照。
 
 ## 文件与验证入口
@@ -246,16 +246,20 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
 | 文件 | 职责 |
 | --- | --- |
 | `include/board_config.h` | 引脚、轮向、输入上下拉、时钟与 PWM |
-| `include/control_config.h` | 周期、PID、PWM、滤波、连续性与超时初值 |
+| `include/control_config.h` | 周期、PWM、滤波与连续性初值 |
+| `include/motion_config.h` | 尺寸与计数标定、双环参数、航向/路口/路径超时 |
 | `src/gray_sensor.c` | 一次反相、逐路滤波、区域分类及位置 |
 | `src/pid.c` | PID、条件积分抗饱和、微分滤波及复位 |
 | `src/motor_command.c` | 可在主机测试的差速限幅与 PWM 映射 |
 | `src/motor.c` | HAL TIM3、双轮方向和独立 STBY 停车 |
-| `include/encoder.h`、`src/encoder.c` | 双轮霍尔 A/B 相 GPIO 输入初始化；TIM1/TIM4 计数留待后续 |
-| `src/line_follow.c` | 状态机、间隙/歧义/寻线、恢复与截止时限 |
+| `src/encoder.c`、`src/odometry.c` | TIM1/TIM4 四倍频计数、回绕增量、cm 里程与轮速/航向 |
+| `src/speed_control.c` | 左右轮速度 PID、前馈、单侧抗饱和、反馈异常停车 |
+| `src/route.c`、`src/route_table.c` | 路口 FSM、预设路径表与 STOP 一次性回调事件 |
+| `src/line_follow.c` | 位置外环、路径/航向模式选择、运行状态与独立停车 |
 | `src/main.c`、`src/stm32f1xx_it.c` | 初始化、调度、按钮、诊断、看门狗与异常入口 |
 | `include/stm32f1xx_hal_conf.h` | HAL 模块配置；DMA 是 TIM HAL 类型依赖，不用于灰度采样 |
-| `test/test_logic.c`、`test/test_motor_hal.c`、`test/run_host_tests.sh` | 主机逻辑与 HAL 模拟用例，开启地址和未定义行为检查 |
+| `test/test_logic.c`、`test/test_navigation.c` | 传感器/PID/PWM、里程/双环/路口/干扰/路径逻辑 |
+| `test/test_motor_hal.c`、`test/test_encoder_hal.c`、`test/run_host_tests.sh` | 外设 HAL 模拟及主机验证入口，ASan / UBSan |
 
 ```sh
 # 在工程目录执行，均无需接板
@@ -282,9 +286,9 @@ pio run -e genericSTM32F103C8 -t compiledb
 
 1. **硬件确认与接线**：核对实际模块电平、供电、引脚和 SWD；真实白线/深蓝底逐路记录，确定上下拉与阈值。
 2. **底层板上验证**：先确认上电 STBY 低、PWM 频率、按键入口；架空确认轮向、两轮独立指令、单轮零 PWM、整车待机和复位停车。未完成前不落地运行。
-3. **位置与控制板上核对**：对照六类输入与诊断，确认左右符号、周期/耗时、故障停车与看门狗效果。
-4. **实线低速调参**：先 P 再 PD，视需要加 I；直线 → 缓弯 → 急弯，记录参数、阈值、电量与现象。
-5. **虚线与异常**：居中/弯道虚线、短噪声、重获、持续无白线、全白与多区域交替；标定间隙/总时限并测量停车时间。
+3. **编码器标定与速度环**：停车时手动转轮核对计数方向，测量轮径/输出轮计数/轮距；填入标定参数。架空及低速验证左右速度反馈、闭环和故障停车，再调位置外环。
+4. **实线低速调参**：先调速度内环，再调位置外环 P / PD，视需要加 I；直线 → 缓弯 → 急弯，记录参数、电量与现象。
+5. **路径与干扰**：测量真实路段与路口形状，替换示例表；验证 LEFT / RIGHT / STRAIGHT / STOP、离口去重、干扰航向保持、虚线恢复和超限停车。
 6. **整理交付**：更新最终接线、标定参数与板上记录，分别报告逻辑、构建和实车结果。
 
 当前首版软件工作已完成；下一项是硬件确认及架空验证。详细结果与未执行项目见 `docs/validation.md`。

@@ -8,12 +8,27 @@ trap 'rm -f "$test_binary"' EXIT HUP INT TERM
     -I"$project_dir/include" \
     "$project_dir/test/test_logic.c" \
     "$project_dir/src/gray_sensor.c" "$project_dir/src/pid.c" \
-    "$project_dir/src/motor_command.c" "$project_dir/src/line_follow.c" \
+    "$project_dir/src/motor_command.c" \
     -lm -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/test/fakes" -I"$project_dir/include" \
+    "$project_dir/test/test_encoder_hal.c" "$project_dir/src/encoder.c" \
+    -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -I"$project_dir/test/fakes" -I"$project_dir/include" \
     "$project_dir/test/test_motor_hal.c" "$project_dir/src/motor.c" \
     "$project_dir/src/motor_command.c" -lm -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" \
+    "$project_dir/test/test_navigation.c" "$project_dir/src/gray_sensor.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
+    "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+    "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
+    -lm -o "$test_binary"
 "$test_binary"

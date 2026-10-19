@@ -28,8 +28,7 @@
 #define START_STOP_PIN GPIO_PIN_10
 /* PB10 button to GND; internal pull-up. SWD PA13/PA14 remains enabled. */
 
-/* Hall quadrature inputs. Reserve default TIM1_CH1/2 and TIM4_CH1/2;
- * only GPIO input initialization is enabled at this stage, not counting. */
+/* Hall quadrature inputs, default TIM1_CH1/2 and TIM4_CH1/2 in TI12 x4 mode. */
 #define ENCODER_LEFT_PORT GPIOA
 #define ENCODER_LEFT_A_PIN GPIO_PIN_8
 #define ENCODER_LEFT_B_PIN GPIO_PIN_9

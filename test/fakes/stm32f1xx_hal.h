@@ -1,21 +1,28 @@
 #ifndef TEST_STM32_HAL_H
 #define TEST_STM32_HAL_H
 
-/* Minimal host HAL surrogate for motor.c only. Never included in firmware. */
+/* Minimal host HAL surrogate for motor.c / encoder.c. Never included in firmware. */
 #include <stdint.h>
 typedef struct { uint16_t output; } GPIO_TypeDef;
-typedef struct { uint32_t compare[2]; } TIM_TypeDef;
+typedef struct { uint32_t compare[2], counter; } TIM_TypeDef;
 typedef enum { HAL_OK, HAL_ERROR } HAL_StatusTypeDef;
 typedef enum { GPIO_PIN_RESET, GPIO_PIN_SET } GPIO_PinState;
 typedef struct { uint32_t Pin, Mode, Pull, Speed; } GPIO_InitTypeDef;
 typedef struct { uint32_t Prescaler, CounterMode, Period, ClockDivision; } TIM_Base_InitTypeDef;
 typedef struct { TIM_TypeDef *Instance; TIM_Base_InitTypeDef Init; } TIM_HandleTypeDef;
 typedef struct { uint32_t OCMode, Pulse, OCPolarity, OCFastMode; } TIM_OC_InitTypeDef;
+typedef struct {
+    uint32_t EncoderMode, IC1Polarity, IC1Selection, IC1Prescaler, IC1Filter;
+    uint32_t IC2Polarity, IC2Selection, IC2Prescaler, IC2Filter;
+} TIM_Encoder_InitTypeDef;
 extern GPIO_TypeDef fake_gpio_a, fake_gpio_b;
 extern TIM_TypeDef fake_tim3;
+extern TIM_TypeDef fake_tim1, fake_tim4;
 #define GPIOA (&fake_gpio_a)
 #define GPIOB (&fake_gpio_b)
 #define TIM3 (&fake_tim3)
+#define TIM1 (&fake_tim1)
+#define TIM4 (&fake_tim4)
 #define GPIO_PIN_0 (1U << 0)
 #define GPIO_PIN_1 (1U << 1)
 #define GPIO_PIN_2 (1U << 2)
@@ -24,12 +31,16 @@ extern TIM_TypeDef fake_tim3;
 #define GPIO_PIN_5 (1U << 5)
 #define GPIO_PIN_6 (1U << 6)
 #define GPIO_PIN_7 (1U << 7)
+#define GPIO_PIN_8 (1U << 8)
+#define GPIO_PIN_9 (1U << 9)
 #define GPIO_PIN_10 (1U << 10)
 #define GPIO_PIN_12 (1U << 12)
 #define GPIO_PIN_13 (1U << 13)
 #define GPIO_PIN_14 (1U << 14)
 #define GPIO_PIN_15 (1U << 15)
 #define GPIO_PULLUP 1U
+#define GPIO_NOPULL 0U
+#define GPIO_MODE_INPUT 0U
 #define GPIO_MODE_OUTPUT_PP 1U
 #define GPIO_MODE_AF_PP 2U
 #define GPIO_SPEED_FREQ_LOW 1U
@@ -41,14 +52,26 @@ extern TIM_TypeDef fake_tim3;
 #define TIM_OCFAST_DISABLE 0U
 #define TIM_CHANNEL_1 0U
 #define TIM_CHANNEL_2 1U
+#define TIM_CHANNEL_ALL 0x3cU
+#define TIM_ENCODERMODE_TI12 3U
+#define TIM_ICPOLARITY_RISING 0U
+#define TIM_ICSELECTION_DIRECTTI 1U
+#define TIM_ICPSC_DIV1 0U
 #define __HAL_RCC_GPIOA_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_GPIOB_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_TIM3_CLK_ENABLE() ((void)0)
+#define __HAL_RCC_TIM1_CLK_ENABLE() ((void)0)
+#define __HAL_RCC_TIM4_CLK_ENABLE() ((void)0)
 #define __HAL_TIM_SET_COMPARE(timer, channel, value) ((timer)->Instance->compare[channel] = (value))
+#define __HAL_TIM_SET_COUNTER(timer, value) ((timer)->Instance->counter = (value))
+#define __HAL_TIM_GET_COUNTER(timer) ((timer)->Instance->counter)
 void HAL_GPIO_WritePin(GPIO_TypeDef *port, uint16_t pins, GPIO_PinState state);
 void HAL_GPIO_Init(GPIO_TypeDef *port, GPIO_InitTypeDef *pins);
 HAL_StatusTypeDef HAL_TIM_PWM_Init(TIM_HandleTypeDef *timer);
 HAL_StatusTypeDef HAL_TIM_PWM_ConfigChannel(TIM_HandleTypeDef *timer, TIM_OC_InitTypeDef *oc, uint32_t channel);
 HAL_StatusTypeDef HAL_TIM_PWM_Start(TIM_HandleTypeDef *timer, uint32_t channel);
+HAL_StatusTypeDef HAL_TIM_Encoder_Init(TIM_HandleTypeDef *timer, const TIM_Encoder_InitTypeDef *config);
+HAL_StatusTypeDef HAL_TIM_Encoder_Start(TIM_HandleTypeDef *timer, uint32_t channel);
+HAL_StatusTypeDef HAL_TIM_Encoder_Stop(TIM_HandleTypeDef *timer, uint32_t channel);
 
 #endif

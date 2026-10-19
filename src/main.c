@@ -3,12 +3,21 @@
 #include "control_config.h"
 #include "encoder.h"
 #include "motor.h"
+#include "motion_config.h"
 
 volatile uint32_t g_control_request;
 volatile ControlDiagnostics g_diagnostics;
 static IWDG_HandleTypeDef watchdog;
 static GraySensor sensor;
 static LineFollow follow;
+
+void route_stop_callback(size_t step_index, void *context)
+{
+    (void)context;
+    /* Invoked once AFTER motor stop. Keep callbacks nonblocking and bounded. */
+    ++g_diagnostics.route_stop_events;
+    g_diagnostics.route_stopped_step = (uint32_t)step_index;
+}
 
 static bool clock_init(void)
 {
@@ -101,10 +110,16 @@ int main(void)
     motor_safe_gpio_init();
     if (HAL_Init() != HAL_OK || !clock_init()) Error_Handler();
     sensor_gpio_init();
-    encoder_gpio_init();
+    if (!encoder_init()) Error_Handler();
     if (!motor_init()) Error_Handler();
     gray_sensor_init(&sensor);
-    line_follow_init(&follow);
+    OdometryCalibration calibration = {
+        LEFT_WHEEL_DIAMETER_CM, RIGHT_WHEEL_DIAMETER_CM,
+        LEFT_COUNTS_PER_WHEEL_REV, RIGHT_COUNTS_PER_WHEEL_REV, WHEEL_TRACK_CM,
+        ENCODER_LEFT_SIGN, ENCODER_RIGHT_SIGN, ODOMETRY_CALIBRATION_CONFIRMED != 0
+    };
+    line_follow_init(&follow, calibration, route, route_count, route_stop_callback, NULL);
+    g_diagnostics.odometry_ready = follow.odometry.ready;
     if (!watchdog_init()) Error_Handler();
     uint32_t last_control_ms = HAL_GetTick();
     bool start_pending = false;
@@ -125,13 +140,25 @@ int main(void)
         uint32_t interval = (uint32_t)(now_ms - last_control_ms);
         if (interval >= CONTROL_PERIOD_MS) {
             last_control_ms = now_ms;
+            EncoderCounts counts;
+            if (!encoder_read(&counts)) Error_Handler();
             GrayObservation observation = gray_sensor_update(&sensor, read_raw(),
                 line_follow_have_recent_position(&follow, now_ms), follow.reliable_position);
-            line_follow_update(&follow, observation, now_ms, (float)interval / 1000.0f, start_pending);
+            line_follow_update(&follow, observation, counts, now_ms,
+                               (float)interval / 1000.0f, start_pending);
             start_pending = false; /* One-shot; failed start is never queued for later. */
             uint32_t duration = (uint32_t)(HAL_GetTick() - now_ms);
             if (duration >= CONTROL_PERIOD_MS) line_follow_stop(&follow, LINE_STOP_FAULT);
             motor_apply(follow.command);
+            if (follow.stop_reason == LINE_STOP_ROUTE_COMPLETE) {
+                motor_stop();
+                route_dispatch_stop_callback(&follow.route);
+            }
+            duration = (uint32_t)(HAL_GetTick() - now_ms);
+            if (duration >= CONTROL_PERIOD_MS) {
+                line_follow_stop(&follow, LINE_STOP_FAULT);
+                motor_stop();
+            }
             ++g_diagnostics.control_count;
             g_diagnostics.last_sample_ms = now_ms;
             g_diagnostics.task_duration_ms = duration;
@@ -145,6 +172,16 @@ int main(void)
             g_diagnostics.stop_reason = follow.stop_reason;
             g_diagnostics.left_command = follow.command.left;
             g_diagnostics.right_command = follow.command.right;
+            g_diagnostics.left_encoder = counts.left;
+            g_diagnostics.right_encoder = counts.right;
+            g_diagnostics.distance_cm = follow.odometry.distance_cm;
+            g_diagnostics.heading_rad = follow.odometry.heading_rad;
+            g_diagnostics.left_speed_cm_s = follow.odometry.left_speed_cm_s;
+            g_diagnostics.right_speed_cm_s = follow.odometry.right_speed_cm_s;
+            g_diagnostics.left_target_cm_s = follow.left_target_cm_s;
+            g_diagnostics.right_target_cm_s = follow.right_target_cm_s;
+            g_diagnostics.route_state = follow.route.state;
+            g_diagnostics.route_index = (uint32_t)follow.route.index;
             if (HAL_IWDG_Refresh(&watchdog) != HAL_OK) Error_Handler();
         }
         __WFI(); /* SysTick wakes every ms; no blocking delay or serial output. */

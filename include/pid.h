@@ -15,5 +15,7 @@ typedef struct {
 void pid_init(Pid *pid, PidConfig config);
 void pid_reset(Pid *pid);
 bool pid_update(Pid *pid, float error, float dt, float limit, float *output);
+bool pid_update_bounded(Pid *pid, float error, float dt, float low, float high,
+                        float feedforward, float *output);
 
 #endif

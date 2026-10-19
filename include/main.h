@@ -11,11 +11,18 @@ typedef struct {
     LineState state;
     LineStopReason stop_reason;
     float position, left_command, right_command;
+    uint16_t left_encoder, right_encoder;
+    bool odometry_ready;
+    float distance_cm, heading_rad, left_speed_cm_s, right_speed_cm_s;
+    float left_target_cm_s, right_target_cm_s;
+    RouteState route_state;
+    uint32_t route_index, route_stop_events, route_stopped_step;
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */
 extern volatile uint32_t g_control_request;
 extern volatile ControlDiagnostics g_diagnostics;
 void Error_Handler(void);
+void route_stop_callback(size_t step_index, void *context);
 
 #endif

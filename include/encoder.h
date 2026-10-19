@@ -1,7 +1,10 @@
 #ifndef ENCODER_H
 #define ENCODER_H
 
-/* Configure both motors' A/B pins as inputs; no EXTI, timer or speed feedback. */
+#include "odometry.h"
+/* TIM1 PA8/9 and TIM4 PB6/7, TI12 x4, no interrupts. */
 void encoder_gpio_init(void);
+bool encoder_init(void);
+bool encoder_read(EncoderCounts *counts);
 
 #endif
