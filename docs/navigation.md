@@ -4,18 +4,22 @@
 
 ## 编译开关与普通电压控制
 
-`include/motion_config.h` 的 `ENCODER_CONTROL_ENABLED` 是唯一模式开关，默认 0。修改后重新编译；不支持行驶中动态切换。
+`include/motion_config.h` 使用两个独立编译开关，均默认 0，修改后重新编译；不支持行驶中动态切换。2026-10-22 新增 `PRESET_ROUTE_ENABLED`，可在编码器双环下单独测试巡线。
 
 - **0**：不初始化/读取编码器，不运行里程、速度环、距离路口导航或路径 STOP callback；状态为 `ROUTE_DISABLED`。白线位置 PID 直接输出左右 PWM，通过占空比调节电机平均电压，轮速保持开环。尺寸参数为 0 不影响该模式的启动。
-- **1**：启用本文后续的编码器、双环和厘米路径；保留尺寸标定门禁、路口 FSM、STOP callback 和反馈异常停车。
+- **1**：启用编码器和双环；保留尺寸标定门禁和反馈异常停车。厘米路径另由 `PRESET_ROUTE_ENABLED` 选择。
+
+`PRESET_ROUTE_ENABLED=0` 为仅巡线：忽略传入路径表和回调，不校验路径、不采用表内速度，不执行预设转向、距离窗口、路段超时或路径 STOP，状态保持 `ROUTE_DISABLED`。编码器仅巡线使用 `LINE_FOLLOW_SPEED_CM_S=12.0f` 作为基础目标速度，保留弯道降速、双轮速度环、干扰航向保持、400 ms / 8 cm 超限停车、任务/反馈故障和明确停止。全白、宽线和多区域一律进入干扰保持，不保证分岔处的分支选择。PWM 模式继续使用独立 PWM 参数。
+
+`PRESET_ROUTE_ENABLED=1` 为本文的预设厘米路径、路口 FSM 与 STOP callback，必须同时配置 `ENCODER_CONTROL_ENABLED=1`，否则编译报错。两个开关都只允许 0 / 1。
 
 PWM 模式的参数独立使用 PWM 单位：正常基础 55、最大偏差时基础 40、干扰基础上限 35、上升斜率 200 PWM 指令/s、位置 PID 8/0/0.08。均为待实测初值，输出仍限于非负且不超过 100（255 标尺）。不把路径表中的 cm/s 数字直接当作 PWM。
 
 PWM 模式要求明确启动且连续 3 帧有效窄白线。遇到无白线、宽线、全白或多区域时，冻结位置 PID，不提高基础 PWM，保留最近的有界 PWM 差值并在剩余异常预算内衰减；这不具备测量航向或纠正偏航的能力。恢复需连续 3 帧，重置 PID 历史；最后稳定白线起 400 ms 停车，孤立有效帧不续时，先检查截止再接受恢复。没有编码器，不使用 8 cm 距离限额，也不进行厘米路径动作。PB10、调试停止、任务时序检查、IWDG 和上电停止保留。
 
-默认构建 `pio run -e genericSTM32F103C8` 遵循代码开关；显式验证环境 `pio run -e encoder_closed_loop` 通过编译参数强制开关为 1。两者输出目录独立，MCU/引脚配置相同。`g_diagnostics.encoder_control_enabled` 表示实际模式；关闭时里程和速度保持未测量的 0 值，不能解释为实际零速。
+默认构建 `pio run -e genericSTM32F103C8` 遵循代码开关；`pio run -e encoder_line_only` 强制编码器 1 / 路径 0，`pio run -e encoder_closed_loop` 强制两者为 1。三个环境输出目录独立，MCU/引脚配置相同。`g_diagnostics.encoder_control_enabled`、`preset_route_enabled` 表示实际模式；关闭编码器时里程和速度保持未测量的 0 值，不能解释为实际零速。
 
-主机测试脚本分别以宏 0 / 1 编译控制器。PWM 测试不链接 `odometry.c` 或 `speed_control.c`，以检验关闭模式没有这些运行依赖。下面各节适用于开关为 1。
+主机测试脚本分别编译 PWM 仅巡线、编码器仅巡线、编码器预设路径三个组合。PWM 测试不链接 `odometry.c` 或 `speed_control.c`；编码器仅巡线测试不链接 `route_table.c`，并检查传入路径表不会产生动作或回调。下面的双环/里程内容适用于编码器开关为 1，路径/路口内容还要求路径开关为 1。
 
 ## 单位与双环
 

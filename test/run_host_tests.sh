@@ -26,7 +26,7 @@ trap 'rm -f "$test_binary"' EXIT HUP INT TERM
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -I"$project_dir/include" \
-    -DENCODER_CONTROL_ENABLED=1 \
+    -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
     "$project_dir/test/test_navigation.c" "$project_dir/src/gray_sensor.c" \
     "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
     "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
@@ -35,7 +35,16 @@ trap 'rm -f "$test_binary"' EXIT HUP INT TERM
 "$test_binary"
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
-    -I"$project_dir/include" -DENCODER_CONTROL_ENABLED=0 \
+    -I"$project_dir/include" \
+    -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=0 \
+    "$project_dir/test/test_line_only.c" "$project_dir/src/gray_sensor.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
+    "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+    "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" -DENCODER_CONTROL_ENABLED=0 -DPRESET_ROUTE_ENABLED=0 \
     "$project_dir/test/test_open_loop.c" "$project_dir/src/gray_sensor.c" \
     "$project_dir/src/pid.c" "$project_dir/src/motor_command.c" \
     "$project_dir/src/route.c" "$project_dir/src/line_follow.c" \

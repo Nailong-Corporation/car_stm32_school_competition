@@ -3,15 +3,30 @@
 
 /* ==================== 一、控制模式选择 ====================
  * 0：白线位置 PID 直接调节 PWM，电机速度保持开环，不使用编码器和厘米路径。
- * 1：启用编码器、位置/速度双环、厘米路径表及路口状态机，需完成尺寸标定。
+ * 1：启用编码器及位置/速度双环，需完成尺寸标定；路径由下面的独立开关选择。
  * 这是编译开关，修改后须重新构建；允许通过编译参数覆盖。
  * encoder_closed_loop 构建环境会强制指定为 1。
  */
 #ifndef ENCODER_CONTROL_ENABLED
-#define ENCODER_CONTROL_ENABLED       0
+#define ENCODER_CONTROL_ENABLED       1
 #endif
 #if ENCODER_CONTROL_ENABLED != 0 && ENCODER_CONTROL_ENABLED != 1
 #error "ENCODER_CONTROL_ENABLED must be 0 or 1"
+#endif
+
+/* 预设路径开关：0 仅沿白线巡线，1 按 route_table.c 执行距离/路口/STOP。
+ * 默认 0，便于测试巡线稳定性；仅巡线仍保留明确启动、丢线及故障停车。
+ * 路径使用厘米定位，置 1 时必须同时开启 ENCODER_CONTROL_ENABLED。
+ * encoder_closed_loop 强制两开关为 1；encoder_line_only 强制编码器 1、路径 0。
+ */
+#ifndef PRESET_ROUTE_ENABLED
+#define PRESET_ROUTE_ENABLED          0
+#endif
+#if PRESET_ROUTE_ENABLED != 0 && PRESET_ROUTE_ENABLED != 1
+#error "PRESET_ROUTE_ENABLED must be 0 or 1"
+#endif
+#if PRESET_ROUTE_ENABLED && !ENCODER_CONTROL_ENABLED
+#error "PRESET_ROUTE_ENABLED requires ENCODER_CONTROL_ENABLED=1"
 #endif
 
 /* ==================== 二、普通 PWM 模式参数 ====================
@@ -33,8 +48,8 @@
  * 若厂家只给电机轴单相每圈周期数，则输出轮计数约为该值 × 4 × 减速比。
  */
 #define ODOMETRY_CALIBRATION_CONFIRMED 0    /* 尺寸、计数口径及正向符号实测确认后置 1。 */
-#define LEFT_WHEEL_DIAMETER_CM        0.0f /* 左轮有效直径，单位 cm。 */
-#define RIGHT_WHEEL_DIAMETER_CM       0.0f /* 右轮有效直径，单位 cm。 */
+#define LEFT_WHEEL_DIAMETER_CM        4.8f /* 左轮有效直径，单位 cm。 */
+#define RIGHT_WHEEL_DIAMETER_CM       4.8f /* 右轮有效直径，单位 cm。 */
 #define LEFT_COUNTS_PER_WHEEL_REV     0.0f /* 左输出轮完整一圈的最终四倍频计数。 */
 #define RIGHT_COUNTS_PER_WHEEL_REV    0.0f /* 右输出轮完整一圈的最终四倍频计数。 */
 #define WHEEL_TRACK_CM               0.0f /* 左右轮中心间距，单位 cm，用于推算航向变化。 */
@@ -77,6 +92,7 @@
 #define POSITION_KD_CM_S              0.025f /* 白线位置微分系数。 */
 #define POSITION_CURVE_SLOWDOWN       0.35f  /* 最大位置偏差时，相对路段基础速度的降速比例。 */
 #define TARGET_RISE_CM_S2            40.0f  /* 基础目标速度最大上升斜率，单位 cm/s²。 */
+#define LINE_FOLLOW_SPEED_CM_S        12.0f /* 编码器仅巡线时的基础速度；路径模式改用表中 speed。 */
 
 /* ==================== 八、丢线、图形干扰与航向保持 ====================
  * 两模式均冻结普通位置 PID，并从最后稳定白线起计时；孤立有效帧不刷新预算。
@@ -88,7 +104,7 @@
 #define INTERFERENCE_MAX_DISTANCE_CM 8.0f  /* 仅编码器模式：进入异常后允许的里程偏移上限，单位 cm。 */
 
 /* ==================== 九、路口候选确认 ====================
- * 仅编码器模式使用；还必须位于当前路径项距离窗口内，形状满足中心白线和所需分支。
+ * 仅开启预设路径时使用；还必须位于当前路径项距离窗口内，形状满足中心白线和所需分支。
  * 连续帧数、前进距离和时间窗口联合约束，静止图形或孤立噪声不能直接触发动作。
  */
 #define JUNCTION_CONFIRM_SAMPLES     3U    /* 候选路口至少连续出现的控制采样帧数。 */

@@ -31,7 +31,7 @@ static bool timer_init(TIM_HandleTypeDef *timer, TIM_TypeDef *instance)
     timer->Instance = instance;
     timer->Init.Prescaler = 0;
     timer->Init.CounterMode = TIM_COUNTERMODE_UP;
-    timer->Init.Period = 65535U;
+    timer->Init.Period = 65535U; // 计数器回绕
     timer->Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     TIM_Encoder_InitTypeDef config = {0};
     config.EncoderMode = TIM_ENCODERMODE_TI12;

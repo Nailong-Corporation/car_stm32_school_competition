@@ -1,6 +1,38 @@
 # 首版验证记录
 
-## 2026-10-19 当前增量：编码器 / 双环与 PWM 模式开关
+## 2026-10-22 当前增量：预设路径 / 仅巡线独立开关
+
+新增 `PRESET_ROUTE_ENABLED` 编译开关，默认 0 为仅巡线；编码器开关仍默认 0。三个有效组合是 PWM 仅巡线（0/0）、编码器双环仅巡线（1/0）、编码器预设路径（1/1）。开启路径但关闭编码器，或任一开关不为 0/1，编译报错。编码器仅巡线仍要求尺寸标定，基础目标速度由 `LINE_FOLLOW_SPEED_CM_S=12.0f` 配置；不绑定路径表或回调，不执行路径 FSM、距离窗口、表内速度或路段超时。启动、丢线/干扰、任务及编码器保护保留。
+
+已执行 `sh test/run_host_tests.sh`，C11 严格警告及 ASan / UBSan 下全部通过：
+
+| 套件 | 本次结果 |
+| --- | --- |
+| 传感器 / PID / PWM | 120960 次检查通过 |
+| 编码器、双环与预设路径 | 5175 次检查通过，显式编译 1/1 |
+| 新编码器仅巡线 `test_line_only.c` | 24421 次检查通过，显式编译 1/0，不链接路径表 |
+| PWM 仅巡线 | 3827 次检查通过，显式编译 0/0 |
+| 编码器 / 电机 HAL 模拟 | 均通过 |
+
+新套件使用合成尺寸/计数，覆盖：无路径可启动但未标定仍拒绝；必须明确请求和连续窄白线启动；提供 LEFT/STOP 表也不采用表内速度或执行动作；连续巡线超过 15000 ms 和 55 cm 不被路径停止；左右符号和双环仍生效；路口形状、全白、多区域及无白线进入干扰；冻结位置 PID、编码器航向修正、连续恢复；孤立噪声不续时、400 ms / 8 cm 先到停车及毫秒回绕截止点；手动停止、堵转、异常计数和任务故障锁定。断言数量包含持续运行的逐周期范围检查，不代表独立实车场景数。
+
+已执行 `pio run -e genericSTM32F103C8 -e encoder_line_only -e encoder_closed_loop`，三个环境均 SUCCESS：
+
+| 环境 / 编码器与路径开关 | PlatformIO Flash | 静态 RAM | BIN 长度 |
+| --- | --- | --- | --- |
+| `genericSTM32F103C8`，0/0 | 9244 / 65536 B | 536 / 20480 B | 9520 B |
+| `encoder_line_only`，1/0 | 11560 / 65536 B | 684 / 20480 B | 11836 B |
+| `encoder_closed_loop`，1/1 | 12944 / 65536 B | 684 / 20480 B | 13220 B |
+
+使用 `arm-none-eabi-nm` 核对最终 ELF：PWM 仅巡线不包含编码器、里程、速度环及路径入口；编码器仅巡线包含 `encoder_init/read`、`odometry_update`、`speed_control_update`，但不包含 `route_init/start/update`、`route_dispatch_stop_callback`、`route_stop_callback`、`route`、`route_count`；预设路径模式包含上述编码器及路径符号。`route_is_narrow_line` 是共用窄线分类辅助函数，保留不代表启用了路径。预处理检查确认 0/1、1/2、2/0 三种非法开关组合分别产生预期错误。
+
+应用源码未出现警告；三个环境均出现框架 `stm32f1xx_ll_utils.c` 原有的 3 个 unused-parameter 警告。`git diff --check` 通过。README 的模式表与 Mermaid、控制说明、AGENTS 已同步，调试诊断增加 `preset_route_enabled`。保留用户原有 `src/encoder.c` 回绕注释修改。
+
+没有烧录、操作电机或实车测试，`hardware_tested=false`。编码器尺寸仍未知、标定确认仍为 0；软件测试和构建通过不证明实车巡线稳定。仅巡线遇到分岔、宽线或全白按干扰处理，不保证选择某一分支。
+
+以下为历史版本记录，当前开关行为及产物大小以本节为准。
+
+## 2026-10-19 历史增量：编码器 / 双环与 PWM 模式开关
 
 `include/motion_config.h` 新增 `ENCODER_CONTROL_ENABLED` 编译开关，默认 0。0 使用独立 PWM 单位的白线位置 PID，不初始化/读取编码器，不运行厘米路径或 STOP callback；1 保留已实现的编码器、双环与路径，继续要求尺寸标定。PWM 模式启动无需轮径/计数/轮距，仍需明确请求与连续有效白线。
 

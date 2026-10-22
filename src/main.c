@@ -121,12 +121,13 @@ int main(void)
         ENCODER_LEFT_SIGN, ENCODER_RIGHT_SIGN, ODOMETRY_CALIBRATION_CONFIRMED != 0
     };
     line_follow_init(&follow, calibration,
-#if ENCODER_CONTROL_ENABLED
+#if PRESET_ROUTE_ENABLED
                      route, route_count, route_stop_callback, NULL);
 #else
                      NULL, 0, NULL, NULL);
 #endif
     g_diagnostics.encoder_control_enabled = ENCODER_CONTROL_ENABLED != 0;
+    g_diagnostics.preset_route_enabled = PRESET_ROUTE_ENABLED != 0;
     g_diagnostics.odometry_ready = follow.odometry.ready;
     if (!watchdog_init()) Error_Handler();
     uint32_t last_control_ms = HAL_GetTick();
@@ -160,7 +161,7 @@ int main(void)
             uint32_t duration = (uint32_t)(HAL_GetTick() - now_ms);
             if (duration >= CONTROL_PERIOD_MS) line_follow_stop(&follow, LINE_STOP_FAULT);
             motor_apply(follow.command);
-#if ENCODER_CONTROL_ENABLED
+#if PRESET_ROUTE_ENABLED
             if (follow.stop_reason == LINE_STOP_ROUTE_COMPLETE) {
                 motor_stop();
                 route_dispatch_stop_callback(&follow.route);

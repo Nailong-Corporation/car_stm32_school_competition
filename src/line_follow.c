@@ -14,7 +14,7 @@ static bool locked(LineStopReason reason)
 
 /**
  * @brief 初始化巡线状态及当前编译模式的控制器，上电保持 IDLE。
- * 编码器模式绑定标定、路径表和停止回调；PWM 模式只初始化位置 PID。
+ * 编码器模式绑定标定和双环；仅开启预设路径时绑定路径表和停止回调。
  */
 void line_follow_init(LineFollow *f, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,
@@ -22,19 +22,22 @@ void line_follow_init(LineFollow *f, OdometryCalibration calibration,
 {
     memset(f, 0, sizeof(*f));
     f->state = LINE_IDLE;
-#if ENCODER_CONTROL_ENABLED
-    odometry_init(&f->odometry, calibration);
+#if PRESET_ROUTE_ENABLED
     route_init(&f->route, steps, count, callback, context);
-    speed_control_init(&f->speed);
-    pid_init(&f->pid, (PidConfig){POSITION_KP_CM_S, POSITION_KI_CM_S, POSITION_KD_CM_S,
-                                  PID_INTEGRAL_LIMIT, PID_DERIVATIVE_TAU_S});
 #else
-    (void)calibration;
     (void)steps;
     (void)count;
     (void)callback;
     (void)context;
     f->route.state = ROUTE_DISABLED;
+#endif
+#if ENCODER_CONTROL_ENABLED
+    odometry_init(&f->odometry, calibration);
+    speed_control_init(&f->speed);
+    pid_init(&f->pid, (PidConfig){POSITION_KP_CM_S, POSITION_KI_CM_S, POSITION_KD_CM_S,
+                                  PID_INTEGRAL_LIMIT, PID_DERIVATIVE_TAU_S});
+#else
+    (void)calibration;
     pid_init(&f->pid, (PidConfig){OPEN_LOOP_POSITION_KP, OPEN_LOOP_POSITION_KI,
                                   OPEN_LOOP_POSITION_KD, PID_INTEGRAL_LIMIT, PID_DERIVATIVE_TAU_S});
 #endif
@@ -152,7 +155,7 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
 
 /**
  * @brief 执行一个实际 dt 控制周期，更新巡线状态及最终 PWM 命令。
- * 编码器模式用 counts 更新里程、路口和速度内环；PWM 模式忽略 counts。
+ * 编码器模式用 counts 更新里程和速度内环，仅开启路径时推进路口；PWM 模式忽略 counts。
  * 非法观测或时序进入故障停车；启动请求为一次性，超时判断先于恢复确认。
  */
 void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
@@ -183,8 +186,10 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     bool stable = f->valid_count >= LINE_CONFIRM_SAMPLES;
     if (f->state == LINE_IDLE || f->state == LINE_STOPPED) {
         if (!start_request || !stable || locked(f->stop_reason)) return;
+#if PRESET_ROUTE_ENABLED
         if (!f->route.valid) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
         route_start(&f->route, f->odometry.distance_cm, now_ms);
+#endif
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
         f->last_reliable_ms = now_ms;
@@ -199,6 +204,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         line_follow_stop(f, LINE_STOP_LOST);
         return;
     }
+#if PRESET_ROUTE_ENABLED
     RouteState previous_route = f->route.state;
     route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
     if (f->route.state == ROUTE_FAILED) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
@@ -213,6 +219,11 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         stable = false;
     }
     RouteStep step = f->route.steps[f->route.index];
+    float base_speed = (float)step.speed;
+#else
+    float base_speed = LINE_FOLLOW_SPEED_CM_S;
+#endif
+#if PRESET_ROUTE_ENABLED
     if (f->route.state == ROUTE_EXECUTING) {
         if (previous_route != ROUTE_EXECUTING) {
             pid_reset(&f->pid);
@@ -224,7 +235,13 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
                            step.action == RIGHT ? JUNCTION_TURN_DIFF_CM_S :
                            HEADING_KP_CM_S_PER_RAD * (f->route.entry_heading - f->odometry.heading_rad);
         targets(f, fminf((float)step.speed, JUNCTION_TURN_SPEED_CM_S), correction, dt);
-    } else if (narrow && (stable || !f->abnormal) && f->route.state != ROUTE_CANDIDATE) {
+    } else
+#endif
+    if (narrow && (stable || !f->abnormal)
+#if PRESET_ROUTE_ENABLED
+        && f->route.state != ROUTE_CANDIDATE
+#endif
+    ) {
         if (f->abnormal) {
             pid_reset(&f->pid);
             speed_control_reset(&f->speed);
@@ -236,7 +253,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
             f->last_reliable_ms = now_ms;
             f->reliable_position = obs.position;
         }
-        float base = (float)step.speed * (1.0f - POSITION_CURVE_SLOWDOWN * fabsf(obs.position) / 7.0f);
+        float base = base_speed * (1.0f - POSITION_CURVE_SLOWDOWN * fabsf(obs.position) / 7.0f);
         float next = fminf(base, f->base + TARGET_RISE_CM_S2 * dt);
         float correction;
         if (!pid_update(&f->pid, obs.position, dt,
@@ -254,7 +271,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
             f->abnormal_origin_cm = f->odometry.distance_cm;
         }
         f->state = LINE_GAP_HOLD;
-        targets(f, fminf((float)step.speed, HOLD_SPEED_CM_S),
+        targets(f, fminf(base_speed, HOLD_SPEED_CM_S),
                 HEADING_KP_CM_S_PER_RAD * (f->hold_heading_rad - f->odometry.heading_rad), dt);
     }
     if (!speed_control_update(&f->speed, f->left_target_cm_s, f->right_target_cm_s,

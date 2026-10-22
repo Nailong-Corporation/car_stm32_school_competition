@@ -18,6 +18,7 @@
 - 2026-10-19 用户进一步授权双环控制、预设路径表 + 编码器定位、路口 FSM 和元器件图形干扰保持航向；STOP 也须在距离窗口内确认路口。轮径、输出轮四倍频计数与轮距暂未知；编码器模式保留标定门禁。用户随后要求增加编译开关 `ENCODER_CONTROL_ENABLED`，默认 0 为普通 PWM 模式，1 启用编码器和双环。
 - 开关为 0 时，白线位置 PID 直接输出非负 PWM，不初始化/读取编码器，不要求尺寸标定，不运行厘米路径/路口动作或表中 STOP callback；干扰仅做限时历史 PWM 差值衰减，不能称为航向闭环。
 - 开关为 1 时，使用白线横向位置 PID 外环，输出左右目标速度差（cm/s）；左右轮各自速度 PID 内环通过编码器反馈输出非负 PWM。干扰阶段冻结位置 PID，使用编码器航向保持。
+- 2026-10-22 新增独立 `PRESET_ROUTE_ENABLED` 编译开关，默认 0 为仅巡线；1 启用预设路径/路口/STOP，须同时开启编码器，否则编译报错。仅巡线不校验或运行路径表，不采用表中速度、不受路径窗口/路段超时限制，也不分派路径成功回调；编码器仅巡线使用 `LINE_FOLLOW_SPEED_CM_S`，保留标定门禁、双环、干扰航向保持及所有非路径停车保护。
 - 差速底层参考 `/Users/zhendong/Documents/RemoteCar_wifi/remote_car`，重点阅读 `src/main.c`、`include/main.h` 及其配置。
 - 可借鉴 `drive()`、`set_wheel()`、指令限幅和 PWM 映射；不要直接搬入遥控链路和串口命令超时逻辑作为巡线条件。
 - 当前配置是 `genericSTM32F103C8` + `stm32cube`。参考工程的 `bluepill_f103c8`、晶振和 PWM 时钟不是本项目已确认配置。
@@ -48,9 +49,9 @@
 ## 虚线与丢线规则
 
 - 无白线不是零误差，不用无效观测继续更新普通 PID。
-- 当前运行状态为 `IDLE / TRACKING / GAP_HOLD / LINE_JUNCTION / STOPPED`；PWM 模式只使用普通巡线/丢线状态，路径为 `ROUTE_DISABLED`。编码器模式路口采用 `FOLLOW → CANDIDATE → EXECUTING → CLEARING → 下一项`，STOP 确认则停车后回调一次。
+- 当前运行状态为 `IDLE / TRACKING / GAP_HOLD / LINE_JUNCTION / STOPPED`；仅巡线只使用普通巡线/丢线状态，路径为 `ROUTE_DISABLED`。开启预设路径时路口采用 `FOLLOW → CANDIDATE → EXECUTING → CLEARING → 下一项`，STOP 确认则停车后回调一次。
 - 虚线、未确认全白/宽线/多区域与元器件图形按丢线处理，冻结位置 PID；编码器模式降速保持估计航向，PWM 模式降低基础 PWM、保留并衰减历史差值。均不进入旧的 SEARCH 寻线。
-- 编码器模式航向来自左右编码器距离差；所有异常保持、路口确认/执行/离口和整段行驶均有终止时限，打滑误差需实车验证。
+- 编码器模式航向来自左右编码器距离差；异常保持始终有终止时限，预设路径另有限制路口确认/执行/离口和整段行驶的时限。仅巡线不设路径路段超时，打滑误差需实车验证。
 - 孤立噪声不能无限刷新无白线/歧义计时；恢复巡线需连续有效观测，并重建 PID 历史。
 - 路口只在路径距离窗口、中心与目标分支、连续帧和前进距离联合确认后执行；多区域即使在传感器层选择了区域也不进入普通位置 PID。相同形状的图形仍可能误判，不宣称语义识别。
 - 未检测到可靠白线时不启动盲行；进入 `STOPPED` 后需明确重启，不自动恢复电机输出。
@@ -70,6 +71,7 @@
 
 - 固件使用 `gray_sensor`、`pid`、`speed_control`、`motor`、`encoder`、`odometry`、`route`、`line_follow` 分层；开关为 1 时左轮 PA8/PA9 使用 TIM1、右轮 PB6/PB7 使用 TIM4 TI12 四倍频，TIM3 始终保留 PWM；配置见 `board_config.h`、`control_config.h` 与 `motion_config.h`。
 - 构建默认模式：`pio run -e genericSTM32F103C8`；强制编码器模式验证：`pio run -e encoder_closed_loop`；主机逻辑测试：`sh test/run_host_tests.sh`，不需要连接开发板。
+- `encoder_closed_loop` 强制编码器和路径两个开关均为 1；`pio run -e encoder_line_only` 强制编码器 1、路径 0。默认环境遵循头文件的两个开关（当前均为 0）。涉及模式边界的修改应验证三个组合。
 - 上电为 `IDLE`，PB10 接地按键一次按下请求启动/停止；启动必须有连续有效白线。不增加自动启动。
 - 停车通过 STBY 拉低进入待机，不能称为已验证短刹；左右单轮零 PWM 与全车停车的电气行为不同。
 - 控制周期 5 ms，PID 使用实际间隔；单次间隔大于 15 ms 或控制计算耗时达到 5 ms 锁定故障停车，需复位。

@@ -2,7 +2,7 @@
 
 ## 当前进度与验证边界
 
-> **2026-10-19 控制模式开关：** `include/motion_config.h` 的 `ENCODER_CONTROL_ENABLED` 默认 **0**：白线位置 PID 直接输出左右 PWM，不初始化/读取编码器，不依赖轮径标定。改为 **1** 后启用编码器、位置/速度双环、厘米路径与路口 STOP；该模式的尺寸参数仍未知，未标定禁止启动。关闭时路径距离和对应 STOP 回调停用，干扰仅做限时历史 PWM 差值保持。两模式均须明确启动，未烧录或验证硬件。详见下方开关说明与 [控制说明](docs/navigation.md)。
+> **2026-10-22 独立路径开关：** `include/motion_config.h` 新增 `PRESET_ROUTE_ENABLED`，默认 **0（仅巡线）**；改为 **1** 时按预设路径表执行距离、路口转向与 STOP，且要求 `ENCODER_CONTROL_ENABLED=1`。编码器开关仍默认 0，控制 PWM / 双环的选择；现在也可开启编码器双环、关闭路径，单独测试巡线稳定性。仅巡线停用路径距离、路段超时及路径 STOP callback，保留启动门禁、丢线/干扰与故障停车。编码器模式仍须尺寸标定。未烧录或验证硬件，详见下方开关说明与 [控制说明](docs/navigation.md)。
 
 > **2026-10-17 下单后终审：** 用户确认订单为 **A10 + SMT**，1×20 排母换料已接受。本次重新核查制造包、原生 PCB 的 32 个器件 / 143 个引脚及 48 个网络，未发现确定性电气接错、断路或异网短路。降压标称约 5.08 V；3.3 V 来自核心板。USB 供电前须拆 R4，电机启动电流、3.3 V 负载余量与降压动态/温升尚未验证。详见 [A10 电气终审](docs/A10-final-electrical-review.md)。
 
@@ -23,7 +23,8 @@
 | MCU / 电机驱动 / 灰度接口类型 | 用户确认，尚未核对实际板与模块 |
 | 引脚选择 | 已落实到固件；实际接线待确认 |
 | 双轮霍尔编码器 | 开关为 1 时启用 TIM1/TIM4；默认不初始化或读取 |
-| 控制模式 | 默认 0：PWM 开环调速；1：双环/厘米路径，未标定拒绝启动 |
+| 控制模式 | 编码器默认 0：PWM 开环调速；1：双环，未标定拒绝启动 |
+| 预设路径 | 默认 0：仅巡线；1：编码器厘米路径与路口 STOP |
 | 模块供电与输出电平、输入上下拉 | 用户确认灰度为 3.3 V 供电；输出电平、输出类型及上下拉仍待实物确认 |
 | 深蓝底识别、轮向、停车、电量变化、赛道效果 | 未验证 |
 | PID / PWM / 丢线与路口时限 | 未标定初值 |
@@ -46,29 +47,45 @@
 
 ## 控制模式开关
 
-在 `include/motion_config.h` 修改一个宏后重新编译：
+在 `include/motion_config.h` 修改两个独立宏后重新编译，不支持行驶中切换：
 
 ```c
-#define ENCODER_CONTROL_ENABLED 0  // 0：普通 PWM；1：编码器 + 双环 + 厘米路径
+#define ENCODER_CONTROL_ENABLED 0  // 0：普通 PWM；1：编码器 + 双环
+#define PRESET_ROUTE_ENABLED    0  // 0：仅巡线；1：按预设路径行驶（需编码器为 1）
 ```
+
+| 编码器开关 | 路径开关 | 实际模式 |
+| --- | --- | --- |
+| 0 | 0 | 当前默认：普通 PWM 仅巡线，不要求编码器标定 |
+| 1 | 0 | 编码器双环仅巡线，用于独立测试巡线稳定性；仍要求标定 |
+| 1 | 1 | 编码器双环 + `src/route_table.c` 预设路径与路口 STOP |
+| 0 | 1 | 无法进行厘米定位，编译报错；两个开关仅允许 0 / 1 |
+
+`PRESET_ROUTE_ENABLED=0` 时，不读取或校验路径表，不使用表内速度、不执行 LEFT / RIGHT / STRAIGHT / STOP、不受路径距离窗口或 15000 ms 路段超时限制，路径状态保持 `ROUTE_DISABLED`。编码器仅巡线的基础速度使用 `LINE_FOLLOW_SPEED_CM_S=12.0f`（cm/s），仍随弯道降速；PWM 仅巡线沿用 `OPEN_LOOP_BASE_PWM` 等参数。两者均保留 PB10/调试停止、丢线/干扰超限、任务异常等停车，编码器模式另保留反馈故障和 8 cm 异常距离上限。宽线、全白、多区域均按干扰处理；仅巡线不保证在分岔路口选择某个分支，建议用连续单线先测试稳定性。
+
+下表比较编码器开关的作用；路径行为由独立路径开关决定：
 
 | 行为 | 0（当前默认） | 1 |
 | --- | --- | --- |
 | 电机调速 | 白线位置 PID → 左右 PWM，调节平均电压 | 位置 PID → 目标 cm/s → 双轮速度 PID → PWM |
 | 编码器 | 不初始化/读取 TIM1/TIM4，不依赖编码器接线 | 初始化并读取，检查计数/反馈故障 |
 | 标定门禁 | 不要求轮径/计数/轮距 | 须填写尺寸、方向并确认标定 |
-| 路径与 STOP | `ROUTE_DISABLED`，距离导航及表中 STOP callback 停用 | 保留原距离窗口、路口 FSM 和一次性 STOP callback |
+| 路径与 STOP | `ROUTE_DISABLED`，距离导航及表中 STOP callback 停用 | 路径开关为 0 则停用，为 1 则启用距离窗口、路口 FSM 和一次性 STOP callback |
 | 干扰/丢线 | 降低 PWM，冻结位置 PID，保留并衰减历史 PWM 差值 | 降速并使用编码器反馈保持估计航向 |
-| 停止条件 | PB10/调试停止、丢线 400 ms、任务异常 | 另含里程上限、路径异常及编码器反馈故障 |
+| 停止条件 | PB10/调试停止、丢线 400 ms、任务异常 | 另含异常里程上限、编码器反馈故障；开启路径时另检查路径异常 |
 
 普通模式的 `OPEN_LOOP_BASE_PWM=55`、弯道基础值 40、干扰上限 35、位置 PID 初值 8/0/0.08 均集中在同一个配置文件，指令使用 255 标尺且受 PWM 上限 100 约束。它们不是 cm/s，`RouteStep.speed` 不会被挪作 PWM 使用。电机开环调速通过 PWM 占空比改变驱动平均电压，实际速度受负载、电量等影响；没有编码器就不能测量并纠正航向或按厘米定位。
 
 ```mermaid
 flowchart LR
-    GPIO["8 路灰度 / 位置"] --> SELECT{"编译开关"}
+    GPIO["8 路灰度 / 白线位置反馈"] --> SELECT{"ENCODER_CONTROL_ENABLED"}
     SELECT -->|0| POSITION["位置 PID<br/>输出 PWM 差值"]
     POSITION --> PWM["非负 PWM 限幅 → TIM3 → 电机"]
-    SELECT -->|1| CASCADE["编码器与位置/速度双环<br/>厘米路径 / 路口 FSM"]
+    SELECT -->|1| ROUTE{"PRESET_ROUTE_ENABLED"}
+    ROUTE -->|0| ONLY["仅巡线 / ROUTE_DISABLED<br/>LINE_FOLLOW_SPEED_CM_S"]
+    ROUTE -->|1| TABLE["预设路径 / 路口 FSM<br/>路径速度 / 转向 / STOP"]
+    ONLY --> CASCADE["白线位置外环 + 双轮速度内环"]
+    TABLE --> CASCADE
     CASCADE --> PWM
     GPIO --> BAD["丢线 / 干扰"]
     BAD --> HOLD["0：历史 PWM 差值衰减<br/>1：编码器航向保持"]
@@ -76,7 +93,7 @@ flowchart LR
     STOP["明确停止 / 超时 / 故障<br/>STBY 低"] --> PWM
 ```
 
-`pio run -e genericSTM32F103C8` 使用代码中的开关；当前默认构建为 PWM 模式。另提供 `pio run -e encoder_closed_loop` 验证环境，使用同一 MCU 配置并以编译参数强制开关为 1，输出到独立目录。不要用这个强制环境判断宏为 0 的默认行为。`g_diagnostics.encoder_control_enabled` 显示实际构建模式；PWM 模式的里程/轮速字段为 0，不代表已测得零速。
+`pio run -e genericSTM32F103C8` 使用代码中的两个开关，当前默认是 PWM 仅巡线。`pio run -e encoder_line_only` 强制编码器为 1、路径为 0；`pio run -e encoder_closed_loop` 强制两者为 1，保持原预设路径验证用途。三个环境使用相同 MCU/引脚、输出目录独立；强制环境会覆盖头文件中的选择。`g_diagnostics.encoder_control_enabled`、`preset_route_enabled` 显示实际编译模式；PWM 模式的里程/轮速字段为 0，不代表已测得零速。
 
 ## 接线方案
 
@@ -174,19 +191,21 @@ right_pwm = base_pwm - correction_pwm
 
 ## 编码器模式总体架构（Mermaid）
 
-以下图示及厘米路径/路口章节仅适用于 `ENCODER_CONTROL_ENABLED=1`；默认 PWM 模式见上方开关说明。
+以下图示适用于 `ENCODER_CONTROL_ENABLED=1`；图中的路径表、路口 FSM 和路径 STOP 仅在 `PRESET_ROUTE_ENABLED=1` 时启用。仅巡线仍使用白线位置双环及独立干扰/停车路径，默认 PWM 模式见上方开关说明。
 
 ```mermaid
 flowchart LR
     TRACK["白线 / 赛道"] --> GPIO["8 GPIO → 一次反相 → 多数滤波"]
     GPIO --> OBS["区域分类 / 白线位置"]
-    TABLE["const RouteStep 路径表<br/>cm / cm/s / LEFT RIGHT STRAIGHT STOP"] --> FSM["路口 FSM<br/>距离窗口 + 分支 + 连续确认"]
-    OBS --> FSM
+    TABLE["仅路径开关 1：const RouteStep<br/>cm / cm/s / LEFT RIGHT STRAIGHT STOP"] --> FSM["仅路径开关 1：路口 FSM<br/>距离窗口 + 分支 + 连续确认"]
+    OBS -->|仅路径开关 1| FSM
     OBS --> OUTER["正常白线位置 PID 外环<br/>输出速度差 cm/s"]
     FSM --> MODE["控制模式选择"]
     OUTER --> MODE
+    ONLY["路径开关 0：仅巡线基础速度<br/>LINE_FOLLOW_SPEED_CM_S"] --> MODE
     HOLD["丢线 / 元器件干扰<br/>冻结位置 PID / 降速保持航向"] --> MODE
     FSM -->|未确认图形| HOLD
+    OBS -->|无白线 / 歧义或多区域| HOLD
     MODE --> TARGET["左右非负目标速度<br/>左 = base + correction<br/>右 = base - correction"]
     TARGET --> INNER["左右轮速度 PID 内环<br/>含前馈 / 输出抗饱和"]
     INNER --> MOTOR["PWM 限幅 → TIM3 → TB6612"]
@@ -209,7 +228,7 @@ flowchart LR
 
 位置外环初值 `Kp=1.8, Ki=0, Kd=0.025`，输出单位 cm/s；左右轮内环各使用 `Kp=2, Ki=8, Kd=0`，输出为 0…100 的 PWM 指令（255 标尺），加 `3 × 目标速度` 前馈。所有参数均待标定。速度目标上限 25 cm/s、基础速度上升斜率 40 cm/s²，降速与停止立即执行。内环抗饱和按前馈与 PID 相加后的 0…100 实际边界处理；目标速度为零时清空相应 PID 并输出零。
 
-`src/route_table.c` 中只有一条行驶示例与一条停止项，编译进 Flash，不在运行中写 Flash：
+`PRESET_ROUTE_ENABLED=1` 时使用 `src/route_table.c`，其中只有一条行驶示例与一条停止项，编译进 Flash，不在运行中写 Flash。关闭路径时不使用或校验该表：
 
 ```c
 typedef enum { LEFT, RIGHT, STRAIGHT, STOP } Action;
@@ -240,11 +259,15 @@ const RouteStep route[] = {
 flowchart TD
     IDLE["IDLE / 上电停止"] --> START{"一次启动请求<br/>尺寸已标定 + 连续 3 帧窄白线？"}
     START -->|否| IDLE
-    START -->|是| FOLLOW["TRACKING / ROUTE_FOLLOW<br/>位置外环 + 双轮速度内环"]
+    START -->|是| SELECT{"PRESET_ROUTE_ENABLED"}
+    SELECT -->|0| ONLY["TRACKING / ROUTE_DISABLED<br/>白线双环 / 独立基础速度"]
+    ONLY -->|无白线 / 宽线 / 全白 / 多区域| HOLD
+    ONLY -->|正常白线| ONLY
+    SELECT -->|1| FOLLOW["TRACKING / ROUTE_FOLLOW<br/>位置外环 + 双轮速度内环"]
     FOLLOW --> WINDOW{"距离窗口内<br/>中心白线 + 所需分支？"}
     WINDOW -->|是| CANDIDATE["ROUTE_CANDIDATE<br/>降速保持航向 / 连续计数与运动确认"]
     WINDOW -->|无白线或干扰图形| HOLD["GAP_HOLD<br/>冻结位置 PID / 编码器航向保持"]
-    HOLD -->|连续 3 帧窄白线且未超限| FOLLOW
+    HOLD -->|连续 3 帧窄白线且未超限| SELECT
     HOLD -->|400 ms 或 8 cm 先到| STOPPED["STOPPED / STBY 低"]
     CANDIDATE --> CONFIRM{"至少 3 帧 + 前进至少 0.1 cm<br/>100 ms 内且仍在距离窗口？"}
     CONFIRM -->|图形消失| HOLD
@@ -299,13 +322,16 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
 | `src/main.c`、`src/stm32f1xx_it.c` | 初始化、调度、按钮、诊断、看门狗与异常入口 |
 | `include/stm32f1xx_hal_conf.h` | HAL 模块配置；DMA 是 TIM HAL 类型依赖，不用于灰度采样 |
 | `test/test_logic.c`、`test/test_navigation.c`、`test/test_open_loop.c` | 传感器/PID/PWM、双环导航及关闭编码器后的 PWM 控制 |
+| `test/test_line_only.c` | 编码器仅巡线、长时间运行不受路径限制、干扰及停车回归 |
 | `test/test_motor_hal.c`、`test/test_encoder_hal.c`、`test/run_host_tests.sh` | 外设 HAL 模拟及主机验证入口，ASan / UBSan |
 
 ```sh
 # 在工程目录执行，均无需接板
 sh test/run_host_tests.sh
 pio run -e genericSTM32F103C8
-# 独立验证开启模式（强制宏为 1）
+# 编码器双环仅巡线（编码器 1、路径 0，仍需标定）
+pio run -e encoder_line_only
+# 编码器双环 + 预设路径（两个宏均强制为 1）
 pio run -e encoder_closed_loop
 ```
 
