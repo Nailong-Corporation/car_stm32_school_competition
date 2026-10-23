@@ -4,7 +4,7 @@
 /* 原始 GPIO 白色=0、黑色=1：1 巡白线（反相），0 巡黑线（不反相）。
  * 转换后统一以 1 表示目标线；修改后须重新编译，可通过 -D 覆盖。 */
 #ifndef GRAY_INVERT_ENABLED
-#define GRAY_INVERT_ENABLED         0
+#define GRAY_INVERT_ENABLED         1
 #endif
 #if GRAY_INVERT_ENABLED != 0 && GRAY_INVERT_ENABLED != 1
 #error "GRAY_INVERT_ENABLED must be 0 or 1"
@@ -25,7 +25,12 @@
 #define CONTROL_PERIOD_MS           5U
 #define CONTROL_MAX_INTERVAL_MS     15U
 #define SENSOR_FILTER_SAMPLES       3U
+#include "motion_config.h"
+#if ENCODER_CONTROL_ENABLED
 #define SENSOR_MAX_REGION_WIDTH     4U
+#else
+#define SENSOR_MAX_REGION_WIDTH     7U /* 普通 PWM 接受连续 1～7 路；8 路全目标仍为歧义。 */
+#endif
 #define SENSOR_CONTINUITY_DISTANCE  3.0f
 #define SENSOR_CONTINUITY_MARGIN    1.0f
 #define LINE_CONFIRM_SAMPLES        3U

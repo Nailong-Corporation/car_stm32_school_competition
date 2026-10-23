@@ -418,7 +418,7 @@ static void test_raw_pipeline(void)
 
 static void test_startup_ramp(void)
 {
-    const int speeds[] = {12, 25, 40};
+    const int speeds[] = {12, 25, 50};
     for (size_t s = 0; s < sizeof(speeds)/sizeof(speeds[0]); ++s) {
         RouteStep steps[] = {{1000, 2, STOP, speeds[s]}};
         LineFollow f; EncoderCounts c; uint32_t now=0;
@@ -457,17 +457,17 @@ static void test_startup_ramp(void)
 /* 提前减速只影响基础目标；窗口外即使出现路口图形也不能触发转弯。 */
 static void test_junction_approach_speed(void)
 {
-    const int speeds[]={4,12,40};
+    const int speeds[]={4,12,50};
     for (unsigned mirror=0;mirror<2;++mirror) for (unsigned n=0;n<3;++n) {
         RouteStep steps[]={{100,8,mirror?RIGHT:LEFT,speeds[n]},{100,5,STOP,40}};
         LineFollow f; EncoderCounts c; uint32_t now=0;
         start(&f,&c,&now,steps,2);
         float previous=0;
         bool saw_deceleration=false, saw_window=false;
-        while (f.odometry.distance_cm-f.route.origin_cm<99 && f.state!=LINE_STOPPED) {
+        while (f.odometry.distance_cm-f.route.origin_cm<103 && f.state!=LINE_STOPPED) {
             tick(&f,&c,&now,speeds[n]/2,speeds[n]/2,0x18,false);
             float progress=f.odometry.distance_cm-f.route.origin_cm;
-            float remaining=steps[0].distance-steps[0].tolerance-progress;
+            float remaining=steps[0].distance-progress;
             float slow=fminf((float)speeds[n],JUNCTION_APPROACH_SPEED_CM_S);
             float fraction=fmaxf(0,fminf(1,remaining/JUNCTION_APPROACH_DISTANCE_CM));
             float expected=sqrtf(slow*slow+((float)(speeds[n]*speeds[n])-slow*slow)*fraction);
@@ -499,7 +499,7 @@ static void test_junction_approach_speed(void)
 /* 真实走完左右转确认，再用中心线验证离口中即提速、下一段低速/短段包络及里程去重。 */
 static void test_early_exit_acceleration(void)
 {
-    const int speeds[]={4,12,40};
+    const int speeds[]={4,12,50};
     for (unsigned mirror=0;mirror<2;++mirror) for (unsigned n=0;n<3;++n)
     for (unsigned short_next=0;short_next<2;++short_next) {
         RouteStep steps[]={{100,8,mirror?RIGHT:LEFT,40},
@@ -526,7 +526,7 @@ static void test_early_exit_acceleration(void)
         CHECK(f.startup_elapsed_s>=STARTUP_RAMP_TIME_S);
         float old_origin=f.route.origin_cm, clear_cm=f.route.clear_cm;
         float expected=(float)speeds[n];
-        float remaining=18.0f-f.route.outgoing_cm;
+        float remaining=20.0f-f.route.outgoing_cm;
         if (short_next && remaining<JUNCTION_APPROACH_DISTANCE_CM && expected>JUNCTION_APPROACH_SPEED_CM_S) {
             float slow=JUNCTION_APPROACH_SPEED_CM_S;
             expected=sqrtf(slow*slow+(expected*expected-slow*slow)*fmaxf(0.0f,remaining)/JUNCTION_APPROACH_DISTANCE_CM);
@@ -534,9 +534,9 @@ static void test_early_exit_acceleration(void)
         if (speeds[n]>6) CHECK(f.base>before_exit); /* 首个离口周期就上升，不等 3 cm。 */
         else NEAR(f.base,4.0f); /* 下一段低速不能沿用旧段 40 cm/s。 */
         uint32_t began=now;
-        while (now-began<220U && f.route.state==ROUTE_CLEARING && f.state!=LINE_STOPPED) {
+        while (now-began<280U && f.route.state==ROUTE_CLEARING && f.state!=LINE_STOPPED) {
             float previous=f.base;
-            tick(&f,&c,&now,5,5,0x18,false); /* 220 ms 只走 2.2 cm，仍处于去重区。 */
+            tick(&f,&c,&now,5,5,0x18,false); /* 280 ms 只走 2.8 cm，仍处于去重区。 */
             CHECK(f.route.state==ROUTE_CLEARING && f.route.index==0);
             NEAR(f.route.origin_cm,old_origin);
             CHECK(f.base<=expected+.001f);
@@ -544,7 +544,7 @@ static void test_early_exit_acceleration(void)
             CHECK(f.base<=previous+TARGET_RISE_CM_S2*.005f+.001f);
         }
         CHECK(f.route.state==ROUTE_CLEARING && f.odometry.distance_cm-clear_cm<3.0f);
-        NEAR(f.base,expected); /* 6→40 在 220 ms 内完成目标规划。 */
+        NEAR(f.base,expected); /* 6→50 在 280 ms 内完成目标规划。 */
         for (unsigned i=0;i<30 && f.route.index==0 && f.state!=LINE_STOPPED;++i)
             tick(&f,&c,&now,5,5,0x18,false);
         CHECK(f.route.state==ROUTE_FOLLOW && f.route.index==1);
@@ -599,15 +599,15 @@ static void test_long_straight_without_timeout(void)
 /* 真实配置轮距和计数比例下的理想运动学回归；灰度与轮速为合成输入，不是实车证据。 */
 static void test_configured_path(void)
 {
-    CHECK(route_count==5U);
-    const float distances[]={104,131,60,39,70};
+    CHECK(route_count==4U);
+    const float distances[]={75,219,75,219};
     for (size_t i=0;i<route_count;++i) {
-        NEAR(route[i].distance,distances[i]); CHECK(route[i].speed==40);
+        NEAR(route[i].distance,distances[i]); CHECK(route[i].speed==50);
         CHECK(i+1U==route_count ? route[i].action==STOP :
               (route[i].action==LEFT || route[i].action==RIGHT));
     }
     for (unsigned mirror=0;mirror<2;++mirror) for (uint32_t limit=0;limit<=2;++limit) {
-        RouteStep steps[5];
+        RouteStep steps[4];
         for (size_t i=0;i<route_count;++i) {
             steps[i]=route[i];
             if (mirror) {
@@ -621,6 +621,7 @@ static void test_configured_path(void)
         for (unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
             tick(&f,&c,&now,0,0,0x18,i==LINE_CONFIRM_SAMPLES-1U);
         f.route.repeat_count=limit;
+        f.route.repeat_action=mirror ? RIGHT : LEFT;
         unsigned expected_laps=limit ? limit : 2;
         float residual_l=0,residual_r=0;
         bool saw_fast=false, saw_slow=false, saw_approach=false, saw_reacceleration=false;
@@ -639,7 +640,7 @@ static void test_configured_path(void)
             if (f.route.state==ROUTE_FOLLOW || f.route.state==ROUTE_CANDIDATE) {
                 float progress=f.odometry.distance_cm-f.route.origin_cm;
                 if (progress>=step.distance) line=step.action==RIGHT ? 0xf8 : 0x1f;
-                if (progress>=step.distance-step.tolerance) {
+                if (progress>=step.distance) {
                     CHECK(f.base<=JUNCTION_APPROACH_SPEED_CM_S+.001f);
                     saw_approach=true;
                 }
@@ -650,7 +651,7 @@ static void test_configured_path(void)
                 float turn=fabsf(f.odometry.heading_rad-f.route.entry_heading);
                 line=turn>=1.48f ? 0x18 : 0;
                 if (!f.route.turn_capturing) {
-                    if (step.action==RIGHT) NEAR(f.right_target_cm_s,0);
+                    if (route_current_action(&f.route)==RIGHT) NEAR(f.right_target_cm_s,0);
                     else NEAR(f.left_target_cm_s,0);
                 }
                 if (f.route.turn_capturing) {
@@ -675,10 +676,10 @@ static void test_configured_path(void)
             }
             previous=f.route.state;
         }
-        CHECK(saw_fast && saw_slow && saw_approach && saw_reacceleration && completed_turns==4U*expected_laps);
+        CHECK(saw_fast && saw_slow && saw_approach && saw_reacceleration && completed_turns==3U*expected_laps);
         CHECK(f.route.completed_laps==expected_laps && f.route.failure==ROUTE_FAILURE_NONE);
         if (limit) {
-            CHECK(f.stop_reason==LINE_STOP_ROUTE_COMPLETE && f.route.index==4);
+            CHECK(f.stop_reason==LINE_STOP_ROUTE_COMPLETE && f.route.index==3);
             CHECK(!f.command.enabled);
         } else {
             CHECK(f.route.index==0 && f.command.enabled && !f.route.stop_pending);
@@ -730,23 +731,71 @@ static void test_near_angle_exit(void)
             route_start(&p,0,0);
             p.state=ROUTE_EXECUTING;
             p.entry_cm=p.projection_previous_cm=100;
-            float heading=(mirror?1.0f:-1.0f)*(scenario==1?1.29f:1.3474f);
+            float heading=(mirror?1.0f:-1.0f)*(scenario==1?1.24f:1.2774f);
             p.projection_previous_heading=heading;
             /* 连续中心线、两路中心偏差=2，重现板上 0x30。 */
             for(unsigned i=0;i<28;++i) {
                 float distance=100+(scenario==2?0:.03f*(float)i);
                 uint8_t line=scenario==3?0xff:(mirror?0x0c:0x30);
                 if(scenario==5) {
-                    /* 100 ms 内位置 2/3 往返，最后三帧居中。旧实现持续清空证据。 */
+                    /* 位置 2/3 往返，最后三帧居中；不能因窄线横移持续清空证据。 */
                     line=i<24 && i%2 ? (mirror?0x04:0x20) : (mirror?0x0c:0x30);
                 }
                 if(scenario==4 && i%10==9) line=0; /* 孤立/中断证据不得累积。 */
                 route_update(&p,mask(line),distance,heading,200+i*5);
-                if (i<20) CHECK(p.state==ROUTE_EXECUTING);
+                if (i<10) CHECK(p.state==ROUTE_EXECUTING);
             }
             if(scenario==0 || scenario==5) CHECK(p.state==ROUTE_CLEARING);
             else CHECK(p.state==ROUTE_EXECUTING);
         }
+    }
+}
+
+/* 放宽后的出口仍同时检查时间、距离、角度与最终中心帧，左右镜像一致。 */
+static void test_exit_evidence_boundaries(void)
+{
+    for (unsigned mirror=0;mirror<2;++mirror) {
+        RouteStep steps[]={{100,16,mirror?RIGHT:LEFT,50},{100,16,STOP,50}};
+        RoutePlanner p;
+        init_route_once(&p,steps,2,NULL,NULL);
+        route_start(&p,0,0);
+        p.state=ROUTE_EXECUTING;
+        p.entry_cm=p.projection_previous_cm=100;
+        float heading=(mirror?1.0f:-1.0f)*1.26f;
+        route_update(&p,mask(0x18),100,heading,200);
+        route_update(&p,mask(0x18),100.26f,heading,249); /* 距离足够、时间未到。 */
+        CHECK(p.state==ROUTE_EXECUTING && p.exit_count==0);
+        route_update(&p,mask(0x18),100.24f,heading,250); /* 时间足够、净前进不足。 */
+        CHECK(p.state==ROUTE_EXECUTING && p.exit_count==0);
+        route_update(&p,mask(mirror?0x04:0x20),100.26f,heading,255);
+        CHECK(p.state==ROUTE_EXECUTING && p.exit_count==0); /* 窄线仍须最终居中。 */
+        for(unsigned i=0;i<3;++i) {
+            route_update(&p,mask(0x18),100.27f+.01f*(float)i,heading,260+5*i);
+            CHECK(i==2 ? p.state==ROUTE_CLEARING : p.state==ROUTE_EXECUTING);
+        }
+    }
+}
+
+/* 仅靠有界出口条件即可进入离口并在同周期升速，不等待正常角度或 3 cm。 */
+static void test_relaxed_exit_acceleration(void)
+{
+    for (unsigned mirror=0;mirror<2;++mirror) {
+        RouteStep steps[]={{100,16,mirror?RIGHT:LEFT,50},{100,16,STOP,50}};
+        LineFollow f; EncoderCounts c; uint32_t now=0;
+        start(&f,&c,&now,steps,2);
+        f.route.state=ROUTE_EXECUTING;
+        f.route.phase_ms=now;
+        f.route.entry_cm=f.route.projection_previous_cm=f.odometry.distance_cm;
+        f.odometry.heading_rad=(mirror?1.0f:-1.0f)*1.26f;
+        f.route.projection_previous_heading=f.odometry.heading_rad;
+        f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
+        f.base=6;
+        for(unsigned i=0;i<30 && f.route.state==ROUTE_EXECUTING;++i)
+            tick(&f,&c,&now,3,3,0x18,false);
+        CHECK(f.route.state==ROUTE_CLEARING && f.route.index==0);
+        CHECK(fabsf(f.odometry.heading_rad)<JUNCTION_TURN_MIN_RAD);
+        CHECK(f.base>6 && f.base<=6+TARGET_RISE_CM_S2*.005f+.001f);
+        NEAR(f.odometry.distance_cm,f.route.clear_cm);
     }
 }
 
@@ -761,12 +810,12 @@ static void test_capture_cancellation(void)
         f.route.phase_ms=now;
         f.route.entry_heading=0;
         f.route.entry_cm=f.route.projection_previous_cm=f.odometry.distance_cm;
-        f.odometry.heading_rad=direction*1.3465f;
+        f.odometry.heading_rad=direction*1.2774f;
         f.route.projection_previous_heading=f.odometry.heading_rad;
         f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
         f.base=6;
         /* 强制稳态位置 PID：与航向项相反的线位置，覆盖抵消/反向修正。 */
-        for(unsigned i=0;i<20;++i) {
+        for(unsigned i=0;i<8;++i) {
             tick(&f,&c,&now,3,3,mirror?0x08:0x10,false);
             CHECK(f.route.state==ROUTE_EXECUTING);
             CHECK(direction*(f.left_target_cm_s-f.right_target_cm_s)>=
@@ -778,7 +827,8 @@ static void test_capture_cancellation(void)
             tick(&f,&c,&now,l,r,0x18,false);
         }
         CHECK(f.route.state==ROUTE_CLEARING && f.state!=LINE_STOPPED);
-        CHECK(direction*(f.odometry.heading_rad-f.route.entry_heading)>=JUNCTION_TURN_MIN_RAD);
+        CHECK(direction*(f.odometry.heading_rad-f.route.entry_heading)>=
+              JUNCTION_TURN_MIN_RAD-JUNCTION_EXIT_ANGLE_MARGIN_RAD);
     }
 }
 
@@ -807,12 +857,50 @@ static void test_corner_distance_projection(void)
     }
 }
 
+/* 末项大容差不提前消费；非最终轮在末端左转，骤变也只计轮一次。 */
+static void test_loop_end_corner(void)
+{
+    const RouteStep steps[]={{219,16,STOP,50}};
+    RoutePlanner p;
+    route_init(&p,steps,1,NULL,NULL);
+    CHECK(p.repeat_action==LEFT);
+    route_start(&p,0,0);
+    confirm(&p,0xff,204,10);
+    CHECK(p.state==ROUTE_FOLLOW && p.completed_laps==0);
+    for (unsigned i=0;i<3;++i) route_update(&p,mask(0x18),213.9f,0,30+5*i);
+    route_update(&p,mask(0),214,0,45);
+    CHECK(p.state==ROUTE_EXECUTING && p.turn_forced && p.lap_boundary);
+    CHECK(p.completed_laps==1 && route_current_action(&p)==LEFT && !p.stop_pending);
+    for (unsigned i=0;i<3;++i) route_update(&p,mask(0x18),224,-1.5f,50+5*i);
+    CHECK(p.state==ROUTE_CLEARING && p.completed_laps==1);
+    for (unsigned i=0;i<3;++i) route_update(&p,mask(0x18),227.1f,-1.5f,70+5*i);
+    CHECK(p.state==ROUTE_FOLLOW && p.index==0 && !p.lap_boundary);
+    p.repeat_count=1;
+    route_start(&p,0,0);
+    confirm(&p,0xff,204,10);
+    CHECK(p.state==ROUTE_FOLLOW && !p.stop_pending);
+    confirm(&p,0xff,219,30);
+    CHECK(p.state==ROUTE_FINISHED && p.completed_laps==1 && p.stop_pending);
+
+    LineFollow f; EncoderCounts c={0}; uint32_t now=0;
+    start(&f,&c,&now,steps,1);
+    for (unsigned i=0;i<250;++i) tick(&f,&c,&now,25,25,0x18,false);
+    f.route.origin_cm=f.odometry.distance_cm-203;
+    tick(&f,&c,&now,25,25,0x18,false);
+    CHECK(f.route.state==ROUTE_FOLLOW); NEAR(f.base,50);
+    f.route.origin_cm=f.odometry.distance_cm-214;
+    tick(&f,&c,&now,25,25,0x18,false);
+    CHECK(f.base<50 && f.base>10);
+}
+
 static void test_route_repeats(void)
 {
     const RouteStep stop[]={{10,2,STOP,8}};
     RoutePlanner p;
     route_init(&p,stop,1,NULL,NULL);
     CHECK(p.repeat_count == ROUTE_REPEAT_COUNT);
+    CHECK(p.repeat_action == LEFT);
+    p.repeat_action = STRAIGHT;
     for (uint32_t limit=0;limit<=3;++limit) {
         p.repeat_count=limit;
         route_start(&p,0,0);
@@ -858,6 +946,7 @@ static void test_route_repeats(void)
         LineFollow f; EncoderCounts c={0}; uint32_t now=0;
         unsigned before=callbacks;
         start(&f,&c,&now,short_stop,1); f.route.repeat_count=limit;
+        f.route.repeat_action=STRAIGHT;
         for (unsigned lap=1;lap<=2;++lap) {
             while (f.odometry.distance_cm-f.route.origin_cm<9.85f && f.state!=LINE_STOPPED)
                 tick(&f,&c,&now,5,5,0x18,false);
@@ -1109,7 +1198,7 @@ static void test_spatial_corner(void)
 int main(void)
 {
     test_odometry(); test_measured_distance_scale(); test_speed(); test_left_encoder_direction(); test_routes(); test_controller(); test_full_route_pipeline(); test_post_turn_stop_snapshot(); test_raw_pipeline();
-    test_startup_ramp(); test_junction_approach_speed(); test_early_exit_acceleration(); test_long_straight_without_timeout(); test_configured_path(); test_route_repeats(); test_corner_distance_projection(); test_capture_cancellation(); test_near_angle_exit(); test_late_turn_clear_budget(); test_turn_capture(); test_l_corner_confirmation(); test_route_abrupt_priority(); test_spatial_corner();
+    test_startup_ramp(); test_junction_approach_speed(); test_early_exit_acceleration(); test_long_straight_without_timeout(); test_configured_path(); test_route_repeats(); test_loop_end_corner(); test_corner_distance_projection(); test_capture_cancellation(); test_near_angle_exit(); test_exit_evidence_boundaries(); test_relaxed_exit_acceleration(); test_late_turn_clear_budget(); test_turn_capture(); test_l_corner_confirmation(); test_route_abrupt_priority(); test_spatial_corner();
     printf("PASS: odometry, nested loops, junction FSM, interference and route STOP; %u checks\n",checks);
     return 0;
 }

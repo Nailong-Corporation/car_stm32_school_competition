@@ -46,7 +46,7 @@ static void start(LineFollow *f, uint32_t *now)
 /* 经过实际极性转换/滤波/启动门禁/PWM 换算，复现“按键请求有了但不转”。 */
 static void raw_start_cases(void)
 {
-    const uint8_t line[] = {0x00, 0xff, 0x19, 0x18};
+    const uint8_t line[] = {0x00, 0xff, 0x19, 0x18, 0x1f, 0x3e, 0x7c, 0xf8, 0x3f, 0x7e, 0xfc, 0x7f, 0xfe};
     for (unsigned n = 0; n < sizeof(line); ++n) {
         GraySensor sensor;
         LineFollow f;
@@ -58,13 +58,15 @@ static void raw_start_cases(void)
             line_follow_update(&f, obs, (EncoderCounts){0}, i * CONTROL_PERIOD_MS,
                                .005f, i == 10);
         }
-        if (line[n] == 0x18) { /* S3/S4 目标线居中，两种原始极性均可启动。 */
+        if (line[n] == 0x18 || n >= 4) { /* S3/S4 目标线居中，两种原始极性均可启动。 */
             CHECK(f.state == LINE_TRACKING && f.command.enabled);
             CHECK(f.start_result == LINE_START_ACCEPTED);
-            NEAR(f.command.left, OPEN_LOOP_BASE_PWM);
-            NEAR(f.command.right, OPEN_LOOP_BASE_PWM);
+            CHECK(fmaxf(f.command.left, f.command.right) == OPEN_LOOP_BASE_PWM);
+            if (mask(line[n]).position == 0.0f) NEAR(f.command.left, f.command.right);
+            else if (mask(line[n]).position > 0) CHECK(f.command.left > f.command.right);
+            else CHECK(f.command.left < f.command.right);
             /* 居中并完成加速后 255/255，CCR=ARR+1，达到满占空比。 */
-            CHECK(motor_command_to_ccr(f.command.left, 1, 0, 6399) == 6400);
+            CHECK(motor_command_to_ccr(fmaxf(f.command.left, f.command.right), 1, 0, 6399) == 6400);
         } else {
             CHECK(f.state == LINE_IDLE && !f.command.enabled);
             CHECK(f.start_result == LINE_START_REJECTED_LINE);
@@ -98,9 +100,9 @@ int main(void)
     CHECK(f.state==LINE_TRACKING); /* no encoder stall or route deadline */
     NEAR(f.command.left,OPEN_LOOP_BASE_PWM); NEAR(f.command.right,OPEN_LOOP_BASE_PWM);
     for (unsigned i=0; i<20; ++i) tick(&f,&now,0x20,false);
-    CHECK(f.command.left>f.command.right);
+    CHECK(f.command.left>f.command.right); NEAR(f.command.left, OPEN_LOOP_BASE_PWM);
     for (unsigned i=0; i<20; ++i) tick(&f,&now,0x04,false);
-    CHECK(f.command.left<f.command.right);
+    CHECK(f.command.left<f.command.right); NEAR(f.command.right, OPEN_LOOP_BASE_PWM);
     float before=f.base, integral=f.pid.integral, derivative=f.pid.derivative;
     tick(&f,&now,0x19,false); /* selected multi-region target is still interference */
     CHECK(f.state==LINE_GAP_HOLD && f.base<=before && f.base<=OPEN_LOOP_HOLD_PWM);
@@ -109,8 +111,10 @@ int main(void)
     float difference=f.command.right-f.command.left;
     for (unsigned i=0; i<10; ++i) tick(&f,&now,0xff,false);
     CHECK(f.command.right-f.command.left<difference);
-    for (unsigned i=0; i<LINE_CONFIRM_SAMPLES; ++i) tick(&f,&now,0x18,false);
+    for (unsigned i=0; i<LINE_CONFIRM_SAMPLES; ++i) tick(&f,&now,0x7f,false);
     CHECK(f.state==LINE_TRACKING && !f.abnormal); NEAR(f.pid.derivative,0);
+    for (unsigned i=0; i<LINE_CONFIRM_SAMPLES; ++i) tick(&f,&now,0x7e,false);
+    CHECK(f.state==LINE_TRACKING && !f.abnormal);
     uint32_t reliable=f.last_reliable_ms;
     for (unsigned i=0; i<100 && f.state!=LINE_STOPPED; ++i)
         tick(&f,&now,i%4U==3U ? 0x18 : 0,false);

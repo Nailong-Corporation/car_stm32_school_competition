@@ -8,7 +8,7 @@
  * PlatformIO 只使用 genericSTM32F103C8 环境，编译和上传遵循本文件的开关。
  */
 #ifndef ENCODER_CONTROL_ENABLED
-#define ENCODER_CONTROL_ENABLED       1
+#define ENCODER_CONTROL_ENABLED       0
 #endif
 #if ENCODER_CONTROL_ENABLED != 0 && ENCODER_CONTROL_ENABLED != 1
 #error "ENCODER_CONTROL_ENABLED must be 0 or 1"
@@ -20,7 +20,7 @@
  * 编译环境不覆盖模式；修改本文件后使用同一个编译/上传入口。
  */
 #ifndef PRESET_ROUTE_ENABLED
-#define PRESET_ROUTE_ENABLED          1
+#define PRESET_ROUTE_ENABLED          0
 #endif
 #if PRESET_ROUTE_ENABLED != 0 && PRESET_ROUTE_ENABLED != 1
 #error "PRESET_ROUTE_ENABLED must be 0 or 1"
@@ -30,7 +30,7 @@
 #endif
 
 /* 预设路径执行轮数：0 无限循环，1 单轮，N 连续执行 N 轮。
- * 非最后一轮的末项 STOP 作为直行路口通过，离口去重后返回第 0 项。
+ * 非最后一轮的末项 STOP 按 ROUTE_REPEAT_ACTION 转向通过，离口去重后返回第 0 项。
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
  */
 #ifndef ROUTE_REPEAT_COUNT
@@ -40,6 +40,9 @@
 #error "ROUTE_REPEAT_COUNT must be in 0..UINT32_MAX"
 #endif
 
+/* 当前闭合赛道末项需要左转；可选 LEFT / RIGHT / STRAIGHT。 */
+#define ROUTE_REPEAT_ACTION         LEFT
+
 /* 两种控制模式共用的启动包络；按实际 dt 累计，不阻塞传感器与停车保护。 */
 #define STARTUP_RAMP_TIME_S           1.0f /* 明确 START 后升至正常目标的时间，单位 s。 */
 
@@ -48,7 +51,7 @@
  * PWM 用于调节平均驱动电压，不表示已知轮速；不得与 cm/s 参数混用。
  */
 #define OPEN_LOOP_BASE_PWM          255.0f  /* 目标线居中时满占空比，按上升斜坡达到。 */
-#define OPEN_LOOP_TURN_BASE_PWM      40.0f  /* 位置偏差达到最大时降低到此基础 PWM。 */
+#define OPEN_LOOP_CORRECTION_MAX_PWM 127.5f /* 半差上限；外轮满输出时内轮最低为零。 */
 #define OPEN_LOOP_HOLD_PWM           35.0f  /* 丢线/干扰期间的基础 PWM 上限，不主动加速。 */
 #define OPEN_LOOP_PWM_RISE_PER_S (OPEN_LOOP_BASE_PWM / STARTUP_RAMP_TIME_S)
 #define OPEN_LOOP_POSITION_KP         8.0f  /* 位置比例项，输出左右 PWM 的半差。 */
@@ -84,7 +87,7 @@
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
 #define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        40.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
+#define WHEEL_TARGET_MAX_CM_S        50.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
@@ -146,7 +149,7 @@
 #define JUNCTION_ABRUPT_WIDTH_GROWTH   2U   /* 目标线路数一次增加至少两路。 */
 #define JUNCTION_ABRUPT_POSITION_JUMP  4.0f /* 窄线横向位置一次跳变的权重阈值。 */
 
-/* 仅路径模式：从距离窗口下界之前开始减速，窗口内保持路口低速。
+/* 仅路径模式：从表内路口标称位置前 5 cm 开始减速，不扣除距离容差。
  * 5 cm 是按用户反馈缩短后的待实车标定提前量；目标按速度平方随剩余距离插值，非实测制动距离。
  */
 #define JUNCTION_APPROACH_DISTANCE_CM 5.0f
@@ -158,12 +161,12 @@
  */
 #define JUNCTION_ACTION_TIMEOUT_MS   4500U /* 确认路口后的转弯/直行动作时限。 */
 #define JUNCTION_CLEAR_TIMEOUT_MS    1500U /* 确认出口后独立离口时限；仍需 3 cm 与连续窄线。 */
-#define JUNCTION_TURN_MIN_RAD         1.35f /* 约 77° 后才允许中心线确认退出，避免过早切回巡线。 */
+#define JUNCTION_TURN_MIN_RAD         1.30f /* 约 74.5° 后允许连续中心线确认退出。 */
 /* 编码器估计接近退出角且已连续沿中心出口线前进时，允许有界退出。
- * 仅在 1.30 rad 以上、连续 100 ms 且前进 0.5 cm 时生效，不放宽普通路口入口。 */
+ * 仅在 1.25 rad 以上、连续窄线 50 ms 且前进 0.25 cm 时生效，最终仍需连续中心线。 */
 #define JUNCTION_EXIT_ANGLE_MARGIN_RAD 0.05f
-#define JUNCTION_EXIT_CONFIRM_MS      100U
-#define JUNCTION_EXIT_CONFIRM_CM      0.5f
+#define JUNCTION_EXIT_CONFIRM_MS      50U
+#define JUNCTION_EXIT_CONFIRM_CM      0.25f
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */

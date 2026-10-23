@@ -143,13 +143,22 @@ static void pwm_output(LineFollow *f, float base, float correction, float dt)
 {
     f->base = next_base(f, base, OPEN_LOOP_PWM_RISE_PER_S, dt);
     f->startup_elapsed_s = fminf(STARTUP_RAMP_TIME_S, f->startup_elapsed_s + dt);
-    f->command = motor_mix(f->base, correction);
+    /* 满速基准保留转向余量：外轮维持基准，内轮降低两倍半差。
+     * 交给 motor_mix 的均值随半差降低，避免基准 255 时差速被钳为零。 */
+    float limit = f->state == LINE_TRACKING ?
+        fminf(0.5f * f->base, OPEN_LOOP_CORRECTION_MAX_PWM) :
+        fminf(f->base, MOTOR_PWM_LIMIT - f->base);
+    correction = fmaxf(-limit, fminf(limit, correction));
+    if (f->state == LINE_TRACKING)
+        f->command = motor_mix(f->base - fabsf(correction), correction);
+    else
+        f->command = motor_mix(f->base, correction);
     f->correction = 0.5f * (f->command.left - f->command.right);
 }
 
 /**
  * @brief 执行无编码器的巡线状态机，由白线位置 PID 直接生成左右 PWM。
- * 启动和重获需连续窄白线；干扰时冻结 PID、衰减历史差值，超时停止。
+ * 启动和重获需连续单一区域目标线（最多 7 路）；干扰时冻结 PID、衰减历史差值，超时停止。
  * dt 单位为秒，now_ms 单位为毫秒；不计算轮速、厘米里程或真实航向。
  */
 static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms,
@@ -183,12 +192,11 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
             f->reliable_position = obs.position;
             f->last_reliable_ms = now_ms;
         }
-        float base = OPEN_LOOP_BASE_PWM - (OPEN_LOOP_BASE_PWM - OPEN_LOOP_TURN_BASE_PWM) *
-                     fabsf(obs.position) / 7.0f;
+        float base = OPEN_LOOP_BASE_PWM;
         float next = next_base(f, base, OPEN_LOOP_PWM_RISE_PER_S, dt);
         float correction;
         if (!pid_update(&f->pid, obs.position, dt,
-                        fminf(next, MOTOR_PWM_LIMIT - next), &correction)) {
+                        fminf(0.5f * next, OPEN_LOOP_CORRECTION_MAX_PWM), &correction)) {
             line_follow_stop(f, LINE_STOP_FAULT);
             return;
         }
@@ -303,12 +311,13 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         progress = f->route.outgoing_cm;
     }
     float base_speed = (float)speed_step.speed;
-    /* 在窗口下界前规划减速，给实车留出减速距离；候选及转弯动作仍保持低速。
+    /* 按表内路口位置前 5 cm 规划减速；容差窗口只决定是否允许确认路口。
+     * 窗口内提前确认的路口仍立即进入候选低速或转弯动作。
      * v² 随剩余距离线性变化，对理想跟随目标的直线行驶相当于恒定减速度。
      * 这里只改变速度，不放宽 route_update 的距离/形状确认门禁。
      */
     float slow_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
-    float remaining = speed_step.distance - speed_step.tolerance - progress;
+    float remaining = speed_step.distance - progress;
     if (f->route.state == ROUTE_CANDIDATE || remaining <= 0.0f) {
         base_speed = slow_speed;
     } else if (remaining < JUNCTION_APPROACH_DISTANCE_CM) {

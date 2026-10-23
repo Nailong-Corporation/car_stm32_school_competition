@@ -41,6 +41,7 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
     p->steps = steps;
     p->count = count;
     p->repeat_count = ROUTE_REPEAT_COUNT;
+    p->repeat_action = ROUTE_REPEAT_ACTION;
     p->stop_callback = callback;
     p->callback_context = context;
     p->valid = steps != NULL && count > 0U;
@@ -75,10 +76,15 @@ void route_start(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     if (p->state != ROUTE_FAILED) begin_segment(p, distance_cm, now_ms);
 }
 
-/* 循环边界复用直行与离口确认，避免同一标记被再次消费或发生瞬时重启。 */
+/* 最终轮停车，其余轮从入口形状判断开始就使用闭合动作。 */
+static bool another_lap(const RoutePlanner *p)
+{
+    return p->repeat_count == 0U || p->completed_laps < p->repeat_count - 1U;
+}
 Action route_current_action(const RoutePlanner *p)
 {
-    return p->lap_boundary ? STRAIGHT : p->steps[p->index].action;
+    Action action = p->steps[p->index].action;
+    return action == STOP && (p->lap_boundary || another_lap(p)) ? p->repeat_action : action;
 }
 
 /**
@@ -155,11 +161,28 @@ static void begin_action(RoutePlanner *p, float distance_cm, float heading_rad,
     p->exit_count = 0;
 }
 
+/* 普通确认与骤变入口共用计轮逻辑，末项不能漏计或重复计轮。 */
+static void accept_step(RoutePlanner *p, float distance_cm, float heading_rad,
+                        uint32_t now_ms, bool forced)
+{
+    if (p->steps[p->index].action == STOP) {
+        bool repeat = another_lap(p);
+        if (p->completed_laps < UINT32_MAX) ++p->completed_laps;
+        if (!repeat) {
+            p->state = ROUTE_FINISHED;
+            p->stop_pending = true;
+            return;
+        }
+        p->lap_boundary = true;
+    }
+    begin_action(p, distance_cm, heading_rad, now_ms, forced);
+}
+
 /**
  * @brief 依据白线形状、厘米里程、航向和毫秒时基推进路口有限状态机。
  * 窗口内 LEFT/RIGHT 的整排骤变优先按表执行，其余走连续帧/前进距离候选确认。
  * 动作退出后还需离口消抖。
- * 最终轮 STOP 确认产生待分派事件，中间轮按直行离口后回到首项。
+ * 最终轮 STOP 确认产生待分派事件，中间轮按闭合动作及离口后回到首项。
  * 超时或异常置失败；本函数不直接操作电机或调用回调。
  */
 void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
@@ -180,13 +203,17 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
     }
     if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
         bool in_window = progress >= s.distance - s.tolerance && progress <= s.distance + s.tolerance;
-        bool forced = in_window && (s.action == LEFT || s.action == RIGHT) &&
+        /* 末项的大容差不能使终点提前降速/转向；最早从标称位置前减速区开始确认。 */
+        if (s.action == STOP && progress < s.distance - JUNCTION_APPROACH_DISTANCE_CM)
+            in_window = false;
+        Action action = route_current_action(p);
+        bool forced = in_window && (action == LEFT || action == RIGHT) &&
             row_changed_abruptly(p, obs, now_ms);
         remember_line(p, obs, now_ms);
         if (forced) {
             /* 不再等中心/指定分支、候选帧数或普通 PID 的在线判断。方向只取路径表。 */
             p->candidate_count = 0;
-            begin_action(p, distance_cm, heading_rad, now_ms, true);
+            accept_step(p, distance_cm, heading_rad, now_ms, true);
             return;
         }
         bool centered_line = in_window && route_is_narrow_line(obs) &&
@@ -199,7 +226,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
                 p->approach_center_cm = distance_cm;
             }
         } else p->approach_center_count = 0;
-        if (!in_window || !junction_matches(p, obs, s.action, distance_cm, now_ms)) {
+        if (!in_window || !junction_matches(p, obs, action, distance_cm, now_ms)) {
             p->candidate_count = 0;
             p->state = ROUTE_FOLLOW;
             return;
@@ -217,16 +244,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         if (p->candidate_count < JUNCTION_CONFIRM_SAMPLES) ++p->candidate_count;
         if (p->candidate_count < JUNCTION_CONFIRM_SAMPLES ||
             distance_cm - p->entry_cm < JUNCTION_CONFIRM_DISTANCE_CM) return;
-        if (s.action == STOP) {
-            if (p->completed_laps < UINT32_MAX) ++p->completed_laps;
-            if (p->repeat_count != 0U && p->completed_laps >= p->repeat_count) {
-                p->state = ROUTE_FINISHED;
-                p->stop_pending = true;
-                return;
-            }
-            p->lap_boundary = true;
-        }
-        begin_action(p, distance_cm, heading_rad, now_ms, false);
+        accept_step(p, distance_cm, heading_rad, now_ms, false);
         return;
     }
     uint32_t phase_timeout = p->state == ROUTE_CLEARING ? JUNCTION_CLEAR_TIMEOUT_MS :
@@ -273,7 +291,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             p->exit_candidate_cm = distance_cm;
         }
         /* 实测转角差约 0.003 rad 时，1.6 cm/s 目标轮差未形成足够实际轮差。
-         * 仅在接近角度门槛且连续沿中心出口线前进后，接受有界估计误差。 */
+         * 仅在接近角度门槛且连续沿窄出口线前进后，接受有界估计误差。 */
         if (near_exit && (uint32_t)(now_ms - p->exit_candidate_ms) >= JUNCTION_EXIT_CONFIRM_MS &&
             distance_cm - p->exit_candidate_cm >= JUNCTION_EXIT_CONFIRM_CM) departed = true;
         p->exit_count = departed && centered ? (uint8_t)(p->exit_count + 1U) : 0U;

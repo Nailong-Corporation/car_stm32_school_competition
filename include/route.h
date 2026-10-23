@@ -32,6 +32,7 @@ typedef struct {
     uint32_t exit_candidate_ms;
     float exit_candidate_cm;
     bool exit_candidate_pending; /* 接近退出角时的连续中心出口线证据。 */
+    Action repeat_action; /* 非最终轮末项的闭合动作，由 motion_config.h 初始化。 */
     uint32_t repeat_count, completed_laps; /* 0 无限；完成末项路口确认后累计，START 清零。 */
     uint8_t candidate_count, exit_count, approach_center_count;
     uint8_t previous_line_mask, narrow_count;
@@ -39,7 +40,7 @@ typedef struct {
     float previous_line_position;
     bool have_approach_center;
     bool valid, stop_pending, callback_dispatched;
-    bool turn_capturing, lap_boundary; /* 出口线捕获 / 非末轮 STOP 的直行离口。 */
+    bool turn_capturing, lap_boundary; /* 出口线捕获 / 非末轮 STOP 的闭合动作。 */
     bool turn_forced; /* 本项由整排骤变触发；保持至下一路段，便于诊断。 */
     RouteStopCallback stop_callback;
     void *callback_context;
@@ -52,7 +53,7 @@ void route_init(RoutePlanner *planner, const RouteStep *steps, size_t count,
 void route_start(RoutePlanner *planner, float distance_cm, uint32_t now_ms);
 void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
                    float heading_rad, uint32_t now_ms);
-/* 非最后一轮的末项 STOP 在执行阶段映射为 STRAIGHT。 */
+/* 非最后一轮的末项 STOP 映射为配置的闭合动作。 */
 Action route_current_action(const RoutePlanner *planner);
 bool route_is_narrow_line(GrayObservation obs);
 /* Caller MUST physically issue motor_stop / disabled output before dispatch.
