@@ -10,6 +10,9 @@ typedef struct {
     GrayKind observation;
     LineState state;
     LineStopReason stop_reason;
+    uint32_t button_press_count, start_request_count;
+    LineStartResult start_result;
+    uint8_t valid_line_samples, start_raw_mask, start_line_mask;
     float position, left_command, right_command;
     uint16_t left_encoder, right_encoder;
     bool encoder_control_enabled, preset_route_enabled, odometry_ready;

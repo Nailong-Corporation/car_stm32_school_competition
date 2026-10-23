@@ -1,6 +1,15 @@
 #ifndef CONTROL_CONFIG_H
 #define CONTROL_CONFIG_H
 
+/* 原始 GPIO 白色=0、黑色=1：1 巡白线（反相），0 巡黑线（不反相）。
+ * 转换后统一以 1 表示目标线；修改后须重新编译，可通过 -D 覆盖。 */
+#ifndef GRAY_INVERT_ENABLED
+#define GRAY_INVERT_ENABLED         0
+#endif
+#if GRAY_INVERT_ENABLED != 0 && GRAY_INVERT_ENABLED != 1
+#error "GRAY_INVERT_ENABLED must be 0 or 1"
+#endif
+
 /* Initial bench values only; no track or motor calibration has been performed. */
 #define CONTROL_PERIOD_MS           5U
 #define CONTROL_MAX_INTERVAL_MS     15U
@@ -10,7 +19,7 @@
 #define SENSOR_CONTINUITY_MARGIN    1.0f
 #define LINE_CONFIRM_SAMPLES        3U
 #define MOTOR_COMMAND_MAX          255.0f
-#define MOTOR_PWM_LIMIT            100.0f
+#define MOTOR_PWM_LIMIT            255.0f /* 255 标尺的满占空比；仍保留非负限幅。 */
 #define MOTOR_LEFT_GAIN            1.0f
 #define MOTOR_RIGHT_GAIN           1.0f
 #define MOTOR_LEFT_DEADZONE         0.0f

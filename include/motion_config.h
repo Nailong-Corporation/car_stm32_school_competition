@@ -8,7 +8,7 @@
  * encoder_closed_loop 构建环境会强制指定为 1。
  */
 #ifndef ENCODER_CONTROL_ENABLED
-#define ENCODER_CONTROL_ENABLED       1
+#define ENCODER_CONTROL_ENABLED       0
 #endif
 #if ENCODER_CONTROL_ENABLED != 0 && ENCODER_CONTROL_ENABLED != 1
 #error "ENCODER_CONTROL_ENABLED must be 0 or 1"
@@ -33,7 +33,7 @@
  * 仅在开关为 0 时使用；以下指令采用 0～255 标尺，并受 MOTOR_PWM_LIMIT 限制。
  * PWM 用于调节平均驱动电压，不表示已知轮速；不得与 cm/s 参数混用。
  */
-#define OPEN_LOOP_BASE_PWM           55.0f  /* 白线居中时的目标基础 PWM。 */
+#define OPEN_LOOP_BASE_PWM          255.0f  /* 目标线居中时满占空比，按上升斜坡达到。 */
 #define OPEN_LOOP_TURN_BASE_PWM      40.0f  /* 位置偏差达到最大时降低到此基础 PWM。 */
 #define OPEN_LOOP_HOLD_PWM           35.0f  /* 丢线/干扰期间的基础 PWM 上限，不主动加速。 */
 #define OPEN_LOOP_PWM_RISE_PER_S     200.0f /* 基础 PWM 每秒最大上升量；降速与停车不等待斜坡。 */

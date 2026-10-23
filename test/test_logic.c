@@ -1,3 +1,4 @@
+#include "gray_test_input.h"
 #include "control_config.h"
 #include "gray_sensor.h"
 #include "motor_command.h"
@@ -12,11 +13,23 @@ static unsigned checks;
 
 static void test_sensor(void)
 {
+    /* 固定物理电平验证，避免仅靠测试输入转换函数掩盖极性选错。 */
+    GraySensor physical;
+    gray_sensor_init(&physical);
+    GrayObservation center = gray_sensor_update(&physical,
+#if GRAY_INVERT_ENABLED
+        0xe7, /* 白线：S3/S4 低，其余高。 */
+#else
+        0x18, /* 黑线：S3/S4 高，其余低。 */
+#endif
+        false, 0.0f);
+    CHECK(center.kind == GRAY_VALID && center.line_mask == 0x18);
+    NEAR(center.position, 0.0f);
     /* Independent enumeration: count transitions and sum physical positions. */
     for (unsigned mask = 0; mask < 256; ++mask) {
         GraySensor sensor;
         gray_sensor_init(&sensor);
-        GrayObservation obs = gray_sensor_update(&sensor, (uint8_t)~mask, false, 0.0f);
+        GrayObservation obs = gray_sensor_update(&sensor, raw_for_line((uint8_t)mask), false, 0.0f);
         unsigned count = 0, regions = 0;
         float sum = 0.0f;
         for (unsigned i = 0; i < 8; ++i) {
@@ -27,7 +40,7 @@ static void test_sensor(void)
             }
         }
         CHECK(obs.line_mask == mask);
-        CHECK(obs.raw_mask == (uint8_t)~mask);
+        CHECK(obs.raw_mask == raw_for_line((uint8_t)mask));
         CHECK(obs.white_count == count && obs.region_count == regions);
         if (count == 0) CHECK(obs.kind == GRAY_NONE);
         else if (regions == 1 && count <= SENSOR_MAX_REGION_WIDTH) {
@@ -58,11 +71,11 @@ static void test_sensor(void)
     CHECK(gray_classify(0xff, true, 0.0f).kind == GRAY_AMBIGUOUS);
     GraySensor sensor;
     gray_sensor_init(&sensor);
-    gray_sensor_update(&sensor, 0xe7, false, 0.0f);
-    gray_sensor_update(&sensor, 0xe7, false, 0.0f);
-    selected = gray_sensor_update(&sensor, 0xff, false, 0.0f);
+    gray_sensor_update(&sensor, raw_for_line(0x18), false, 0.0f);
+    gray_sensor_update(&sensor, raw_for_line(0x18), false, 0.0f);
+    selected = gray_sensor_update(&sensor, raw_for_line(0x00), false, 0.0f);
     CHECK(selected.kind == GRAY_VALID && selected.line_mask == 0x18);
-    selected = gray_sensor_update(&sensor, 0xff, false, 0.0f);
+    selected = gray_sensor_update(&sensor, raw_for_line(0x00), false, 0.0f);
     CHECK(selected.kind == GRAY_NONE);
 }
 
@@ -109,7 +122,8 @@ static void test_pid_and_mixing(void)
     CHECK(!motor_mix(10.0f, INFINITY).enabled);
     CHECK(motor_command_to_ccr(0.0f, 1.0f, 20.0f, 6399) == 0);
     CHECK(motor_command_to_ccr(-1.0f, 1.0f, 20.0f, 6399) == 0);
-    CHECK(motor_command_to_ccr(255.0f, 1.0f, 0.0f, 6399) == 2510);
+    CHECK(motor_command_to_ccr(255.0f, 1.0f, 0.0f, 6399) == 6400);
+    CHECK(motor_command_to_ccr(300.0f, 1.0f, 0.0f, 6399) == 6400);
     CHECK(motor_command_to_ccr(50.0f, 1.0f, 0.0f, 6399) == 1255);
     CHECK(motor_command_to_ccr(NAN, 1.0f, 0.0f, 6399) == 0);
 }

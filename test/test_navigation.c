@@ -1,3 +1,4 @@
+#include "gray_test_input.h"
 #include "line_follow.h"
 #include "motion_config.h"
 #include <assert.h>
@@ -153,12 +154,22 @@ static void test_controller(void)
     line_follow_init(&f,invalid,long_route,1,NULL,NULL);
     tick(&f,&c,&now,0,0,0x18,true);
     CHECK(f.stop_reason==LINE_STOP_CALIBRATION && !f.command.enabled);
+    CHECK(f.start_result==LINE_START_REJECTED_CALIBRATION);
+    line_follow_init(&f,calibration(),NULL,0,NULL,NULL);
+    for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
+        tick(&f,&c,&now,0,0,0x18,i==LINE_CONFIRM_SAMPLES-1U);
+    CHECK(f.stop_reason==LINE_STOP_ROUTE && !f.command.enabled);
+    CHECK(f.start_result==LINE_START_REJECTED_ROUTE);
     line_follow_init(&f,calibration(),long_route,1,NULL,NULL);
     for(unsigned i=0;i<10;++i) tick(&f,&c,&now,0,0,0,true);
     CHECK(f.state==LINE_IDLE);
+    CHECK(f.start_result==LINE_START_REJECTED_LINE);
     for(unsigned i=0;i<5;++i) tick(&f,&c,&now,0,0,0x18,false);
     CHECK(f.state==LINE_IDLE); /* no queued start */
     start(&f,&c,&now,long_route,1);
+    CHECK(f.start_result==LINE_START_ACCEPTED);
+    tick(&f,&c,&now,0,0,0x18,true);
+    CHECK(f.state==LINE_TRACKING && f.start_result==LINE_START_ALREADY_RUNNING);
     for(unsigned i=0;i<20;++i) tick(&f,&c,&now,5,5,0x20,false);
     CHECK(f.left_target_cm_s>f.right_target_cm_s);
     float integral=f.pid.integral, derivative=f.pid.derivative;
@@ -181,6 +192,7 @@ static void test_controller(void)
     line_follow_stop(&f,LINE_STOP_REQUEST); CHECK(f.stop_reason==LINE_STOP_FAULT);
     for(unsigned i=0;i<5;++i) tick(&f,&c,&now,0,0,0x18,true);
     CHECK(f.state==LINE_STOPPED);
+    CHECK(f.start_result==LINE_START_REJECTED_FAULT);
     start(&f,&c,&now,long_route,1);
     for(unsigned i=0;i<150 && f.state!=LINE_STOPPED;++i) tick(&f,&c,&now,0,0,0x18,false);
     CHECK(f.stop_reason==LINE_STOP_ENCODER); /* stalled or disconnected encoder */
@@ -242,21 +254,21 @@ static void test_raw_pipeline(void)
     line_follow_init(&f,calibration(),long_route,1,NULL,NULL);
     for(unsigned i=0;i<12;++i) {
         now+=5; c.left+=3; c.right+=3;
-        GrayObservation obs=gray_sensor_update(&sensor,0xe7,
+        GrayObservation obs=gray_sensor_update(&sensor,raw_for_line(0x18),
             line_follow_have_recent_position(&f,now),f.reliable_position);
         line_follow_update(&f,obs,c,now,.005f,i==11);
     }
     CHECK(f.state==LINE_TRACKING);
     for(unsigned i=0;i<5;++i) {
         now+=5; c.left+=3; c.right+=3;
-        GrayObservation obs=gray_sensor_update(&sensor,(uint8_t)~0x19U,
+        GrayObservation obs=gray_sensor_update(&sensor,raw_for_line(0x19),
             line_follow_have_recent_position(&f,now),f.reliable_position);
         line_follow_update(&f,obs,c,now,.005f,false);
     }
     CHECK(f.state==LINE_GAP_HOLD && f.route.index==0);
     for(unsigned i=0;i<5;++i) {
         now+=5; c.left+=3; c.right+=3;
-        GrayObservation obs=gray_sensor_update(&sensor,0xe7,
+        GrayObservation obs=gray_sensor_update(&sensor,raw_for_line(0x18),
             line_follow_have_recent_position(&f,now),f.reliable_position);
         line_follow_update(&f,obs,c,now,.005f,false);
     }

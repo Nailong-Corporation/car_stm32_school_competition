@@ -2,6 +2,12 @@
 
 ## 当前进度与验证边界
 
+> **2026-10-22 满速巡线配置：** 用户反馈当前巡线正常，现将普通 PWM 模式的居中目标由 `55/255` 提高为 `255/255`，公共输出上限由 `100` 提高为 `255`。居中并完成加速后，两轮达到名义 100% 占空比（TIM3 ARR=6399、CCR=6400）；基础 PWM 仍以每秒 200 上升，从零约 1.275 s 达到 255。位置偏差增大时仍降速并差速转向，最大偏差基础值 40、丢线/干扰上限 35、400 ms 丢线停车及 PB10/故障停车均保留。当前颜色开关保持用户已有的 `GRAY_INVERT_ENABLED=0`，编码器/路径均为 0。公共 PWM 上限也适用于编码器模式，但其 cm/s 目标与标定门禁未改。本次满速配置未烧录，满速赛道表现尚未验证；PWM 占空比不代表实测轮速。
+
+> **2026-10-22 巡线颜色开关：** `include/control_config.h` 新增 `GRAY_INVERT_ENABLED`，**1：反相、巡白线**；**0：不反相、巡黑线**，当前配置为 **0**。转换后 `line_mask` 的 1 始终表示目标线，适用于 PWM、编码器仅巡线及编码器路径三种模式；修改后重新编译。
+
+> **2026-10-22 历史实物排查（用户后续已反馈巡线正常）：** 用户报告独立的 `motor_test_stm32` 最小项目可通过 PB10 控制电机，巡线项目在灰度已接好并对准白线时按 START 两侧仍完全不动。源码对照确认两项目电机引脚、64 MHz 时钟、TIM3 10 kHz PWM 与按键消抖配置一致；最小项目当前配置固定 20% 占空比，当时本项目居中稳态为 55/255，约 21.6%。这将排查重点转向实际烧录模式、启动白线门禁与任务故障；尚未读取板上诊断，不能确认具体根因。已新增保留的启动请求结果、消抖按键计数与启动时灰度掩码，见下方操作入口。本次改动未烧录，巡线与灰度板上行为仍待验证。
+
 > **2026-10-22 独立路径开关：** `include/motion_config.h` 新增 `PRESET_ROUTE_ENABLED`，默认 **0（仅巡线）**；改为 **1** 时按预设路径表执行距离、路口转向与 STOP，且要求 `ENCODER_CONTROL_ENABLED=1`。编码器开关仍默认 0，控制 PWM / 双环的选择；现在也可开启编码器双环、关闭路径，单独测试巡线稳定性。仅巡线停用路径距离、路段超时及路径 STOP callback，保留启动门禁、丢线/干扰与故障停车。编码器模式仍须尺寸标定。未烧录或验证硬件，详见下方开关说明与 [控制说明](docs/navigation.md)。
 
 > **2026-10-17 下单后终审：** 用户确认订单为 **A10 + SMT**，1×20 排母换料已接受。本次重新核查制造包、原生 PCB 的 32 个器件 / 143 个引脚及 48 个网络，未发现确定性电气接错、断路或异网短路。降压标称约 5.08 V；3.3 V 来自核心板。USB 供电前须拆 R4，电机启动电流、3.3 V 负载余量与降压动态/温升尚未验证。详见 [A10 电气终审](docs/A10-final-electrical-review.md)。
@@ -26,7 +32,7 @@
 | 控制模式 | 编码器默认 0：PWM 开环调速；1：双环，未标定拒绝启动 |
 | 预设路径 | 默认 0：仅巡线；1：编码器厘米路径与路口 STOP |
 | 模块供电与输出电平、输入上下拉 | 用户确认灰度为 3.3 V 供电；输出电平、输出类型及上下拉仍待实物确认 |
-| 深蓝底识别、轮向、停车、电量变化、赛道效果 | 未验证 |
+| 实车巡线 | 用户反馈原配置巡线正常；本次满速及各项停车、电量变化未专项验证 |
 | PID / PWM / 丢线与路口时限 | 未标定初值 |
 
 ## 工程配置与参考来源
@@ -74,17 +80,19 @@
 | 干扰/丢线 | 降低 PWM，冻结位置 PID，保留并衰减历史 PWM 差值 | 降速并使用编码器反馈保持估计航向 |
 | 停止条件 | PB10/调试停止、丢线 400 ms、任务异常 | 另含异常里程上限、编码器反馈故障；开启路径时另检查路径异常 |
 
-普通模式的 `OPEN_LOOP_BASE_PWM=55`、弯道基础值 40、干扰上限 35、位置 PID 初值 8/0/0.08 均集中在同一个配置文件，指令使用 255 标尺且受 PWM 上限 100 约束。它们不是 cm/s，`RouteStep.speed` 不会被挪作 PWM 使用。电机开环调速通过 PWM 占空比改变驱动平均电压，实际速度受负载、电量等影响；没有编码器就不能测量并纠正航向或按厘米定位。
+普通模式的 `OPEN_LOOP_BASE_PWM=255`、弯道基础值 40、干扰上限 35、位置 PID 初值 8/0/0.08 均集中在同一个配置文件，指令使用 255 标尺且受 PWM 上限 255 约束。居中稳定时按每秒 200 的斜坡升至满占空比，偏离中心则降低基础 PWM，为左右差速保留余量；弯道及丢线阶段不强制两轮同时满输出。它们不是 cm/s，`RouteStep.speed` 不会被挪作 PWM 使用。电机开环调速通过 PWM 占空比改变驱动平均电压，实际速度受负载、电量等影响；没有编码器就不能测量并纠正航向或按厘米定位。
+
+初次架空检查电机时，未完成编码器标定应使用两个开关均为 0 的 `genericSTM32F103C8` 固件。编码器模式下，只要标定未确认、任一每圈计数或轮距仍为 0，按 START 也会被 `LINE_STOP_CALIBRATION` 拒绝；不能仅填写轮径或把确认标志改为 1 来跳过实测。普通 PWM 模式仍需先稳定识别有效白线，再按一次 START，不会上电自动转动；它向左右两路输出巡线指令，并非专用单电机测试模式。单侧电机能否正常起转及其实际轮向仍需架空验证。
 
 ```mermaid
 flowchart LR
-    GPIO["8 路灰度 / 白线位置反馈"] --> SELECT{"ENCODER_CONTROL_ENABLED"}
+    GPIO["8 路灰度 / 目标线位置反馈"] --> SELECT{"ENCODER_CONTROL_ENABLED"}
     SELECT -->|0| POSITION["位置 PID<br/>输出 PWM 差值"]
     POSITION --> PWM["非负 PWM 限幅 → TIM3 → 电机"]
     SELECT -->|1| ROUTE{"PRESET_ROUTE_ENABLED"}
     ROUTE -->|0| ONLY["仅巡线 / ROUTE_DISABLED<br/>LINE_FOLLOW_SPEED_CM_S"]
     ROUTE -->|1| TABLE["预设路径 / 路口 FSM<br/>路径速度 / 转向 / STOP"]
-    ONLY --> CASCADE["白线位置外环 + 双轮速度内环"]
+    ONLY --> CASCADE["目标线位置外环 + 双轮速度内环"]
     TABLE --> CASCADE
     CASCADE --> PWM
     GPIO --> BAD["丢线 / 干扰"]
@@ -153,7 +161,20 @@ TB6612 电机输出为 H 桥两端，不是固定电源正负；电机线极性�
 
 ## 采样与位置语义
 
-原始 `raw[i]` 白色为 0、黑色为 1；深蓝底预期为 1，必须用真实材料逐路确认。传感器层执行且仅执行一次 `line[i] = 1 - raw[i]`，之后统一以 1 表示白线。每 5 ms 读取 GPIOA、GPIOB 各一次寄存器快照，八路输入均为独立 GPIO；跨端口并非完全同时采样。
+在 `include/control_config.h` 选择巡线颜色，默认保留巡白线：
+
+```c
+#define GRAY_INVERT_ENABLED 1  // 1：巡白线，反相；0：巡黑线，不反相
+```
+
+| 配置 | GPIO 到目标线的转换 | 目标线电平 | 背景电平 |
+| --- | --- | --- | --- |
+| `GRAY_INVERT_ENABLED=1`（默认巡白线） | `line[i] = 1 - raw[i]` | 白色 0 | 黑色 1 |
+| `GRAY_INVERT_ENABLED=0`（巡黑线） | `line[i] = raw[i]` | 黑色 1 | 白色 0 |
+
+这是编译开关，修改后须重新编译；也支持 `-DGRAY_INVERT_ENABLED=0/1` 覆盖，其他数值会编译报错。它独立于编码器、路径开关，三个 PlatformIO 环境均采用此选择。原始 `raw[i]` 白色为 0、黑色为 1，深蓝底预期为 1；这些电平仍必须用真实材料逐路确认。极性只在传感器层转换，随后统一以 1 表示**目标线**；滤波、位置符号、启动确认、路口判断与丢线保护沿用同一逻辑。为兼容现有接口保留 `white_count` 字段名，其含义改为目标线路数。下文控制说明中沿用的“白线/全白”在巡黑线模式分别指目标黑线/全部通道检测到黑线。
+
+灰度输入仍使用原有上拉；巡黑线时断开的通道可能读为目标线，开关不提供断线检测。每 5 ms 读取 GPIOA、GPIOB 各一次寄存器快照，八路输入均为独立 GPIO；跨端口并非完全同时采样。
 
 使用 3 帧逐路多数滤波，恢复巡线另需连续 3 次有效分类，存在滤波与确认延迟。等间距初始权重如下：
 
@@ -164,7 +185,7 @@ TB6612 电机输出为 H 桥两端，不是固定电源正负；电机线极性�
 只对选定的有效连续区域使用有符号 `float` 计算：
 
 ```text
-position = Σ(w[i] × line[i]) / 选定区域白线路数
+position = Σ(w[i] × line[i]) / 选定区域目标线路数
 error = position - 0
 # 编码器模式（开关 1）：
 left_target_cm_s = base_cm_s + correction_cm_s
@@ -174,9 +195,9 @@ left_pwm = base_pwm + correction_pwm
 right_pwm = base_pwm - correction_pwm
 ```
 
-正误差表示白线在右侧；正修正在编码器模式使左轮目标速度较大、右轮较小，在 PWM 模式使左轮 PWM 较大、右轮较小，期望向右转。两轮“正指令均向前”仍需架空确认，可通过 `board_config.h` 的左右轮方向配置修正。
+正误差表示目标线在右侧；正修正在编码器模式使左轮目标速度较大、右轮较小，在 PWM 模式使左轮 PWM 较大、右轮较小，期望向右转。两轮“正指令均向前”仍需架空确认，可通过 `board_config.h` 的左右轮方向配置修正。
 
-以下字符串按 S0→S7 排列；代码掩码使用 **bit0=S0、bit7=S7**，因此调试器二进制显示从高位到低位时顺序与表中字符串相反。
+下表为默认巡白线（`GRAY_INVERT_ENABLED=1`）示例。巡黑线时，同一 `line` 图案的 `raw` 与 `line` 相同。以下字符串按 S0→S7 排列；代码掩码使用 **bit0=S0、bit7=S7**，因此调试器二进制显示从高位到低位时顺序与表中字符串相反。
 
 | `raw` | `line` | 预期处理 |
 | --- | --- | --- |
@@ -195,22 +216,22 @@ right_pwm = base_pwm - correction_pwm
 
 ```mermaid
 flowchart LR
-    TRACK["白线 / 赛道"] --> GPIO["8 GPIO → 一次反相 → 多数滤波"]
-    GPIO --> OBS["区域分类 / 白线位置"]
+    TRACK["目标线 / 赛道"] --> GPIO["8 GPIO → 按颜色开关转换极性 → 多数滤波"]
+    GPIO --> OBS["区域分类 / 目标线位置"]
     TABLE["仅路径开关 1：const RouteStep<br/>cm / cm/s / LEFT RIGHT STRAIGHT STOP"] --> FSM["仅路径开关 1：路口 FSM<br/>距离窗口 + 分支 + 连续确认"]
     OBS -->|仅路径开关 1| FSM
-    OBS --> OUTER["正常白线位置 PID 外环<br/>输出速度差 cm/s"]
+    OBS --> OUTER["正常目标线位置 PID 外环<br/>输出速度差 cm/s"]
     FSM --> MODE["控制模式选择"]
     OUTER --> MODE
     ONLY["路径开关 0：仅巡线基础速度<br/>LINE_FOLLOW_SPEED_CM_S"] --> MODE
     HOLD["丢线 / 元器件干扰<br/>冻结位置 PID / 降速保持航向"] --> MODE
     FSM -->|未确认图形| HOLD
-    OBS -->|无白线 / 歧义或多区域| HOLD
+    OBS -->|无目标线 / 歧义或多区域| HOLD
     MODE --> TARGET["左右非负目标速度<br/>左 = base + correction<br/>右 = base - correction"]
     TARGET --> INNER["左右轮速度 PID 内环<br/>含前馈 / 输出抗饱和"]
     INNER --> MOTOR["PWM 限幅 → TIM3 → TB6612"]
     MOTOR --> CAR["左右电机 / 车体"]
-    CAR -->|改变相对白线位置| TRACK
+    CAR -->|改变相对目标线位置| TRACK
     CAR --> ENCODER["TIM1 / TIM4 编码器四倍频计数"]
     ENCODER --> ODOM["有符号增量 / cm 里程<br/>cm/s 轮速 / 右转为正的航向"]
     ODOM -->|轮速反馈| INNER
@@ -226,7 +247,7 @@ flowchart LR
 
 ## 双环、里程与路径表
 
-位置外环初值 `Kp=1.8, Ki=0, Kd=0.025`，输出单位 cm/s；左右轮内环各使用 `Kp=2, Ki=8, Kd=0`，输出为 0…100 的 PWM 指令（255 标尺），加 `3 × 目标速度` 前馈。所有参数均待标定。速度目标上限 25 cm/s、基础速度上升斜率 40 cm/s²，降速与停止立即执行。内环抗饱和按前馈与 PID 相加后的 0…100 实际边界处理；目标速度为零时清空相应 PID 并输出零。
+位置外环初值 `Kp=1.8, Ki=0, Kd=0.025`，输出单位 cm/s；左右轮内环各使用 `Kp=2, Ki=8, Kd=0`，输出为 0…255 的 PWM 指令（255 标尺），加 `3 × 目标速度` 前馈。所有参数均待标定。速度目标上限 25 cm/s、基础速度上升斜率 40 cm/s²，降速与停止立即执行。内环抗饱和按前馈与 PID 相加后的 0…255 实际边界处理；目标速度为零时清空相应 PID 并输出零。
 
 `PRESET_ROUTE_ENABLED=1` 时使用 `src/route_table.c`，其中只有一条行驶示例与一条停止项，编译进 Flash，不在运行中写 Flash。关闭路径时不使用或校验该表：
 
@@ -257,17 +278,17 @@ const RouteStep route[] = {
 
 ```mermaid
 flowchart TD
-    IDLE["IDLE / 上电停止"] --> START{"一次启动请求<br/>尺寸已标定 + 连续 3 帧窄白线？"}
+    IDLE["IDLE / 上电停止"] --> START{"一次启动请求<br/>尺寸已标定 + 连续 3 帧窄目标线？"}
     START -->|否| IDLE
     START -->|是| SELECT{"PRESET_ROUTE_ENABLED"}
-    SELECT -->|0| ONLY["TRACKING / ROUTE_DISABLED<br/>白线双环 / 独立基础速度"]
-    ONLY -->|无白线 / 宽线 / 全白 / 多区域| HOLD
-    ONLY -->|正常白线| ONLY
+    SELECT -->|0| ONLY["TRACKING / ROUTE_DISABLED<br/>目标线双环 / 独立基础速度"]
+    ONLY -->|无目标线 / 宽线 / 全目标线 / 多区域| HOLD
+    ONLY -->|正常目标线| ONLY
     SELECT -->|1| FOLLOW["TRACKING / ROUTE_FOLLOW<br/>位置外环 + 双轮速度内环"]
-    FOLLOW --> WINDOW{"距离窗口内<br/>中心白线 + 所需分支？"}
+    FOLLOW --> WINDOW{"距离窗口内<br/>中心目标线 + 所需分支？"}
     WINDOW -->|是| CANDIDATE["ROUTE_CANDIDATE<br/>降速保持航向 / 连续计数与运动确认"]
-    WINDOW -->|无白线或干扰图形| HOLD["GAP_HOLD<br/>冻结位置 PID / 编码器航向保持"]
-    HOLD -->|连续 3 帧窄白线且未超限| SELECT
+    WINDOW -->|无目标线或干扰图形| HOLD["GAP_HOLD<br/>冻结位置 PID / 编码器航向保持"]
+    HOLD -->|连续 3 帧窄目标线且未超限| SELECT
     HOLD -->|400 ms 或 8 cm 先到| STOPPED["STOPPED / STBY 低"]
     CANDIDATE --> CONFIRM{"至少 3 帧 + 前进至少 0.1 cm<br/>100 ms 内且仍在距离窗口？"}
     CONFIRM -->|图形消失| HOLD
@@ -275,13 +296,13 @@ flowchart TD
     CONFIRM -->|STOP 项确认| DONE["ROUTE_FINISHED<br/>停车后 callback 一次"]
     DONE --> STOPPED
     CONFIRM -->|LEFT / RIGHT / STRAIGHT| EXEC["LINE_JUNCTION / ROUTE_EXECUTING<br/>有限非反转差速 / 独立动作超时"]
-    EXEC -->|退出几何条件 + 连续窄白线| CLEAR["ROUTE_CLEARING<br/>恢复白线控制 / 继续离开至少 3 cm"]
-    CLEAR -->|连续窄白线 / 去重完成| NEXT["下一路径项 / 重置路段里程基准"]
+    EXEC -->|退出几何条件 + 连续窄目标线| CLEAR["ROUTE_CLEARING<br/>恢复目标线控制 / 继续离开至少 3 cm"]
+    CLEAR -->|连续窄目标线 / 去重完成| NEXT["下一路径项 / 重置路段里程基准"]
     NEXT --> FOLLOW
     EXEC -->|2500 ms / 方向或转角异常| STOPPED
     CLEAR -->|动作超时 / 干扰超限| STOPPED
     ERR["任意阶段：按键停止 / 任务故障<br/>编码器故障 / 越过路口窗口 / 路段超时"] --> STOPPED
-    STOPPED -->|明确重启 + 连续窄白线<br/>任务与编码器故障需复位| START
+    STOPPED -->|明确重启 + 连续窄目标线<br/>任务与编码器故障需复位| START
 ```
 
 宽线、全白和多个分离区域只有通过路径窗口、目标分支、连续帧与运动距离联合确认后才是路口候选；其余按丢线/干扰处理。进入干扰时保存当前编码器航向，降低速度至不超过 6 cm/s，通过左右轮目标速度差纠正航向偏移；冻结位置 PID，不按图形位置拐弯，也不进入旧的 SEARCH 寻线。恢复需连续 3 帧单一窄白线，并重建 PID 历史。异常时限从最后稳定白线起算，先检查截止时限再接受恢复，孤立有效帧和异常种类切换不能续时。
@@ -304,14 +325,31 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
 - 调试器可读 `g_diagnostics` 查看灰度掩码、位置、左右 PWM、编码器原始计数、厘米里程、航向、轮速/目标轮速、路径项/状态、STOP 事件、停止原因和任务耗时。
 - 调试器可写 `g_control_request=1` 请求一次启动，写 `2` 停止。请求用后清零；该变量不是串口协议，也没有命令保活要求。诊断结构为主循环逐字段写入，先停止电机并暂停后检查，不要把运行时跨字段读取当成原子快照。
 
+“按 START 两轮完全不动”时，查看 `g_diagnostics`：
+
+| 字段 | 用途 |
+| --- | --- |
+| `control_count` | 是否已进入采样控制循环；为 0 时先检查初始化/故障入口 |
+| `button_press_count` | 消抖后的按下次数，启动/停止均计数；调试器命令不增加此值 |
+| `start_request_count` | 已交给控制器的一次性启动请求数；运行中的按键用于停止 |
+| `encoder_control_enabled` / `preset_route_enabled` | 固件实际编译模式；PlatformIO 一键上传本身不足以证明使用了哪个环境 |
+| `start_result` | 最近一次启动请求的结果，后续无请求的采样与普通停车不会清除此记录 |
+| `start_raw_mask` / `start_line_mask` | 最近一次启动请求所在采样的原始掩码 / 滤波白线掩码；后续采样不覆盖 |
+| `raw_mask` / `line_mask` / `valid_line_samples` | 当前原始输入 / 滤波白线 / 连续有效窄线样本数（启动需至少 3 帧） |
+| `state` / `stop_reason` / `left_command` / `right_command` | 当前是否运行、是否已发生停车、软件下发的 PWM 指令；不代表已测到引脚波形 |
+
+`start_result` 数值为：0 `LINE_START_NONE`（未收到请求）；1 `LINE_START_ACCEPTED`；2 `LINE_START_REJECTED_LINE`（未连续确认有效单一窄白线）；3 `LINE_START_REJECTED_CALIBRATION`；4 `LINE_START_REJECTED_ROUTE`；5 `LINE_START_REJECTED_FAULT`；6 `LINE_START_ALREADY_RUNNING`（运行中收到调试器启动请求）。启动成功后也可能因任务或反馈异常停车，须结合当前 `stop_reason` 检查。
+
+以下为默认巡白线（`GRAY_INVERT_ENABLED=1`）的诊断示例。以 S3/S4 看到白线为例，预期原始掩码为 `0xE7`、滤波后白线为 `0x18`。原始 `0xFF` 表示所有通道高、按当前极性无白线；`0x00` 表示全低、会成为全白歧义；`0xE6` 反相后是分离多区域，同样拒绝启动。这些是软件输入语义示例，须实测灰度输出确认，不能用“传感器已摆在白线上”替代 MCU 读数。巡黑线时 S3/S4 居中的原始掩码为 `0x18`，滤波后仍为 `0x18`；原始 `0x00` 为无目标线，`0xFF` 为全目标线歧义，`0x19` 为分离多区域。拒绝的启动请求不会排队：修正条件后需重新按 START。保留此门禁，避免未检测到可靠白线时盲行。
+
 ## 文件与验证入口
 
 | 文件 | 职责 |
 | --- | --- |
 | `include/board_config.h` | 引脚、轮向、输入上下拉、时钟与 PWM |
-| `include/control_config.h` | 周期、PWM、滤波与连续性初值 |
+| `include/control_config.h` | 巡白线/巡黑线开关、周期、PWM、滤波与连续性初值 |
 | `include/motion_config.h` | 模式开关、PWM 模式参数、尺寸标定、双环与导航参数 |
-| `src/gray_sensor.c` | 一次反相、逐路滤波、区域分类及位置 |
+| `src/gray_sensor.c` | 按开关转换极性、逐路滤波、区域分类及目标线位置 |
 | `src/pid.c` | PID、条件积分抗饱和、微分滤波及复位 |
 | `src/motor_command.c` | 可在主机测试的差速限幅与 PWM 映射 |
 | `src/motor.c` | HAL TIM3、双轮方向和独立 STBY 停车 |
@@ -335,7 +373,7 @@ pio run -e encoder_line_only
 pio run -e encoder_closed_loop
 ```
 
-输出产物为 `.pio/build/genericSTM32F103C8/firmware.elf` 与 `firmware.bin`。主机测试不执行真实外设中断或电机；HAL 电机输出测试采用模拟接口，不代表电气行为已验证。交叉构建不等于板上运行通过。当前构建使用已有 ststm32 19.7.1 / STM32CubeF1 1.8.6 / GCC Arm 7.2.1，无新增第三方应用依赖。
+输出产物为 `.pio/build/genericSTM32F103C8/firmware.elf` 与 `firmware.bin`。主机测试自动分别以 `GRAY_INVERT_ENABLED=1` 和 `0` 执行全部套件，覆盖两种极性的 256 种输入、滤波、启动、恢复与停车。主机测试不执行真实外设中断或电机；HAL 电机输出测试采用模拟接口，不代表电气行为已验证。交叉构建不等于板上运行通过。当前构建使用已有 ststm32 19.7.1 / STM32CubeF1 1.8.6 / GCC Arm 7.2.1，无新增第三方应用依赖。
 
 ### VS Code 头文件解析
 

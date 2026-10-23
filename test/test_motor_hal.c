@@ -74,6 +74,9 @@ int main(void)
     assert(motor_init());
     stopped();
     assert(fake_tim3.compare[0] == 0 && fake_tim3.compare[1] == 0);
+    motor_apply((MotorCommand){255.0f, 255.0f, true});
+    assert(fake_tim3.compare[0] == 6400 && fake_tim3.compare[1] == 6400);
+    assert(fake_gpio_b.output & MOTOR_STBY_PIN);
     motor_apply((MotorCommand){50.0f, 25.0f, true});
     assert(fake_tim3.compare[0] == 1255 && fake_tim3.compare[1] == 627);
     assert(fake_gpio_b.output & MOTOR_STBY_PIN);
@@ -92,7 +95,7 @@ int main(void)
     stopped();
     motor_apply((MotorCommand){NAN, 50.0f, true});
     stopped();
-    assert(stop_writes > 0 && enable_writes == 2);
+    assert(stop_writes > 0 && enable_writes == 3);
     puts("PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop");
     return 0;
 }

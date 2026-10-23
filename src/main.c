@@ -136,6 +136,7 @@ int main(void)
     for (;;) {
         uint32_t now_ms = HAL_GetTick();
         bool pressed = button_press(now_ms);
+        if (pressed) ++g_diagnostics.button_press_count;
         uint32_t request = g_control_request;
         g_control_request = 0;
         if (pressed && request != 2U)
@@ -155,6 +156,11 @@ int main(void)
 #endif
             GrayObservation observation = gray_sensor_update(&sensor, read_raw(),
                 line_follow_have_recent_position(&follow, now_ms), follow.reliable_position);
+            if (start_pending) {
+                ++g_diagnostics.start_request_count;
+                g_diagnostics.start_raw_mask = observation.raw_mask;
+                g_diagnostics.start_line_mask = observation.line_mask;
+            }
             line_follow_update(&follow, observation, counts, now_ms,
                                (float)interval / 1000.0f, start_pending);
             start_pending = false; /* One-shot; failed start is never queued for later. */
@@ -183,6 +189,8 @@ int main(void)
             g_diagnostics.position = observation.position;
             g_diagnostics.state = follow.state;
             g_diagnostics.stop_reason = follow.stop_reason;
+            g_diagnostics.start_result = follow.start_result;
+            g_diagnostics.valid_line_samples = follow.valid_count;
             g_diagnostics.left_command = follow.command.left;
             g_diagnostics.right_command = follow.command.right;
             g_diagnostics.left_encoder = counts.left;

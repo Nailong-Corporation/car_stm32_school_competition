@@ -9,9 +9,16 @@ typedef enum {
     LINE_STOP_NONE, LINE_STOP_REQUEST, LINE_STOP_LOST, LINE_STOP_FAULT,
     LINE_STOP_ENCODER, LINE_STOP_CALIBRATION, LINE_STOP_ROUTE, LINE_STOP_ROUTE_COMPLETE
 } LineStopReason;
+/* 最近一次启动请求的结果；保留到下一次请求，避免白线门禁静默拒绝。 */
+typedef enum {
+    LINE_START_NONE, LINE_START_ACCEPTED, LINE_START_REJECTED_LINE,
+    LINE_START_REJECTED_CALIBRATION, LINE_START_REJECTED_ROUTE,
+    LINE_START_REJECTED_FAULT, LINE_START_ALREADY_RUNNING
+} LineStartResult;
 typedef struct {
     LineState state;
     LineStopReason stop_reason;
+    LineStartResult start_result;
     Odometry odometry;
     RoutePlanner route;
     SpeedControl speed;

@@ -13,8 +13,8 @@ void gray_sensor_init(GraySensor *sensor)
 }
 
 /**
- * @brief 按白线掩码统计连续区域，并计算选中区域的加权横向位置。
- * line_mask 的 1 表示白线；无白线或歧义观测不提供普通 PID 位置。
+ * @brief 按目标线掩码统计连续区域，并计算选中区域的加权横向位置。
+ * line_mask 的 1 表示目标线；无目标线或歧义观测不提供普通 PID 位置。
  * 多区域可按 previous 的连续性选区，但上层仍会将多区域按干扰处理。
  */
 GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previous)
@@ -69,14 +69,18 @@ GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previ
 }
 
 /**
- * @brief 对原始 GPIO 掩码执行一次反相、逐路多数滤波，再分类白线观测。
- * raw_mask 中白色为 0；have_previous/previous 用于多区域连续性选择。
+ * @brief 按开关转换原始 GPIO 极性、逐路多数滤波，再分类目标线观测。
+ * raw_mask 中白色为 0、黑色为 1；have_previous/previous 用于多区域连续性选择。
  */
 GrayObservation gray_sensor_update(GraySensor *sensor, uint8_t raw_mask,
                                    bool have_previous, float previous)
 {
-    /* Only this layer inverts. All later processing uses 1 = white. */
+    /* 极性只在此转换；后续滤波、分类和控制统一使用 1 = 目标线。 */
+#if GRAY_INVERT_ENABLED
     sensor->history[sensor->next] = (uint8_t)~raw_mask;
+#else
+    sensor->history[sensor->next] = raw_mask;
+#endif
     sensor->next = (uint8_t)((sensor->next + 1U) % SENSOR_FILTER_SAMPLES);
     if (sensor->count < SENSOR_FILTER_SAMPLES) ++sensor->count;
     uint8_t filtered = 0;

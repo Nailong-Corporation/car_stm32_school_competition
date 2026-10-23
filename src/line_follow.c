@@ -12,6 +12,20 @@ static bool locked(LineStopReason reason)
     return reason == LINE_STOP_FAULT || reason == LINE_STOP_ENCODER;
 }
 
+/* 只记录请求结果，不排队、不放宽连续白线与故障门禁。 */
+static bool start_allowed(LineFollow *f, bool stable)
+{
+    if (locked(f->stop_reason)) {
+        f->start_result = LINE_START_REJECTED_FAULT;
+        return false;
+    }
+    if (!stable) {
+        f->start_result = LINE_START_REJECTED_LINE;
+        return false;
+    }
+    return true;
+}
+
 /**
  * @brief 初始化巡线状态及当前编译模式的控制器，上电保持 IDLE。
  * 编码器模式绑定标定和双环；仅开启预设路径时绑定路径表和停止回调。
@@ -110,7 +124,8 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
     else if (f->valid_count < LINE_CONFIRM_SAMPLES) ++f->valid_count;
     bool stable = f->valid_count >= LINE_CONFIRM_SAMPLES;
     if (f->state == LINE_IDLE || f->state == LINE_STOPPED) {
-        if (!start_request || !stable || locked(f->stop_reason)) return;
+        if (!start_request || !start_allowed(f, stable)) return;
+        f->start_result = LINE_START_ACCEPTED;
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
         f->base = 0.0f;
@@ -161,10 +176,12 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
 void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request)
 {
+    if (start_request) f->start_result = LINE_START_ALREADY_RUNNING;
     if (!isfinite(dt) || dt <= 0.0f || dt > (float)CONTROL_MAX_INTERVAL_MS / 1000.0f ||
         (obs.kind != GRAY_VALID && obs.kind != GRAY_NONE && obs.kind != GRAY_AMBIGUOUS) ||
         (obs.kind == GRAY_VALID && (!isfinite(obs.position) || fabsf(obs.position) > 7.0f))) {
         line_follow_stop(f, LINE_STOP_FAULT);
+        if (start_request) f->start_result = LINE_START_REJECTED_FAULT;
         return;
     }
 #if !ENCODER_CONTROL_ENABLED
@@ -172,11 +189,15 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     open_loop_update(f, obs, now_ms, dt, start_request);
 #else
     if (!f->odometry.ready) {
-        if (start_request) line_follow_stop(f, LINE_STOP_CALIBRATION);
+        if (start_request) {
+            line_follow_stop(f, LINE_STOP_CALIBRATION);
+            f->start_result = LINE_START_REJECTED_CALIBRATION;
+        }
         return;
     }
     if (!odometry_update(&f->odometry, counts, dt)) {
         line_follow_stop(f, LINE_STOP_ENCODER);
+        if (start_request) f->start_result = LINE_START_REJECTED_FAULT;
         return;
     }
     bool narrow = route_is_narrow_line(obs);
@@ -185,11 +206,16 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     } else f->valid_count = 0;
     bool stable = f->valid_count >= LINE_CONFIRM_SAMPLES;
     if (f->state == LINE_IDLE || f->state == LINE_STOPPED) {
-        if (!start_request || !stable || locked(f->stop_reason)) return;
+        if (!start_request || !start_allowed(f, stable)) return;
 #if PRESET_ROUTE_ENABLED
-        if (!f->route.valid) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
+        if (!f->route.valid) {
+            line_follow_stop(f, LINE_STOP_ROUTE);
+            f->start_result = LINE_START_REJECTED_ROUTE;
+            return;
+        }
         route_start(&f->route, f->odometry.distance_cm, now_ms);
 #endif
+        f->start_result = LINE_START_ACCEPTED;
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
         f->last_reliable_ms = now_ms;

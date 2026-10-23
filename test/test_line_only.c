@@ -47,6 +47,7 @@ static void start(LineFollow *f, EncoderCounts *c, uint32_t *now,
     for (unsigned i = 0; i < LINE_CONFIRM_SAMPLES; ++i)
         tick(f,c,now,0,0,0x18,i == LINE_CONFIRM_SAMPLES-1U);
     CHECK(f->state == LINE_TRACKING && f->command.enabled && f->odometry.ready);
+    CHECK(f->start_result == LINE_START_ACCEPTED);
 }
 int main(void)
 {
@@ -55,10 +56,12 @@ int main(void)
     line_follow_init(&f,unknown,NULL,0,callback,NULL);
     tick(&f,&c,&now,0,0,0x18,true);
     CHECK(f.stop_reason == LINE_STOP_CALIBRATION);
+    CHECK(f.start_result == LINE_START_REJECTED_CALIBRATION);
 
     line_follow_init(&f,calibration(),NULL,0,callback,NULL);
     for (unsigned i=0; i<10; ++i) tick(&f,&c,&now,0,0,0,true);
     CHECK(f.state == LINE_IDLE);
+    CHECK(f.start_result == LINE_START_REJECTED_LINE);
     for (unsigned i=0; i<5; ++i) tick(&f,&c,&now,0,0,0x18,false);
     CHECK(f.state == LINE_IDLE); /* Rejected start is not queued. */
     start(&f,&c,&now,NULL,0); /* A missing route must not block closed-loop tracking. */

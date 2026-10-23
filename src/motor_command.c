@@ -30,6 +30,6 @@ uint16_t motor_command_to_ccr(float command, float gain, float deadzone, uint16_
         command <= 0.0f || gain <= 0.0f || deadzone < 0.0f) return 0;
     float calibrated = command * gain + deadzone;
     calibrated = fminf(MOTOR_PWM_LIMIT, calibrated);
-    /* period + 1 represents 100% in PWM1; operating limit is below that. */
+    /* PWM1 的 CCR=ARR+1 表示 100% 占空比，255 指令允许达到该值。 */
     return (uint16_t)(calibrated * ((float)period + 1.0f) / MOTOR_COMMAND_MAX + 0.5f);
 }
