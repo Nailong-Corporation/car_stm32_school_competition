@@ -86,6 +86,13 @@ bool line_follow_have_recent_position(const LineFollow *f, uint32_t now_ms)
     return f->have_reliable && (uint32_t)(now_ms - f->last_reliable_ms) < INTERFERENCE_TIMEOUT_MS;
 }
 
+/* 根据实际 dt 规划下一周期基础值；启动包络不阻塞采样，降速及停止不等待。 */
+static float next_base(const LineFollow *f, float base, float rise, float dt)
+{
+    float fraction = fminf(1.0f, (f->startup_elapsed_s + dt) / STARTUP_RAMP_TIME_S);
+    return fminf(base * fraction, f->base + rise * dt);
+}
+
 #if ENCODER_CONTROL_ENABLED
 /**
  * @brief 在编码器模式混合左右目标速度，base/correction 单位均为 cm/s。
@@ -93,7 +100,8 @@ bool line_follow_have_recent_position(const LineFollow *f, uint32_t now_ms)
  */
 static void targets(LineFollow *f, float base, float correction, float dt)
 {
-    f->base = fminf(base, f->base + TARGET_RISE_CM_S2 * dt);
+    f->base = next_base(f, base, TARGET_RISE_CM_S2, dt);
+    f->startup_elapsed_s = fminf(STARTUP_RAMP_TIME_S, f->startup_elapsed_s + dt);
     float limit = fminf(f->base, WHEEL_TARGET_MAX_CM_S - f->base);
     f->correction = fmaxf(-limit, fminf(limit, correction));
     f->left_target_cm_s = f->base + f->correction;
@@ -106,7 +114,8 @@ static void targets(LineFollow *f, float base, float correction, float dt)
  */
 static void pwm_output(LineFollow *f, float base, float correction, float dt)
 {
-    f->base = fminf(base, f->base + OPEN_LOOP_PWM_RISE_PER_S * dt);
+    f->base = next_base(f, base, OPEN_LOOP_PWM_RISE_PER_S, dt);
+    f->startup_elapsed_s = fminf(STARTUP_RAMP_TIME_S, f->startup_elapsed_s + dt);
     f->command = motor_mix(f->base, correction);
     f->correction = 0.5f * (f->command.left - f->command.right);
 }
@@ -129,6 +138,7 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
         f->base = 0.0f;
+        f->startup_elapsed_s = 0.0f;
         pid_reset(&f->pid);
     }
     if (f->abnormal && (uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS) {
@@ -146,7 +156,7 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
         }
         float base = OPEN_LOOP_BASE_PWM - (OPEN_LOOP_BASE_PWM - OPEN_LOOP_TURN_BASE_PWM) *
                      fabsf(obs.position) / 7.0f;
-        float next = fminf(base, f->base + OPEN_LOOP_PWM_RISE_PER_S * dt);
+        float next = next_base(f, base, OPEN_LOOP_PWM_RISE_PER_S, dt);
         float correction;
         if (!pid_update(&f->pid, obs.position, dt,
                         fminf(next, MOTOR_PWM_LIMIT - next), &correction)) {
@@ -221,6 +231,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         f->last_reliable_ms = now_ms;
         f->have_reliable = true;
         f->base = 0.0f;
+        f->startup_elapsed_s = 0.0f;
         pid_reset(&f->pid);
         speed_control_reset(&f->speed);
     }
@@ -246,6 +257,10 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     }
     RouteStep step = f->route.steps[f->route.index];
     float base_speed = (float)step.speed;
+    /* 在路口窗口内提前降速，避免以巡航目标冲过分支；离口完成前也不升速。 */
+    if (f->route.state == ROUTE_CLEARING ||
+        f->odometry.distance_cm - f->route.origin_cm >= step.distance - step.tolerance)
+        base_speed = fminf(base_speed, JUNCTION_TURN_SPEED_CM_S);
 #else
     float base_speed = LINE_FOLLOW_SPEED_CM_S;
 #endif
@@ -257,10 +272,20 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         }
         f->abnormal = false;
         f->state = LINE_JUNCTION;
-        float correction = step.action == LEFT ? -JUNCTION_TURN_DIFF_CM_S :
-                           step.action == RIGHT ? JUNCTION_TURN_DIFF_CM_S :
-                           HEADING_KP_CM_S_PER_RAD * (f->route.entry_heading - f->odometry.heading_rad);
-        targets(f, fminf((float)step.speed, JUNCTION_TURN_SPEED_CM_S), correction, dt);
+        float turn_base = fminf((float)step.speed, JUNCTION_TURN_SPEED_CM_S);
+        float correction;
+        if (step.action == LEFT || step.action == RIGHT) {
+            float direction = step.action == LEFT ? -1.0f : 1.0f;
+            float turn = direction * (f->odometry.heading_rad - f->route.entry_heading);
+            if (turn >= JUNCTION_TURN_SLOW_RAD)
+                turn_base = fminf(turn_base, JUNCTION_TURN_SLOW_CM_S);
+            /* 非反转单轮支点转弯，半径为半轮距；找线阶段外轮减速。 */
+            correction = direction * turn_base;
+        } else {
+            correction = HEADING_KP_CM_S_PER_RAD *
+                         (f->route.entry_heading - f->odometry.heading_rad);
+        }
+        targets(f, turn_base, correction, dt);
     } else
 #endif
     if (narrow && (stable || !f->abnormal)
@@ -280,7 +305,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
             f->reliable_position = obs.position;
         }
         float base = base_speed * (1.0f - POSITION_CURVE_SLOWDOWN * fabsf(obs.position) / 7.0f);
-        float next = fminf(base, f->base + TARGET_RISE_CM_S2 * dt);
+        float next = next_base(f, base, TARGET_RISE_CM_S2, dt);
         float correction;
         if (!pid_update(&f->pid, obs.position, dt,
                         fminf(next, WHEEL_TARGET_MAX_CM_S - next), &correction)) {

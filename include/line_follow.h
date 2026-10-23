@@ -29,6 +29,7 @@ typedef struct {
     float reliable_position, base, correction, left_target_cm_s, right_target_cm_s;
     float hold_heading_rad, abnormal_origin_cm;
     float held_pwm_correction; /* Open-loop interference hold, not measured heading. */
+    float startup_elapsed_s; /* 每次明确 START 重新计时，两种模式均使用 1 s 启动包络。 */
     uint32_t last_reliable_ms;
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,

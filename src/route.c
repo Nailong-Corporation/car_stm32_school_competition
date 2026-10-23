@@ -3,6 +3,19 @@
 #include <math.h>
 #include <string.h>
 
+static void fail(RoutePlanner *p, RouteFailure reason)
+{
+    p->failure = reason;
+    p->state = ROUTE_FAILED;
+}
+
+/* 只建立路段里程和诊断计时起点；整段行驶不设时间限制。 */
+static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
+{
+    p->origin_cm = distance_cm;
+    p->segment_ms = now_ms;
+}
+
 /**
  * @brief 判断观测是否为有效的单一窄白线区域，供正常巡线及路口退出确认使用。
  * 多区域即使底层已选出目标，也不会在此被视作可靠窄白线。
@@ -36,6 +49,7 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
     }
     if (p->valid && steps[count - 1U].action != STOP) p->valid = false;
     p->state = p->valid ? ROUTE_FOLLOW : ROUTE_FAILED;
+    p->failure = p->valid ? ROUTE_FAILURE_NONE : ROUTE_FAILURE_INVALID;
 }
 
 /**
@@ -45,11 +59,11 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
 void route_start(RoutePlanner *p, float distance_cm, uint32_t now_ms)
 {
     p->index = 0;
-    p->origin_cm = distance_cm;
-    p->segment_ms = now_ms;
     p->candidate_count = p->exit_count = 0;
     p->stop_pending = p->callback_dispatched = false;
     p->state = p->valid && isfinite(distance_cm) ? ROUTE_FOLLOW : ROUTE_FAILED;
+    p->failure = p->state == ROUTE_FAILED ? ROUTE_FAILURE_INVALID : ROUTE_FAILURE_NONE;
+    if (p->state != ROUTE_FAILED) begin_segment(p, distance_cm, now_ms);
 }
 
 /**
@@ -76,16 +90,16 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
 {
     if (p->state == ROUTE_FINISHED || p->state == ROUTE_FAILED) return;
     if (!p->valid || p->index >= p->count || !isfinite(distance_cm) || !isfinite(heading_rad)) {
-        p->state = ROUTE_FAILED;
+        fail(p, ROUTE_FAILURE_INVALID);
         return;
     }
     RouteStep s = p->steps[p->index];
     float progress = distance_cm - p->origin_cm;
-    if ((p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) &&
-        (progress > s.distance + s.tolerance ||
-         (uint32_t)(now_ms - p->segment_ms) >= ROUTE_SEGMENT_TIMEOUT_MS)) {
-        p->state = ROUTE_FAILED; /* missing junction, including missing STOP marker */
-        return;
+    if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
+        if (progress > s.distance + s.tolerance) {
+            fail(p, ROUTE_FAILURE_WINDOW);
+            return;
+        }
     }
     if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
         bool in_window = progress >= s.distance - s.tolerance && progress <= s.distance + s.tolerance;
@@ -101,7 +115,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             p->candidate_count = 0;
         }
         if ((uint32_t)(now_ms - p->phase_ms) >= JUNCTION_CONFIRM_TIMEOUT_MS) {
-            p->state = ROUTE_FAILED;
+            fail(p, ROUTE_FAILURE_CONFIRM_TIMEOUT);
             return;
         }
         if (p->candidate_count < JUNCTION_CONFIRM_SAMPLES) ++p->candidate_count;
@@ -120,13 +134,13 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         return;
     }
     if ((uint32_t)(now_ms - p->phase_ms) >= JUNCTION_ACTION_TIMEOUT_MS) {
-        p->state = ROUTE_FAILED;
+        fail(p, ROUTE_FAILURE_ACTION_TIMEOUT);
         return;
     }
     if (p->state == ROUTE_EXECUTING) {
         float turn = (heading_rad - p->entry_heading) * (s.action == LEFT ? -1.0f : 1.0f);
         if (s.action != STRAIGHT && (turn > JUNCTION_TURN_MAX_RAD || turn < -JUNCTION_WRONG_WAY_RAD)) {
-            p->state = ROUTE_FAILED;
+            fail(p, turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
             return;
         }
         bool departed = s.action == STRAIGHT ? distance_cm - p->entry_cm >= JUNCTION_CLEAR_DISTANCE_CM :
@@ -145,9 +159,8 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             distance_cm - p->clear_cm < JUNCTION_CLEAR_DISTANCE_CM) return;
         /* Debounce the physical junction before consuming another table entry. */
         ++p->index;
-        if (p->index >= p->count) { p->state = ROUTE_FAILED; return; }
-        p->origin_cm = distance_cm;
-        p->segment_ms = now_ms;
+        if (p->index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
+        begin_segment(p, distance_cm, now_ms);
         p->state = ROUTE_FOLLOW;
         p->candidate_count = p->exit_count = 0;
     }

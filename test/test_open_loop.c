@@ -90,6 +90,10 @@ int main(void)
     for (unsigned i=0; i<5; ++i) tick(&f,&now,0x18,false);
     CHECK(f.state==LINE_IDLE); /* rejected start never queues */
     start(&f,&now);
+    for (unsigned i=1; i<=200; ++i) {
+        NEAR(f.base,OPEN_LOOP_BASE_PWM*(float)i/200.0f);
+        if (i<200) tick(&f,&now,0x18,false);
+    }
     for (unsigned i=0; i<500; ++i) tick(&f,&now,0x18,false);
     CHECK(f.state==LINE_TRACKING); /* no encoder stall or route deadline */
     NEAR(f.command.left,OPEN_LOOP_BASE_PWM); NEAR(f.command.right,OPEN_LOOP_BASE_PWM);

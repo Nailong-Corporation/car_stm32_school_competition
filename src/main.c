@@ -202,6 +202,9 @@ int main(void)
             g_diagnostics.left_target_cm_s = follow.left_target_cm_s;
             g_diagnostics.right_target_cm_s = follow.right_target_cm_s;
             g_diagnostics.route_state = follow.route.state;
+            g_diagnostics.route_failure = follow.route.failure;
+            g_diagnostics.route_progress_cm = follow.odometry.distance_cm - follow.route.origin_cm;
+            g_diagnostics.route_elapsed_ms = (uint32_t)(now_ms - follow.route.segment_ms);
             g_diagnostics.route_index = (uint32_t)follow.route.index;
             if (HAL_IWDG_Refresh(&watchdog) != HAL_OK) Error_Handler();
         }

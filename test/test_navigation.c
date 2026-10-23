@@ -100,6 +100,33 @@ static void test_speed(void)
     CHECK(!speed_control_update(&s,10,10,-2,10,.005f,&out));
     CHECK(!speed_control_update(&s,NAN,10,0,0,.005f,&out));
 }
+static void test_left_encoder_direction(void)
+{
+    /* Replay the reported startup snapshot: left 0 -> 65527 (-9), right 0 -> 2.
+     * Use the reported geometry; a sign correction must preserve reverse-feedback protection. */
+    for (int sign = 1; sign >= -1; sign -= 2) {
+        LineFollow f; EncoderCounts counts = {0}; uint32_t now = 0;
+        OdometryCalibration c = {4.8f, 4.8f, 1560.0f, 1560.0f, 14.5f, sign, 1, true};
+        line_follow_init(&f,c,long_route,1,NULL,NULL);
+        for (unsigned i=0; i<LINE_CONFIRM_SAMPLES; ++i)
+            tick(&f,&counts,&now,0,0,0x18,i==LINE_CONFIRM_SAMPLES-1U);
+        CHECK(f.start_result==LINE_START_ACCEPTED && f.state==LINE_TRACKING);
+        tick(&f,&counts,&now,-9,2,0x18,false);
+        CHECK(counts.left==65527U && counts.right==2U);
+        if (sign==1) {
+            CHECK(f.stop_reason==LINE_STOP_ENCODER && !f.command.enabled);
+            tick(&f,&counts,&now,0,0,0x18,true);
+            CHECK(f.start_result==LINE_START_REJECTED_FAULT);
+        } else {
+            CHECK(f.odometry.left_delta==9 && f.odometry.right_delta==2);
+            CHECK(f.odometry.left_speed_cm_s>0 && f.odometry.right_speed_cm_s>0);
+            CHECK(f.state==LINE_TRACKING && f.command.enabled);
+            for (unsigned i=0; i<120; ++i)
+                tick(&f,&counts,&now,-6,6,0x18,false);
+            CHECK(f.state==LINE_TRACKING && f.stop_reason==LINE_STOP_NONE);
+        }
+    }
+}
 static void confirm(RoutePlanner *p, uint8_t shape, float start_cm, uint32_t t)
 {
     for(unsigned i=0;i<3;++i) route_update(p,mask(shape),start_cm+.06f*(float)i,0,t+5U*i);
@@ -117,8 +144,14 @@ static void test_routes(void)
         confirm(&p,shape,9,30); CHECK(p.state==ROUTE_EXECUTING);
         /* Same marker cannot consume the next step while executing. */
         route_update(&p,mask(0xff),9.2f,0,50); CHECK(p.index==0);
-        float heading=a==LEFT ? -1.2f : a==RIGHT ? 1.2f : 0;
+        float heading=a==LEFT ? -1.45f : a==RIGHT ? 1.45f : 0;
         float distance=a==STRAIGHT ? 12.3f : 10.0f;
+        if (a!=STRAIGHT) {
+            float early=a==LEFT ? -1.2f : 1.2f;
+            for (unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
+                route_update(&p,mask(0x18),distance,early,51+2*i);
+            CHECK(p.state==ROUTE_EXECUTING); /* A centered graphic at 69° cannot exit. */
+        }
         for(unsigned i=0;i<3;++i) route_update(&p,mask(0x18),distance,heading,60+5*i);
         CHECK(p.state==ROUTE_CLEARING && p.index==0);
         route_update(&p,mask(0xff),distance+3.1f,heading,80); CHECK(p.index==0);
@@ -235,7 +268,7 @@ static void test_full_route_pipeline(void)
         tick(&f,&c,&now,5,5,0xff,false);
     CHECK(f.state==LINE_JUNCTION && f.route.index==0);
     float angle=f.route.entry_heading;
-    while(f.odometry.heading_rad-angle> -1.15f && f.state!=LINE_STOPPED)
+    while(f.odometry.heading_rad-angle> -1.45f && f.state!=LINE_STOPPED)
         tick(&f,&c,&now,1,7,0,false);
     for(unsigned i=0;i<3;++i) tick(&f,&c,&now,1,7,0x18,false);
     CHECK(f.route.state==ROUTE_CLEARING);
@@ -274,9 +307,153 @@ static void test_raw_pipeline(void)
     }
     CHECK(f.state==LINE_TRACKING && !f.abnormal);
 }
+
+static void test_startup_ramp(void)
+{
+    const int speeds[] = {12, 25};
+    for (size_t s = 0; s < sizeof(speeds)/sizeof(speeds[0]); ++s) {
+        RouteStep steps[] = {{1000, 2, STOP, speeds[s]}};
+        LineFollow f; EncoderCounts c; uint32_t now=0;
+        start(&f,&c,&now,steps,1);
+        /* start() has already applied the first 5 ms control interval. */
+        for (unsigned i=1; i<=200; ++i) {
+            float expected=(float)speeds[s]*(float)i/200.0f;
+            NEAR(f.base,expected);
+            NEAR(f.left_target_cm_s,expected); NEAR(f.right_target_cm_s,expected);
+            if (i<200) tick(&f,&c,&now,6,6,0x18,false);
+        }
+        tick(&f,&c,&now,6,6,0x18,false); NEAR(f.base,(float)speeds[s]);
+        line_follow_stop(&f,LINE_STOP_REQUEST);
+        for (unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
+            tick(&f,&c,&now,0,0,0x18,i==LINE_CONFIRM_SAMPLES-1U);
+        NEAR(f.base,(float)speeds[s]/200.0f); /* Explicit restart ramps again. */
+
+        /* 控制间隔可合法地为 5/15/10 ms；斜坡按实际 dt，且不受毫秒回绕影响。 */
+        now=UINT32_MAX-20U;
+        start(&f,&c,&now,steps,1);
+        const unsigned intervals[]={5,15,10};
+        unsigned elapsed=5, n=0;
+        while (elapsed<1000U) {
+            unsigned ms=intervals[n++%3U];
+            if (ms>1000U-elapsed) ms=1000U-elapsed;
+            now+=ms; c.left=(uint16_t)(c.left+ms); c.right=(uint16_t)(c.right+ms);
+            elapsed+=ms;
+            line_follow_update(&f,mask(0x18),c,now,(float)ms/1000.0f,false);
+            CHECK(f.state==LINE_TRACKING && f.command.enabled);
+            NEAR(f.base,(float)speeds[s]*(float)elapsed/1000.0f);
+        }
+        NEAR(f.base,(float)speeds[s]);
+    }
+}
+
+static void test_long_straight_without_timeout(void)
+{
+    RouteStep steps[]={{131,8,LEFT,12},{70,5,STOP,12}};
+    LineFollow f; EncoderCounts c; uint32_t now=0;
+    start(&f,&c,&now,steps,2);
+    uint32_t began=now;
+    /* Synthetic encoder feedback: 2 cm/s, >60 s to junction; no segment time limit. */
+    while (f.odometry.distance_cm-f.route.origin_cm<130.0f && f.state!=LINE_STOPPED)
+        tick(&f,&c,&now,1,1,0x18,false);
+    CHECK(now-began>60000U);
+    CHECK(f.state==LINE_TRACKING && f.route.failure==ROUTE_FAILURE_NONE);
+    for (unsigned i=0;i<5 && f.route.state!=ROUTE_EXECUTING;++i)
+        tick(&f,&c,&now,3,3,0x1f,false);
+    CHECK(f.route.state==ROUTE_EXECUTING);
+
+    RoutePlanner p;
+    route_init(&p,steps,2,NULL,NULL); route_start(&p,0,UINT32_MAX-100U);
+    uint32_t began_wrap=p.segment_ms;
+    route_update(&p,mask(0x18),120,0,began_wrap+3600000U);
+    CHECK(p.state==ROUTE_FOLLOW);
+    route_update(&p,mask(0x18),120,0,began_wrap+7200000U);
+    CHECK(p.state==ROUTE_FOLLOW && p.failure==ROUTE_FAILURE_NONE);
+    confirm(&p,0xff,130,began_wrap+7200005U);
+    CHECK(p.state==ROUTE_EXECUTING);
+    route_start(&p,0,0); route_update(&p,mask(0x18),139.01f,0,5);
+    CHECK(p.failure==ROUTE_FAILURE_WINDOW && !p.stop_pending);
+    route_start(&p,0,0); confirm(&p,0xff,130,5);
+    route_update(&p,mask(0x18),131,.5f,30);
+    CHECK(p.failure==ROUTE_FAILURE_WRONG_WAY);
+    route_start(&p,0,0); confirm(&p,0xff,130,5);
+    route_update(&p,mask(0x18),131,-2.2f,30);
+    CHECK(p.failure==ROUTE_FAILURE_TURN_LIMIT);
+    route_start(&p,0,0); route_update(&p,mask(0xff),130,0,5);
+    route_update(&p,mask(0xff),130,0,5+JUNCTION_CONFIRM_TIMEOUT_MS);
+    CHECK(p.failure==ROUTE_FAILURE_CONFIRM_TIMEOUT);
+    route_start(&p,0,0); confirm(&p,0xff,130,5);
+    route_update(&p,mask(0x18),131,-1.5f,p.phase_ms+JUNCTION_ACTION_TIMEOUT_MS);
+    CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
+}
+
+/* 真实配置轮距和计数比例下的理想运动学回归；灰度与轮速为合成输入，不是实车证据。 */
+static void test_configured_path(void)
+{
+    CHECK(route_count==5U);
+    const float distances[]={104,131,60,39,70};
+    for (size_t i=0;i<route_count;++i) {
+        NEAR(route[i].distance,distances[i]); CHECK(route[i].speed==25);
+        CHECK(route[i].action==(i+1U==route_count ? STOP : LEFT));
+    }
+    for (unsigned mirror=0;mirror<2;++mirror) {
+        RouteStep steps[5];
+        for (size_t i=0;i<route_count;++i) {
+            steps[i]=route[i];
+            if (mirror && steps[i].action==LEFT) steps[i].action=RIGHT;
+        }
+        LineFollow f; EncoderCounts c={0}; uint32_t now=0;
+        OdometryCalibration geometry={4.8f,4.8f,1560,1560,14.5f,-1,1,true};
+        line_follow_init(&f,geometry,steps,route_count,NULL,NULL);
+        for (unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
+            tick(&f,&c,&now,0,0,0x18,i==LINE_CONFIRM_SAMPLES-1U);
+        float residual_l=0,residual_r=0;
+        bool saw_fast=false, saw_slow=false, saw_approach=false;
+        unsigned completed_turns=0;
+        uint32_t action_started=0;
+        RouteState previous=f.route.state;
+        for (unsigned i=0;i<16000 && f.state!=LINE_STOPPED;++i) {
+            float cm_per_count=3.14159265359f*4.8f/1560.0f;
+            residual_l+=f.left_target_cm_s*.005f/cm_per_count;
+            residual_r+=f.right_target_cm_s*.005f/cm_per_count;
+            int l=(int)residual_l, r=(int)residual_r;
+            residual_l-=(float)l; residual_r-=(float)r;
+            uint8_t line=0x18;
+            RouteStep step=steps[f.route.index];
+            if (f.route.state==ROUTE_FOLLOW || f.route.state==ROUTE_CANDIDATE) {
+                float progress=f.odometry.distance_cm-f.route.origin_cm;
+                if (progress>=step.distance) line=mirror ? 0xf8 : 0x1f;
+                if (progress>=step.distance-step.tolerance) {
+                    CHECK(f.base<=JUNCTION_TURN_SPEED_CM_S+.001f);
+                    saw_approach=true;
+                }
+            } else if (f.route.state==ROUTE_EXECUTING) {
+                float turn=fabsf(f.odometry.heading_rad-f.route.entry_heading);
+                line=turn>=1.48f ? 0x18 : 0;
+                if (mirror) NEAR(f.right_target_cm_s,0);
+                else NEAR(f.left_target_cm_s,0);
+                if (turn<JUNCTION_TURN_SLOW_RAD) {
+                    NEAR(f.base,JUNCTION_TURN_SPEED_CM_S); saw_fast=true;
+                } else {
+                    CHECK(f.base<=JUNCTION_TURN_SLOW_CM_S+.001f); saw_slow=true;
+                }
+            }
+            tick(&f,&c,&now,-l,r,line,false);
+            if (previous!=ROUTE_EXECUTING && f.route.state==ROUTE_EXECUTING) action_started=now;
+            if (previous==ROUTE_CLEARING && f.route.state==ROUTE_FOLLOW) {
+                CHECK(now-action_started<JUNCTION_ACTION_TIMEOUT_MS);
+                ++completed_turns;
+            }
+            previous=f.route.state;
+        }
+        CHECK(saw_fast && saw_slow && saw_approach && completed_turns==4);
+        CHECK(f.stop_reason==LINE_STOP_ROUTE_COMPLETE && f.route.index==4);
+        CHECK(f.route.failure==ROUTE_FAILURE_NONE && !f.command.enabled);
+    }
+}
 int main(void)
 {
-    test_odometry(); test_speed(); test_routes(); test_controller(); test_full_route_pipeline(); test_raw_pipeline();
+    test_odometry(); test_speed(); test_left_encoder_direction(); test_routes(); test_controller(); test_full_route_pipeline(); test_raw_pipeline();
+    test_startup_ramp(); test_long_straight_without_timeout(); test_configured_path();
     printf("PASS: odometry, nested loops, junction FSM, interference and route STOP; %u checks\n",checks);
     return 0;
 }

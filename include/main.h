@@ -19,6 +19,9 @@ typedef struct {
     float distance_cm, heading_rad, left_speed_cm_s, right_speed_cm_s;
     float left_target_cm_s, right_target_cm_s;
     RouteState route_state;
+    RouteFailure route_failure;
+    float route_progress_cm;
+    uint32_t route_elapsed_ms; /* 仅诊断用，不参与路段停车判断。 */
     uint32_t route_index, route_stop_events, route_stopped_step;
 } ControlDiagnostics;
 

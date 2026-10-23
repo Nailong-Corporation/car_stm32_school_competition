@@ -14,11 +14,18 @@ typedef enum {
     ROUTE_FOLLOW, ROUTE_CANDIDATE, ROUTE_EXECUTING, ROUTE_CLEARING,
     ROUTE_FINISHED, ROUTE_FAILED, ROUTE_DISABLED
 } RouteState;
+/* 保留首个失败原因，区分可重启的路径停车与编码器/任务锁定故障。 */
+typedef enum {
+    ROUTE_FAILURE_NONE, ROUTE_FAILURE_INVALID, ROUTE_FAILURE_WINDOW,
+    ROUTE_FAILURE_CONFIRM_TIMEOUT = 4, /* 旧路段超时值 3 停用，其余诊断编号保持。 */
+    ROUTE_FAILURE_ACTION_TIMEOUT, ROUTE_FAILURE_TURN_LIMIT, ROUTE_FAILURE_WRONG_WAY
+} RouteFailure;
 typedef void (*RouteStopCallback)(size_t step_index, void *context);
 typedef struct {
     const RouteStep *steps;
     size_t count, index;
     RouteState state;
+    RouteFailure failure;
     float origin_cm, entry_cm, entry_heading, clear_cm;
     uint32_t segment_ms, phase_ms;
     uint8_t candidate_count, exit_count;

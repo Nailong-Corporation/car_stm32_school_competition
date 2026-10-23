@@ -65,7 +65,7 @@ int main(void)
     for (unsigned i=0; i<5; ++i) tick(&f,&c,&now,0,0,0x18,false);
     CHECK(f.state == LINE_IDLE); /* Rejected start is not queued. */
     start(&f,&c,&now,NULL,0); /* A missing route must not block closed-loop tracking. */
-    for (unsigned i=0; i<100; ++i) tick(&f,&c,&now,3,3,0x18,false);
+    for (unsigned i=0; i<200; ++i) tick(&f,&c,&now,3,3,0x18,false);
     NEAR(f.base,LINE_FOLLOW_SPEED_CM_S);
     CHECK(f.speed.left.primed && f.speed.right.primed && f.odometry.distance_cm > 0);
     for (unsigned i=0; i<20; ++i) tick(&f,&c,&now,3,3,0x20,false);
@@ -77,7 +77,7 @@ int main(void)
     const RouteStep table[] = {{1,.3f,LEFT,4},{1,.3f,STOP,4}};
     start(&f,&c,&now,table,2);
     uint32_t began = now;
-    while ((uint32_t)(now-began) <= ROUTE_SEGMENT_TIMEOUT_MS + 100U)
+    while ((uint32_t)(now-began) <= 30000U)
         tick(&f,&c,&now,3,3,0x18,false);
     CHECK(f.state == LINE_TRACKING && f.odometry.distance_cm > 55.0f);
     NEAR(f.base,LINE_FOLLOW_SPEED_CM_S); /* Ignores speed=4 in the table. */

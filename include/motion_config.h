@@ -5,22 +5,22 @@
  * 0：白线位置 PID 直接调节 PWM，电机速度保持开环，不使用编码器和厘米路径。
  * 1：启用编码器及位置/速度双环，需完成尺寸标定；路径由下面的独立开关选择。
  * 这是编译开关，修改后须重新构建；允许通过编译参数覆盖。
- * encoder_closed_loop 构建环境会强制指定为 1。
+ * PlatformIO 只使用 genericSTM32F103C8 环境，编译和上传遵循本文件的开关。
  */
 #ifndef ENCODER_CONTROL_ENABLED
-#define ENCODER_CONTROL_ENABLED       0
+#define ENCODER_CONTROL_ENABLED       1
 #endif
 #if ENCODER_CONTROL_ENABLED != 0 && ENCODER_CONTROL_ENABLED != 1
 #error "ENCODER_CONTROL_ENABLED must be 0 or 1"
 #endif
 
 /* 预设路径开关：0 仅沿白线巡线，1 按 route_table.c 执行距离/路口/STOP。
- * 默认 0，便于测试巡线稳定性；仅巡线仍保留明确启动、丢线及故障停车。
+ * 当前为 1；设 0 可单独测试巡线，仍保留明确启动、丢线及故障停车。
  * 路径使用厘米定位，置 1 时必须同时开启 ENCODER_CONTROL_ENABLED。
- * encoder_closed_loop 强制两开关为 1；encoder_line_only 强制编码器 1、路径 0。
+ * 编译环境不覆盖模式；修改本文件后使用同一个编译/上传入口。
  */
 #ifndef PRESET_ROUTE_ENABLED
-#define PRESET_ROUTE_ENABLED          0
+#define PRESET_ROUTE_ENABLED          1
 #endif
 #if PRESET_ROUTE_ENABLED != 0 && PRESET_ROUTE_ENABLED != 1
 #error "PRESET_ROUTE_ENABLED must be 0 or 1"
@@ -29,6 +29,9 @@
 #error "PRESET_ROUTE_ENABLED requires ENCODER_CONTROL_ENABLED=1"
 #endif
 
+/* 两种控制模式共用的启动包络；按实际 dt 累计，不阻塞传感器与停车保护。 */
+#define STARTUP_RAMP_TIME_S           1.0f /* 明确 START 后升至正常目标的时间，单位 s。 */
+
 /* ==================== 二、普通 PWM 模式参数 ====================
  * 仅在开关为 0 时使用；以下指令采用 0～255 标尺，并受 MOTOR_PWM_LIMIT 限制。
  * PWM 用于调节平均驱动电压，不表示已知轮速；不得与 cm/s 参数混用。
@@ -36,7 +39,7 @@
 #define OPEN_LOOP_BASE_PWM          255.0f  /* 目标线居中时满占空比，按上升斜坡达到。 */
 #define OPEN_LOOP_TURN_BASE_PWM      40.0f  /* 位置偏差达到最大时降低到此基础 PWM。 */
 #define OPEN_LOOP_HOLD_PWM           35.0f  /* 丢线/干扰期间的基础 PWM 上限，不主动加速。 */
-#define OPEN_LOOP_PWM_RISE_PER_S     200.0f /* 基础 PWM 每秒最大上升量；降速与停车不等待斜坡。 */
+#define OPEN_LOOP_PWM_RISE_PER_S (OPEN_LOOP_BASE_PWM / STARTUP_RAMP_TIME_S)
 #define OPEN_LOOP_POSITION_KP         8.0f  /* 位置比例项，输出左右 PWM 的半差。 */
 #define OPEN_LOOP_POSITION_KI         0.0f  /* 位置积分项初值，未标定前暂不启用。 */
 #define OPEN_LOOP_POSITION_KD         0.08f /* 位置微分项，配合公共微分低通使用。 */
@@ -47,13 +50,15 @@
  * 每输出轮一圈计数必须已经包含减速比和 TI12 四倍频，不能重复乘入。
  * 若厂家只给电机轴单相每圈周期数，则输出轮计数约为该值 × 4 × 减速比。
  */
-#define ODOMETRY_CALIBRATION_CONFIRMED 0    /* 尺寸、计数口径及正向符号实测确认后置 1。 */
+#define ODOMETRY_CALIBRATION_CONFIRMED 1    /* 2026-10-23 按用户要求启用当前标定配置；实物计数及方向待验证。 */
 #define LEFT_WHEEL_DIAMETER_CM        4.8f /* 左轮有效直径，单位 cm。 */
 #define RIGHT_WHEEL_DIAMETER_CM       4.8f /* 右轮有效直径，单位 cm。 */
-#define LEFT_COUNTS_PER_WHEEL_REV     0.0f /* 左输出轮完整一圈的最终四倍频计数。 */
-#define RIGHT_COUNTS_PER_WHEEL_REV    0.0f /* 右输出轮完整一圈的最终四倍频计数。 */
-#define WHEEL_TRACK_CM               0.0f /* 左右轮中心间距，单位 cm，用于推算航向变化。 */
-#define ENCODER_LEFT_SIGN             1    /* 左轮计数方向修正，只允许 +1 或 -1，前进应为正。 */
+/* 用户提供 L150PRO 参数：电机轴单相 13 周期/圈、减速比 30，TI12 四倍频后
+ * 每输出轮一圈为 13 × 30 × 4 = 1560；已含减速与四倍频，实物计数及方向待核对。 */
+#define LEFT_COUNTS_PER_WHEEL_REV  1560.0f /* 左输出轮完整一圈的最终四倍频计数。 */
+#define RIGHT_COUNTS_PER_WHEEL_REV 1560.0f /* 右输出轮完整一圈的最终四倍频计数。 */
+#define WHEEL_TRACK_CM              14.5f /* 用户于 2026-10-23 实测左右轮中心间距，单位 cm。 */
+#define ENCODER_LEFT_SIGN            -1    /* 启动后原始计数 65527 指向负向回绕，取反；实车待复测。 */
 #define ENCODER_RIGHT_SIGN            1    /* 右轮计数方向修正，只允许 +1 或 -1，前进应为正。 */
 
 /* ==================== 四、编码器采样与轮速量程 ====================
@@ -115,19 +120,20 @@
  * 转弯使用非负前进差速；达到退出几何条件并连续获得中心窄白线后进入离口阶段。
  * 动作和离口共用一个超时预算，防止同一路口重复推进路径或无限转弯。
  */
-#define JUNCTION_ACTION_TIMEOUT_MS   2500U /* 从动作开始到离口完成的总时限，单位 ms。 */
-#define JUNCTION_TURN_MIN_RAD         1.0f /* 左右转允许退出的最小期望方向转角，单位 rad。 */
+#define JUNCTION_ACTION_TIMEOUT_MS   4500U /* 转弯及离口共用时限，涵盖减速找线和 3 cm 离口。 */
+#define JUNCTION_TURN_MIN_RAD         1.35f /* 约 77° 后才允许中心线确认退出，避免过早切回巡线。 */
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
 #define JUNCTION_TURN_SPEED_CM_S      6.0f /* 路口动作基础速度上限，单位 cm/s。 */
-#define JUNCTION_TURN_DIFF_CM_S       4.0f /* 左右转目标速度半差的幅值，单位 cm/s。 */
+#define JUNCTION_TURN_SLOW_RAD        1.25f /* 约 72° 后降低外轮目标，减少冲过出口目标线。 */
+#define JUNCTION_TURN_SLOW_CM_S       3.0f /* 找线阶段基础速度；转弯半差等于基础值，内轮目标为零。 */
 #define JUNCTION_CLEAR_DISTANCE_CM    3.0f /* 直行退出的最小前进距离，以及离口去重阶段的额外距离，单位 cm。 */
 
-/* ==================== 十一、整段路径保护 ====================
- * 启动或上一动作离口完成时建立新路段基准；超时或越过距离窗口仍未确认路口则失败停车。
+/* ==================== 十一、路径距离窗口保护 ====================
+ * 启动或上一动作离口完成时建立新路段基准；整段行驶不设时间限制。
+ * 越过距离窗口仍未确认路口则失败停车；路口确认和动作/离口仍有各自时限。
  * STOP 同样要求在窗口内确认路口，不能仅因到达预计里程就调用成功回调。
  */
-#define ROUTE_SEGMENT_TIMEOUT_MS     15000U /* 等待本段路口的最长时间，单位 ms。 */
 
 #endif
