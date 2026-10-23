@@ -17,12 +17,16 @@ void odometry_init(Odometry *o, OdometryCalibration c)
 {
     memset(o, 0, sizeof(*o));
     o->calibration = c;
-    o->ready = c.confirmed && positive(c.left_diameter_cm) && positive(c.right_diameter_cm) &&
+    o->ready = c.confirmed && positive(ODOMETRY_DISTANCE_SCALE) &&
+        positive(c.left_diameter_cm) && positive(c.right_diameter_cm) &&
         positive(c.left_counts_per_rev) && positive(c.right_counts_per_rev) && positive(c.track_cm) &&
         (c.left_sign == 1 || c.left_sign == -1) && (c.right_sign == 1 || c.right_sign == -1);
     if (!o->ready) return;
-    o->left_cm_per_count = 3.14159265359f * c.left_diameter_cm / c.left_counts_per_rev;
-    o->right_cm_per_count = 3.14159265359f * c.right_diameter_cm / c.right_counts_per_rev;
+    /* 同一物理距离换算同时供里程、速度和航向使用，避免只改停车门槛后单位失配。 */
+    o->left_cm_per_count = 3.14159265359f * c.left_diameter_cm / c.left_counts_per_rev *
+        ODOMETRY_DISTANCE_SCALE;
+    o->right_cm_per_count = 3.14159265359f * c.right_diameter_cm / c.right_counts_per_rev *
+        ODOMETRY_DISTANCE_SCALE;
     float max_dt = (float)CONTROL_MAX_INTERVAL_MS / 1000.0f;
     /* At most half a counter revolution between samples, including quantization margin. */
     o->ready = positive(o->left_cm_per_count) && positive(o->right_cm_per_count) &&

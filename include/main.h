@@ -22,7 +22,12 @@ typedef struct {
     RouteFailure route_failure;
     float route_progress_cm;
     uint32_t route_elapsed_ms; /* 仅诊断用，不参与路段停车判断。 */
+    uint32_t route_repeat_count, route_completed_laps;
+    bool route_turn_capturing, route_turn_forced;
+    uint8_t route_candidate_samples;
+    float route_turn_rad;
     uint32_t route_index, route_stop_events, route_stopped_step;
+    LineStopSnapshot stop_snapshot; /* 停车前控制/传感器快照，保持至下一次接受 START。 */
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */

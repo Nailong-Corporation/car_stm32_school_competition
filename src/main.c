@@ -205,7 +205,14 @@ int main(void)
             g_diagnostics.route_failure = follow.route.failure;
             g_diagnostics.route_progress_cm = follow.odometry.distance_cm - follow.route.origin_cm;
             g_diagnostics.route_elapsed_ms = (uint32_t)(now_ms - follow.route.segment_ms);
+            g_diagnostics.route_repeat_count = follow.route.repeat_count;
+            g_diagnostics.route_completed_laps = follow.route.completed_laps;
+            g_diagnostics.route_turn_capturing = follow.route.turn_capturing;
+            g_diagnostics.route_turn_forced = follow.route.turn_forced;
+            g_diagnostics.route_candidate_samples = follow.route.candidate_count;
+            g_diagnostics.route_turn_rad = follow.odometry.heading_rad - follow.route.entry_heading;
             g_diagnostics.route_index = (uint32_t)follow.route.index;
+            g_diagnostics.stop_snapshot = follow.stop_snapshot;
             if (HAL_IWDG_Refresh(&watchdog) != HAL_OK) Error_Handler();
         }
         __WFI(); /* SysTick wakes every ms; no blocking delay or serial output. */

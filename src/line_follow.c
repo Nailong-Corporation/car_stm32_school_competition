@@ -63,6 +63,33 @@ void line_follow_init(LineFollow *f, OdometryCalibration calibration,
  */
 void line_follow_stop(LineFollow *f, LineStopReason reason)
 {
+    if (!f->stop_snapshot.valid) {
+        f->stop_snapshot = (LineStopSnapshot){
+            .valid = true, .reason = reason, .state_before_stop = f->state,
+            .route_state = f->route.state, .route_state_before_update = f->route_state_before_update,
+            .route_failure = f->route.failure, .speed_fault = f->speed.fault,
+            .speed_fault_wheel = f->speed.fault_wheel, .observation = f->observation,
+            .counts = f->sample_counts,
+            .sample_ms = f->sample_ms,
+            .reliable_age_ms = (uint32_t)(f->sample_ms - f->last_reliable_ms),
+            .route_phase_age_ms = (uint32_t)(f->sample_ms - f->route.phase_ms),
+            .route_index = (uint32_t)f->route.index, .dt_s = f->sample_dt_s,
+            .base = f->base, .left_target_cm_s = f->left_target_cm_s,
+            .right_target_cm_s = f->right_target_cm_s,
+            .left_speed_cm_s = f->odometry.left_speed_cm_s,
+            .right_speed_cm_s = f->odometry.right_speed_cm_s,
+            .distance_cm = f->odometry.distance_cm,
+            .route_progress_cm = f->odometry.distance_cm - f->route.origin_cm,
+            .clear_progress_cm = f->odometry.distance_cm - f->route.clear_cm,
+            .turn_rad = f->odometry.heading_rad - f->route.entry_heading,
+            .exit_candidate_pending = f->route.exit_candidate_pending,
+            .exit_candidate_age_ms = f->route.exit_candidate_pending ?
+                (uint32_t)(f->sample_ms - f->route.exit_candidate_ms) : 0U,
+            .exit_candidate_progress_cm = f->route.exit_candidate_pending ?
+                f->odometry.distance_cm - f->route.exit_candidate_cm : 0.0f,
+            .exit_confirm_samples = f->route.exit_count
+        };
+    }
     f->state = LINE_STOPPED;
     if (!locked(f->stop_reason)) f->stop_reason = reason;
     f->command = (MotorCommand){0};
@@ -137,11 +164,13 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
         f->start_result = LINE_START_ACCEPTED;
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
+        f->stop_snapshot = (LineStopSnapshot){0};
         f->base = 0.0f;
         f->startup_elapsed_s = 0.0f;
         pid_reset(&f->pid);
     }
-    if (f->abnormal && (uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS) {
+    if (LOST_LINE_STOP_ENABLED && f->abnormal &&
+        (uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS) {
         line_follow_stop(f, LINE_STOP_LOST);
         return;
     }
@@ -170,8 +199,8 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
             f->held_pwm_correction = f->correction;
         }
         f->state = LINE_GAP_HOLD;
-        float decay = 1.0f - (float)(uint32_t)(now_ms - f->last_reliable_ms) /
-                            (float)INTERFERENCE_TIMEOUT_MS;
+        float decay = fmaxf(0.0f, 1.0f -
+            (float)(uint32_t)(now_ms - f->last_reliable_ms) / (float)INTERFERENCE_TIMEOUT_MS);
         /* No encoder: bounded historical PWM difference only, not heading feedback. */
         pwm_output(f, fminf(OPEN_LOOP_HOLD_PWM, f->base), f->held_pwm_correction * decay, dt);
     }
@@ -186,6 +215,11 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
 void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request)
 {
+    f->sample_ms = now_ms;
+    f->sample_dt_s = dt;
+    f->observation = obs;
+    f->sample_counts = counts;
+    f->route_state_before_update = f->route.state;
     if (start_request) f->start_result = LINE_START_ALREADY_RUNNING;
     if (!isfinite(dt) || dt <= 0.0f || dt > (float)CONTROL_MAX_INTERVAL_MS / 1000.0f ||
         (obs.kind != GRAY_VALID && obs.kind != GRAY_NONE && obs.kind != GRAY_AMBIGUOUS) ||
@@ -228,6 +262,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         f->start_result = LINE_START_ACCEPTED;
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
+        f->stop_snapshot = (LineStopSnapshot){0};
         f->last_reliable_ms = now_ms;
         f->have_reliable = true;
         f->base = 0.0f;
@@ -236,7 +271,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         speed_control_reset(&f->speed);
     }
     /* Deadline precedes recovery/junction confirmation; isolated noise cannot extend it. */
-    if (f->abnormal && ((uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS ||
+    if (LOST_LINE_STOP_ENABLED && f->abnormal && ((uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS ||
         fabsf(f->odometry.distance_cm - f->abnormal_origin_cm) >= INTERFERENCE_MAX_DISTANCE_CM)) {
         line_follow_stop(f, LINE_STOP_LOST);
         return;
@@ -256,11 +291,31 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         stable = false;
     }
     RouteStep step = f->route.steps[f->route.index];
-    float base_speed = (float)step.speed;
-    /* 在路口窗口内提前降速，避免以巡航目标冲过分支；离口完成前也不升速。 */
-    if (f->route.state == ROUTE_CLEARING ||
-        f->odometry.distance_cm - f->route.origin_cm >= step.distance - step.tolerance)
-        base_speed = fminf(base_speed, JUNCTION_TURN_SPEED_CM_S);
+    RouteStep speed_step = step;
+    float progress = f->odometry.distance_cm - f->route.origin_cm;
+    if (f->route.state == ROUTE_CLEARING) {
+        /* 转弯与中心出口线已确认，立即按下一段提速，不再受旧路口窗口的低速锁定。
+         * 路径索引/里程起点仍等 3 cm 离口去重完成后再推进；循环边界预看第 0 项。
+         * 下一段按路口参考点的出口方向位移计程，预看实际进度以约束短段。 */
+        size_t next_index = f->route.lap_boundary ? 0U : f->route.index + 1U;
+        if (next_index >= f->route.count) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
+        speed_step = f->route.steps[next_index];
+        progress = f->route.outgoing_cm;
+    }
+    float base_speed = (float)speed_step.speed;
+    /* 在窗口下界前规划减速，给实车留出减速距离；候选及转弯动作仍保持低速。
+     * v² 随剩余距离线性变化，对理想跟随目标的直线行驶相当于恒定减速度。
+     * 这里只改变速度，不放宽 route_update 的距离/形状确认门禁。
+     */
+    float slow_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
+    float remaining = speed_step.distance - speed_step.tolerance - progress;
+    if (f->route.state == ROUTE_CANDIDATE || remaining <= 0.0f) {
+        base_speed = slow_speed;
+    } else if (remaining < JUNCTION_APPROACH_DISTANCE_CM) {
+        float fraction = remaining / JUNCTION_APPROACH_DISTANCE_CM;
+        base_speed = sqrtf(slow_speed * slow_speed +
+                           (base_speed * base_speed - slow_speed * slow_speed) * fraction);
+    }
 #else
     float base_speed = LINE_FOLLOW_SPEED_CM_S;
 #endif
@@ -274,13 +329,35 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         f->state = LINE_JUNCTION;
         float turn_base = fminf((float)step.speed, JUNCTION_TURN_SPEED_CM_S);
         float correction;
-        if (step.action == LEFT || step.action == RIGHT) {
-            float direction = step.action == LEFT ? -1.0f : 1.0f;
+        Action action = route_current_action(&f->route);
+        if (action == LEFT || action == RIGHT) {
+            float direction = action == LEFT ? -1.0f : 1.0f;
             float turn = direction * (f->odometry.heading_rad - f->route.entry_heading);
             if (turn >= JUNCTION_TURN_SLOW_RAD)
                 turn_base = fminf(turn_base, JUNCTION_TURN_SLOW_CM_S);
-            /* 非反转单轮支点转弯，半径为半轮距；找线阶段外轮减速。 */
-            correction = direction * turn_base;
+            if (f->route.turn_capturing) {
+                /* 捕获侧边出口线，向 ±90° 航向和目标线共同收敛。
+                 * 先前固定支点转到中心才接管，可能把侧边线扫出探头范围。 */
+                turn_base = fminf((float)step.speed, JUNCTION_CAPTURE_SPEED_CM_S);
+                float line_correction;
+                if (!pid_update(&f->pid, obs.position, dt, turn_base, &line_correction)) {
+                    line_follow_stop(f, LINE_STOP_FAULT);
+                    return;
+                }
+                correction = line_correction + JUNCTION_CAPTURE_HEADING_KP *
+                    (f->route.entry_heading + direction * JUNCTION_TURN_TARGET_RAD -
+                     f->odometry.heading_rad);
+                /* 实车快照：中心附近出口线使两项抵消，停在 1.3465 < 1.35 rad。
+                 * 最小退出角之前保持期望方向的小转向；达到门槛后仍按出口线收敛。 */
+                if (turn < JUNCTION_TURN_MIN_RAD) {
+                    float min_turn = fminf(turn_base, JUNCTION_CAPTURE_MIN_TURN_CM_S);
+                    correction = direction * fmaxf(direction * correction, min_turn);
+                }
+            } else {
+                pid_reset(&f->pid);
+                /* 无可靠出口线时继续有界非反转扫线，找线阶段降低外轮目标。 */
+                correction = direction * turn_base;
+            }
         } else {
             correction = HEADING_KP_CM_S_PER_RAD *
                          (f->route.entry_heading - f->odometry.heading_rad);

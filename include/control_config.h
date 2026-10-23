@@ -10,6 +10,17 @@
 #error "GRAY_INVERT_ENABLED must be 0 or 1"
 #endif
 
+/* 丢线/宽线/多区域保持超限后是否自动停车，修改后重新编译。
+ * 1：保留最后稳定线起 400 ms / 编码器异常后 8 cm 的停车；
+ * 0：继续低速保持并等待连续有效线恢复；不关闭路径/反馈/时序/按键停车。
+ * 关闭后可能持续离开赛道，调试时须具备人工停车条件。 */
+#ifndef LOST_LINE_STOP_ENABLED
+#define LOST_LINE_STOP_ENABLED     0
+#endif
+#if LOST_LINE_STOP_ENABLED != 0 && LOST_LINE_STOP_ENABLED != 1
+#error "LOST_LINE_STOP_ENABLED must be 0 or 1"
+#endif
+
 /* Initial bench values only; no track or motor calibration has been performed. */
 #define CONTROL_PERIOD_MS           5U
 #define CONTROL_MAX_INTERVAL_MS     15U

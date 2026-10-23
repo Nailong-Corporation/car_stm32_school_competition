@@ -12,8 +12,9 @@ static unsigned checks, callbacks;
 #define NEAR(a,b) CHECK(fabsf((a)-(b)) < 0.001f)
 static OdometryCalibration calibration(void)
 {
-    /* Synthetic geometry: 1 cm circumference, 100 x4 counts per wheel turn. */
-    return (OdometryCalibration){1.0f/3.14159265359f, 1.0f/3.14159265359f,
+    /* 合成几何在生产距离系数生效后保持 0.01 cm/count，不依赖实车标定值改变输入尺度。 */
+    return (OdometryCalibration){1.0f/(3.14159265359f*ODOMETRY_DISTANCE_SCALE),
+                                 1.0f/(3.14159265359f*ODOMETRY_DISTANCE_SCALE),
                                  100.0f, 100.0f, 10.0f, 1, 1, true};
 }
 static void callback(size_t index, void *context)
