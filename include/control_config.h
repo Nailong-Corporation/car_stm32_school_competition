@@ -4,7 +4,7 @@
 /* 原始 GPIO 白色=0、黑色=1：1 巡白线（反相），0 巡黑线（不反相）。
  * 转换后统一以 1 表示目标线；修改后须重新编译，可通过 -D 覆盖。 */
 #ifndef GRAY_INVERT_ENABLED
-#define GRAY_INVERT_ENABLED         1
+#define GRAY_INVERT_ENABLED         0
 #endif
 #if GRAY_INVERT_ENABLED != 0 && GRAY_INVERT_ENABLED != 1
 #error "GRAY_INVERT_ENABLED must be 0 or 1"
@@ -21,15 +21,25 @@
 #error "LOST_LINE_STOP_ENABLED must be 0 or 1"
 #endif
 
+/* 地板练习：细瓷砖缝常只覆盖一路，启用后在多数滤波后剔除独立单路区域。
+ * 1：目标胶带需连续至少两路；0：正式比赛恢复原始 1 路边缘线响应。
+ * 这是宽度启发式，不能区分覆盖两路或与胶带连通的瓷砖缝。 */
+#ifndef FLOOR_SEAM_FILTER_ENABLED
+#define FLOOR_SEAM_FILTER_ENABLED   0
+#endif
+#if FLOOR_SEAM_FILTER_ENABLED != 0 && FLOOR_SEAM_FILTER_ENABLED != 1
+#error "FLOOR_SEAM_FILTER_ENABLED must be 0 or 1"
+#endif
+
 /* Initial bench values only; no track or motor calibration has been performed. */
 #define CONTROL_PERIOD_MS           5U
 #define CONTROL_MAX_INTERVAL_MS     15U
 #define SENSOR_FILTER_SAMPLES       3U
 #include "motion_config.h"
 #if ENCODER_CONTROL_ENABLED
-#define SENSOR_MAX_REGION_WIDTH     4U
+#define SENSOR_MAX_REGION_WIDTH     5U
 #else
-#define SENSOR_MAX_REGION_WIDTH     7U /* 普通 PWM 接受连续 1～7 路；8 路全目标仍为歧义。 */
+#define SENSOR_MAX_REGION_WIDTH     7U /* 连续 1～7 路有效；8 路全目标缺少位置依据，保持歧义。 */
 #endif
 #define SENSOR_CONTINUITY_DISTANCE  3.0f
 #define SENSOR_CONTINUITY_MARGIN    1.0f

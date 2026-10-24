@@ -7,6 +7,7 @@
 typedef struct {
     uint32_t control_count, last_sample_ms, task_duration_ms, interval_ms;
     uint8_t raw_mask, line_mask, selected_mask;
+    uint8_t prefilter_mask, seam_mask;
     GrayKind observation;
     LineState state;
     LineStopReason stop_reason;

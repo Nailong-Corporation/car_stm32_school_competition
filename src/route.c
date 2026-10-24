@@ -18,6 +18,10 @@ static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     p->approach_center_count = 0;
     p->narrow_count = 0;
     p->turn_forced = false;
+    p->handoff_early = false;
+    p->segment_start_progress_cm = 0.0f;
+    p->turn_exit_branch = false;
+    p->exit_line_mask = 0;
 }
 
 /**
@@ -49,7 +53,9 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
         RouteStep s = steps[i];
         p->valid = isfinite(s.distance) && isfinite(s.tolerance) &&
             s.distance > 0.0f && s.tolerance >= 0.0f && s.tolerance < s.distance &&
-            (unsigned)s.action <= (unsigned)STOP && s.speed > 0 &&
+            (unsigned)s.action <= (unsigned)CUSTOM_TURN && s.speed > 0 &&
+            (s.action != CUSTOM_TURN || (isfinite(s.angle_deg) &&
+             s.angle_deg != 0.0f && fabsf(s.angle_deg) <= 360.0f)) &&
             (float)s.speed <= WHEEL_TARGET_MAX_CM_S &&
             (s.action != STOP || i == count - 1U);
     }
@@ -84,7 +90,37 @@ static bool another_lap(const RoutePlanner *p)
 Action route_current_action(const RoutePlanner *p)
 {
     Action action = p->steps[p->index].action;
+    if (action == CUSTOM_TURN) return p->steps[p->index].angle_deg < 0.0f ? LEFT : RIGHT;
     return action == STOP && (p->lap_boundary || another_lap(p)) ? p->repeat_action : action;
+}
+
+/* 编码器航向本身右转为正，不对 ±180°/360° 取模，以保留实际转动方向与圈数。 */
+float route_turn_target_rad(const RoutePlanner *p)
+{
+    if (p->steps[p->index].action == CUSTOM_TURN)
+        return p->steps[p->index].angle_deg * (JUNCTION_TURN_TARGET_RAD / 90.0f);
+    Action action = route_current_action(p);
+    return action == LEFT ? -JUNCTION_TURN_TARGET_RAD :
+           action == RIGHT ? JUNCTION_TURN_TARGET_RAD : 0.0f;
+}
+
+float route_turn_threshold_rad(const RoutePlanner *p, float threshold)
+{
+    if (p->steps[p->index].action != CUSTOM_TURN) return threshold;
+    float target = fabsf(route_turn_target_rad(p));
+    /* 自定义角度正常退出须到达目标；慢扫/捕获/过转沿用直角参数的角度余量。
+     * 小角度按比例压缩，避免门槛为负。 */
+    if (threshold == JUNCTION_TURN_MIN_RAD) return target;
+    if (threshold > JUNCTION_TURN_TARGET_RAD)
+        return target + threshold - JUNCTION_TURN_TARGET_RAD;
+    return fmaxf(target + threshold - JUNCTION_TURN_TARGET_RAD,
+                 target * threshold / JUNCTION_TURN_TARGET_RAD);
+}
+
+uint32_t route_action_timeout_ms(const RoutePlanner *p)
+{
+    float scale = fmaxf(1.0f, fabsf(route_turn_target_rad(p)) / JUNCTION_TURN_TARGET_RAD);
+    return (uint32_t)ceilf((float)JUNCTION_ACTION_TIMEOUT_MS * scale);
 }
 
 /**
@@ -121,6 +157,9 @@ static unsigned bit_count(uint8_t mask)
 /* 仅对相邻滤波帧判断骤变；稳定窄线是入口证据，本帧无需在线或有指定侧分支。 */
 static bool row_changed_abruptly(const RoutePlanner *p, GrayObservation obs, uint32_t now_ms)
 {
+    /* 剩余细缝被过滤不是“真实全排丢线”，不能触发路径表强制转向。
+     * raw/prefilter 原本就为零的真实间隙仍按原规则处理。 */
+    if (obs.line_mask==0U && obs.seam_mask!=0U) return false;
     if (p->narrow_count < LINE_CONFIRM_SAMPLES ||
         (uint32_t)(now_ms - p->previous_line_ms) > CONTROL_MAX_INTERVAL_MS) return false;
     if (obs.line_mask == 0U) return true;
@@ -176,6 +215,37 @@ static void accept_step(RoutePlanner *p, float distance_cm, float heading_rad,
         p->lap_boundary = true;
     }
     begin_action(p, distance_cm, heading_rad, now_ms, forced);
+}
+
+/* 仅已确认转弯的出口处理可识别此结构；普通巡线/候选仍保留多区域歧义。
+ * 中心连续区域必须同时覆盖 S3/S4，附加区域只能位于转弯反侧最外两路。
+ * 这可能是尚在探头中的入口残支，不声称对图形或路口作语义识别。 */
+static bool branch_exit_line(const RoutePlanner *p, GrayObservation obs, float heading,
+                             GrayObservation *exit_obs)
+{
+    if ((obs.kind != GRAY_AMBIGUOUS && obs.kind != GRAY_VALID) || obs.region_count != 2U ||
+        (obs.line_mask & 0x18U) != 0x18U) return false;
+    float target = route_turn_target_rad(p);
+    float turn = (heading-p->entry_heading) * (target < 0 ? -1.0f : 1.0f);
+    float angle = fabsf(target);
+    if (angle < JUNCTION_CAPTURE_MIN_RAD ||
+        turn < angle-fminf(JUNCTION_EXIT_ANGLE_MARGIN_RAD,angle*.1f) ||
+        turn > angle+JUNCTION_BRANCH_EXIT_OVERRUN_RAD) return false;
+    size_t next = p->lap_boundary ? 0U : p->index+1U;
+    if (next >= p->count ||
+        p->outgoing_cm < p->steps[next].distance-JUNCTION_APPROACH_DISTANCE_CM ||
+        p->outgoing_cm > p->steps[next].distance+p->steps[next].tolerance) return false;
+    unsigned left=3, right=4;
+    while (left>0 && (obs.line_mask & (1U<<(left-1U)))) --left;
+    while (right<7 && (obs.line_mask & (1U<<(right+1U)))) ++right;
+    uint8_t center=(uint8_t)(((1U<<(right-left+1U))-1U)<<left);
+    uint8_t extra=(uint8_t)(obs.line_mask & (uint8_t)~center);
+    uint8_t edge=target<0 ? 0xc0U : 0x03U;
+    if (extra==0U || (extra & (uint8_t)~edge)!=0U) return false;
+    GrayObservation selected=gray_classify(center,false,0);
+    if (!route_is_narrow_line(selected) || fabsf(selected.position)>JUNCTION_CENTER_LIMIT) return false;
+    *exit_obs=selected;
+    return true;
 }
 
 /**
@@ -248,42 +318,60 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         return;
     }
     uint32_t phase_timeout = p->state == ROUTE_CLEARING ? JUNCTION_CLEAR_TIMEOUT_MS :
-                             JUNCTION_ACTION_TIMEOUT_MS;
+                             route_action_timeout_ms(p);
     if ((uint32_t)(now_ms - p->phase_ms) >= phase_timeout) {
         fail(p, ROUTE_FAILURE_ACTION_TIMEOUT);
         return;
     }
     Action action = route_current_action(p);
-    /* 将车轴中心增量投影至入口方向 ±90° 的出口轴；圆弧不等于下一直线长度。
+    /* 将车轴中心增量投影至路径目标航向的出口轴；圆弧不等于下一直线长度。
      * 动作触发点作为路口参考点，灰度排到轮轴的偏移/打滑仍需实测校准。
      * 中点航向 + sinc 对单次恒曲率增量精确积分，也兼容直行和零半径自转。 */
     float dh = heading_rad - p->projection_previous_heading;
     float half = dh * 0.5f;
     float sinc = fabsf(half) < 0.00001f ? 1.0f : sinf(half) / half;
-    float exit_heading = p->entry_heading +
-        (action == LEFT ? -JUNCTION_TURN_TARGET_RAD :
-         action == RIGHT ? JUNCTION_TURN_TARGET_RAD : 0.0f);
+    float exit_heading = p->entry_heading + route_turn_target_rad(p);
     p->outgoing_cm += (distance_cm - p->projection_previous_cm) * sinc *
         cosf((heading_rad + p->projection_previous_heading) * 0.5f - exit_heading);
     p->projection_previous_cm = distance_cm;
     p->projection_previous_heading = heading_rad;
+    GrayObservation exit_obs=obs;
+    bool previous_branch=p->turn_exit_branch;
+    p->turn_exit_branch=branch_exit_line(p,obs,heading_rad,&exit_obs);
+    p->exit_line_mask=route_is_narrow_line(exit_obs) ? exit_obs.line_mask : 0;
+    if (p->turn_exit_branch && !previous_branch) {
+        p->exit_candidate_pending=false;
+        p->exit_count=0; /* 不能借用此前普通窄线的计时或确认帧。 */
+    }
     if (p->state == ROUTE_EXECUTING) {
         float turn = (heading_rad - p->entry_heading) * (action == LEFT ? -1.0f : 1.0f);
-        if (action != STRAIGHT && (turn > JUNCTION_TURN_MAX_RAD || turn < -JUNCTION_WRONG_WAY_RAD)) {
+        if (action != STRAIGHT && (turn > route_turn_threshold_rad(p, JUNCTION_TURN_MAX_RAD) || turn < -JUNCTION_WRONG_WAY_RAD)) {
             fail(p, turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
             return;
         }
-        /* 侧边窄线先交给位置反馈捕获；全目标/多区域不能进入捕获 PID。
+        /* 侧边窄线先交给位置反馈捕获；全目标/普通多区域不能进入位置 PID；有界附带分支只用航向控制。
          * 最终退出仍要求足够转角和连续中心线，不能用提前遇到的图形直接退出。 */
-        p->turn_capturing = action != STRAIGHT && turn >= JUNCTION_CAPTURE_MIN_RAD &&
-            route_is_narrow_line(obs);
+        p->turn_capturing = action != STRAIGHT && turn >= route_turn_threshold_rad(p, JUNCTION_CAPTURE_MIN_RAD) &&
+            route_is_narrow_line(exit_obs);
         bool departed = action == STRAIGHT ? distance_cm - p->entry_cm >= JUNCTION_CLEAR_DISTANCE_CM :
-            turn >= JUNCTION_TURN_MIN_RAD;
-        bool centered = route_is_narrow_line(obs) && fabsf(obs.position) <= JUNCTION_CENTER_LIMIT;
+            turn >= route_turn_threshold_rad(p, JUNCTION_TURN_MIN_RAD);
+        bool centered = route_is_narrow_line(exit_obs) && fabsf(exit_obs.position) <= JUNCTION_CENTER_LIMIT;
         /* 捕获期间允许窄出口线横移；仅最终退出要求居中。
          * 若计时也要求居中，位置 2/3 来回变化会反复清零，直至动作超时。 */
-        bool near_exit = action != STRAIGHT && route_is_narrow_line(obs) &&
-            turn >= JUNCTION_TURN_MIN_RAD - JUNCTION_EXIT_ANGLE_MARGIN_RAD;
+        /* 成熟出口证据建立后，位置 PID 回线可能使角度略微回落。
+         * 仅保持成熟证据时使用小回差，避免清零后重新强制同向转向；
+         * 未积累证据、无线/歧义和超出回差时仍走原始角度门槛。
+         * 附带分支模式不放宽，保持其独立形状与角度约束。 */
+        bool exit_evidence_ready = p->exit_candidate_pending &&
+            (uint32_t)(now_ms - p->exit_candidate_ms) >= JUNCTION_EXIT_CONFIRM_MS &&
+            distance_cm - p->exit_candidate_cm >= JUNCTION_EXIT_CONFIRM_CM;
+        float exit_margin = fminf(JUNCTION_EXIT_ANGLE_MARGIN_RAD,
+                                  fabsf(route_turn_target_rad(p)) * 0.1f);
+        if (exit_evidence_ready && !p->turn_exit_branch)
+            exit_margin += fminf(JUNCTION_EXIT_HYSTERESIS_RAD,
+                                fabsf(route_turn_target_rad(p)) * 0.05f);
+        bool near_exit = action != STRAIGHT && route_is_narrow_line(exit_obs) &&
+            turn >= route_turn_threshold_rad(p, JUNCTION_TURN_MIN_RAD) - exit_margin;
         if (!near_exit) p->exit_candidate_pending = false;
         else if (!p->exit_candidate_pending) {
             p->exit_candidate_pending = true;
@@ -294,6 +382,11 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
          * 仅在接近角度门槛且连续沿窄出口线前进后，接受有界估计误差。 */
         if (near_exit && (uint32_t)(now_ms - p->exit_candidate_ms) >= JUNCTION_EXIT_CONFIRM_MS &&
             distance_cm - p->exit_candidate_cm >= JUNCTION_EXIT_CONFIRM_CM) departed = true;
+        if (p->turn_exit_branch) {
+            departed = p->exit_candidate_pending &&
+                (uint32_t)(now_ms-p->exit_candidate_ms)>=JUNCTION_BRANCH_EXIT_CONFIRM_MS &&
+                distance_cm-p->exit_candidate_cm>=JUNCTION_BRANCH_EXIT_CONFIRM_CM;
+        }
         p->exit_count = departed && centered ? (uint8_t)(p->exit_count + 1U) : 0U;
         if (p->exit_count >= LINE_CONFIRM_SAMPLES) {
             p->state = ROUTE_CLEARING;
@@ -303,10 +396,22 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             p->exit_count = 0;
         }
     } else if (p->state == ROUTE_CLEARING) {
-        if (!route_is_narrow_line(obs)) p->exit_count = 0;
+        if (!route_is_narrow_line(exit_obs)) p->exit_count = 0;
         else if (p->exit_count < LINE_CONFIRM_SAMPLES) ++p->exit_count;
-        if (p->exit_count < LINE_CONFIRM_SAMPLES ||
-            distance_cm - p->clear_cm < JUNCTION_CLEAR_DISTANCE_CM) return;
+        size_t next_index = p->lap_boundary ? 0U : p->index + 1U;
+        if (next_index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
+        float clearance = distance_cm - p->clear_cm;
+        bool normal_clear = p->exit_count >= LINE_CONFIRM_SAMPLES &&
+                            clearance >= JUNCTION_CLEAR_DISTANCE_CM;
+        /* 下一项临近时不继续固定 3 cm 离口，避免切段后窗口已耗尽。
+         * 这里不放大/平移窗口、不清零继承里程；直行动作仍使用完整离口距离。
+         * 转角与出口确认已在 EXECUTING 完成，再要求 0.5 cm 和新的连续窄线证据，允许出口线横移。 */
+        bool early_clear = fabsf(route_turn_target_rad(p)) >= JUNCTION_CAPTURE_MIN_RAD &&
+            p->outgoing_cm >= p->steps[next_index].distance - JUNCTION_APPROACH_DISTANCE_CM &&
+            p->outgoing_cm <= p->steps[next_index].distance + p->steps[next_index].tolerance &&
+            clearance >= JUNCTION_SHORT_CLEAR_CM &&
+            p->exit_count >= LINE_CONFIRM_SAMPLES;
+        if (!normal_clear && !early_clear) return;
         /* Debounce the physical junction before consuming another table entry. */
         if (p->lap_boundary) {
             p->index = 0;
@@ -315,6 +420,20 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         p->turn_capturing = false;
         if (p->index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
         begin_segment(p, distance_cm - p->outgoing_cm, now_ms);
+        p->segment_start_progress_cm = p->outgoing_cm;
+        p->handoff_early = early_clear && !normal_clear;
+        if (p->handoff_early) {
+            /* 已完成出口中心线确认及连续窄线/距离去重，保留入口证据供紧邻下一弯使用。
+             * 时间戳取当前帧，后续仍受 CONTROL_MAX_INTERVAL_MS 的相邻帧门禁。 */
+            remember_line(p, exit_obs, now_ms);
+            p->narrow_count = LINE_CONFIRM_SAMPLES;
+            if (fabsf(exit_obs.position) <= JUNCTION_CENTER_LIMIT) {
+                p->approach_center_count = LINE_CONFIRM_SAMPLES;
+                p->have_approach_center = true;
+                p->approach_center_cm = distance_cm;
+                p->approach_center_ms = now_ms;
+            }
+        }
         p->state = ROUTE_FOLLOW;
         p->candidate_count = p->exit_count = 0;
     }

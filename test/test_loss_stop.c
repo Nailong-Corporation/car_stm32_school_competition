@@ -11,7 +11,7 @@ static void tick(LineFollow *f, EncoderCounts *c, uint32_t *now, uint8_t line, b
 }
 int main(void)
 {
-    const RouteStep route_steps[]={{1000,10,STOP,12}};
+    const RouteStep route_steps[]={{1000,10,STOP,12, 0.0f}};
     OdometryCalibration cal={1.0f/(3.14159265359f*ODOMETRY_DISTANCE_SCALE),
         1.0f/(3.14159265359f*ODOMETRY_DISTANCE_SCALE),100,100,10,1,1,true};
     LineFollow f; EncoderCounts c={0}; uint32_t now=0;

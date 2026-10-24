@@ -23,7 +23,7 @@ GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previ
     uint8_t masks[4] = {0}, widths[4] = {0};
     float positions[4] = {0};
     bool in_region = false, wide = false;
-    result.line_mask = line_mask;
+    result.line_mask = result.prefilter_mask = line_mask;
     result.kind = GRAY_NONE;
     for (unsigned i = 0; i < 8; ++i) {
         if ((line_mask & (1U << i)) == 0) {
@@ -90,7 +90,16 @@ GrayObservation gray_sensor_update(GraySensor *sensor, uint8_t raw_mask,
             if (sensor->history[j] & (1U << bit)) ++votes;
         if (votes > sensor->count / 2U) filtered |= (uint8_t)(1U << bit);
     }
+    uint8_t prefilter=filtered;
+#if FLOOR_SEAM_FILTER_ENABLED
+    /* 只保留有相邻目标通道的像素：一个连续区域的长度 >=2 时整段保留。
+     * 不按位置挑选多区域，也不把多区域交给普通位置 PID。 */
+    uint8_t neighbors=(uint8_t)((filtered << 1U) | (filtered >> 1U));
+    filtered &= neighbors;
+#endif
     GrayObservation result = gray_classify(filtered, have_previous, previous);
     result.raw_mask = raw_mask;
+    result.prefilter_mask=prefilter;
+    result.seam_mask=(uint8_t)(prefilter & (uint8_t)~filtered);
     return result;
 }

@@ -75,7 +75,7 @@ int main(void)
     CHECK(f.left_target_cm_s < f.right_target_cm_s && f.command.left < f.command.right);
 
     /* A supplied LEFT/STOP table must neither steer, set speed nor stop this mode. */
-    const RouteStep table[] = {{1,.3f,LEFT,4},{1,.3f,STOP,4}};
+    const RouteStep table[] = {{1,.3f,LEFT,4, 0.0f},{1,.3f,STOP,4, 0.0f}};
     start(&f,&c,&now,table,2);
     uint32_t began = now;
     while ((uint32_t)(now-began) <= 30000U)
@@ -84,7 +84,8 @@ int main(void)
     NEAR(f.base,LINE_FOLLOW_SPEED_CM_S); /* Ignores speed=4 in the table. */
     float integral=f.pid.integral, derivative=f.pid.derivative;
     float distance=f.odometry.distance_cm;
-    const uint8_t graphics[] = {0x1f,0xf8,0xff,0x19,0};
+    const uint8_t wide = (uint8_t)((1U << (SENSOR_MAX_REGION_WIDTH+1U))-1U);
+    const uint8_t graphics[] = {wide,(uint8_t)(wide << (7U-SENSOR_MAX_REGION_WIDTH)),0xff,0x19,0};
     for (size_t i=0; i<sizeof(graphics); ++i) {
         tick(&f,&c,&now,3,3,graphics[i],false);
         CHECK(f.state == LINE_GAP_HOLD && f.base <= HOLD_SPEED_CM_S);

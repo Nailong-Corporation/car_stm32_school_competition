@@ -8,7 +8,7 @@
  * PlatformIO 只使用 genericSTM32F103C8 环境，编译和上传遵循本文件的开关。
  */
 #ifndef ENCODER_CONTROL_ENABLED
-#define ENCODER_CONTROL_ENABLED       0
+#define ENCODER_CONTROL_ENABLED       1
 #endif
 #if ENCODER_CONTROL_ENABLED != 0 && ENCODER_CONTROL_ENABLED != 1
 #error "ENCODER_CONTROL_ENABLED must be 0 or 1"
@@ -20,7 +20,7 @@
  * 编译环境不覆盖模式；修改本文件后使用同一个编译/上传入口。
  */
 #ifndef PRESET_ROUTE_ENABLED
-#define PRESET_ROUTE_ENABLED          0
+#define PRESET_ROUTE_ENABLED          1
 #endif
 #if PRESET_ROUTE_ENABLED != 0 && PRESET_ROUTE_ENABLED != 1
 #error "PRESET_ROUTE_ENABLED must be 0 or 1"
@@ -34,7 +34,7 @@
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
  */
 #ifndef ROUTE_REPEAT_COUNT
-#define ROUTE_REPEAT_COUNT           0U
+#define ROUTE_REPEAT_COUNT           1U
 #endif
 #if ROUTE_REPEAT_COUNT < 0 || ROUTE_REPEAT_COUNT > 4294967295ULL
 #error "ROUTE_REPEAT_COUNT must be in 0..UINT32_MAX"
@@ -87,7 +87,7 @@
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
 #define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        50.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
+#define WHEEL_TARGET_MAX_CM_S        60.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
@@ -122,7 +122,7 @@
  * 两模式均冻结普通位置 PID，并从最后稳定白线起计时；孤立有效帧不刷新预算。
  * 编码器模式降速并纠正估计航向，另检查厘米距离；PWM 模式只衰减历史差值。
  */
-#define HOLD_SPEED_CM_S              6.0f   /* 编码器模式干扰保持的基础速度上限，单位 cm/s。 */
+#define HOLD_SPEED_CM_S              40.0f   /* 编码器模式干扰保持的基础速度上限，单位 cm/s。 */
 #define HEADING_KP_CM_S_PER_RAD       12.0f /* 每 rad 航向误差产生的目标速度半差，单位 (cm/s)/rad。 */
 #define INTERFERENCE_TIMEOUT_MS     400U   /* 两模式共用：最后稳定观测起的异常总时限，单位 ms。 */
 #define INTERFERENCE_MAX_DISTANCE_CM 8.0f  /* 仅编码器模式：进入异常后允许的里程偏移上限，单位 cm。 */
@@ -153,24 +153,27 @@
  * 5 cm 是按用户反馈缩短后的待实车标定提前量；目标按速度平方随剩余距离插值，非实测制动距离。
  */
 #define JUNCTION_APPROACH_DISTANCE_CM 5.0f
-#define JUNCTION_APPROACH_SPEED_CM_S 10.0f /* 入弯前及候选基础目标，与转弯动作速度独立。 */
+#define JUNCTION_APPROACH_SPEED_CM_S 20.0f /* 入弯前及候选基础目标，与转弯动作速度独立。 */
 
 /* ==================== 十、路口动作、转角与离口去重 ====================
  * 转弯使用非负前进差速；达到退出几何条件并连续获得中心窄白线后进入离口阶段。
  * 转弯与离口分别使用有界超时预算，防止重复推进路径或无限保持。
  */
 #define JUNCTION_ACTION_TIMEOUT_MS   4500U /* 确认路口后的转弯/直行动作时限。 */
-#define JUNCTION_CLEAR_TIMEOUT_MS    1500U /* 确认出口后独立离口时限；仍需 3 cm 与连续窄线。 */
-#define JUNCTION_TURN_MIN_RAD         1.30f /* 约 74.5° 后允许连续中心线确认退出。 */
+#define JUNCTION_CLEAR_TIMEOUT_MS    1500U /* 确认出口后的独立离口时限，早交接也不能刷新。 */
+#define JUNCTION_TURN_MIN_RAD         1.35f /* 约 74.5° 后允许连续中心线确认退出。 */
 /* 编码器估计接近退出角且已连续沿中心出口线前进时，允许有界退出。
  * 仅在 1.25 rad 以上、连续窄线 50 ms 且前进 0.25 cm 时生效，最终仍需连续中心线。 */
 #define JUNCTION_EXIT_ANGLE_MARGIN_RAD 0.05f
+/* 原角度/连续窄线/前进证据成熟后，回线时允许额外 0.02 rad 角度回差；
+ * 无成熟证据不放宽，小角度限制为目标绝对值的 5%。 */
+#define JUNCTION_EXIT_HYSTERESIS_RAD  0.02f
 #define JUNCTION_EXIT_CONFIRM_MS      50U
 #define JUNCTION_EXIT_CONFIRM_CM      0.25f
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
-#define JUNCTION_TURN_SPEED_CM_S      6.0f /* 路口动作基础速度上限，单位 cm/s。 */
+#define JUNCTION_TURN_SPEED_CM_S      18.0f /* 动作基础速度；未捕获出口时内轮 0、外轮 2 倍，即 16 cm/s（表速足够时）。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
 #define JUNCTION_CAPTURE_MIN_TURN_CM_S 0.8f /* 最小退出转角前的转向半差下限，防止位置/航向修正抵消。 */
@@ -179,6 +182,14 @@
 #define JUNCTION_TURN_SLOW_RAD        1.25f /* 约 72° 后降低外轮目标，减少冲过出口目标线。 */
 #define JUNCTION_TURN_SLOW_CM_S       3.0f /* 无可靠出口线时慢速扫线的基础值，半差同值，内轮目标为零。 */
 #define JUNCTION_CLEAR_DISTANCE_CM    3.0f /* 直行退出的最小前进距离，以及离口去重阶段的额外距离，单位 cm。 */
+/* 下一路口已进入标称位置前 5 cm 时，允许缩短上一弯的离口去重距离。
+ * 仅已完成转角/出口确认的转弯使用；仍需这里的前进距离及新的连续窄线保持。 */
+#define JUNCTION_SHORT_CLEAR_CM       0.5f
+/* 紧邻路口的出口中心线附带入口侧孤立边缘分支：仅在已确认转弯内使用。 */
+#define JUNCTION_BRANCH_EXIT_OVERRUN_RAD 0.35f
+#define JUNCTION_BRANCH_EXIT_CONFIRM_MS 100U
+#define JUNCTION_BRANCH_EXIT_CONFIRM_CM 0.5f
+
 
 /* ==================== 十一、路径距离窗口保护 ====================
  * 启动建立首段基准，切段保留转弯及离口的出口方向位移；整段行驶不设时间限制。

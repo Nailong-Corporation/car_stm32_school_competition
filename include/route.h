@@ -3,12 +3,13 @@
 #include "gray_sensor.h"
 #include <stddef.h>
 
-typedef enum { LEFT, RIGHT, STRAIGHT, STOP } Action;
+typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
 typedef struct {
-    float distance;   /* cm from start / previous action completion */
+    float distance;   /* cm from start / previous junction reference point */
     float tolerance;  /* inclusive +/- cm intersection window */
     Action action;
     int speed;        /* target forward speed, cm/s, NOT PWM */
+    float angle_deg;  /* CUSTOM_TURN only: (0, 360] clockwise, [-360, 0) counterclockwise. */
 } RouteStep;
 typedef enum {
     ROUTE_FOLLOW, ROUTE_CANDIDATE, ROUTE_EXECUTING, ROUTE_CLEARING,
@@ -44,6 +45,10 @@ typedef struct {
     bool turn_forced; /* 本项由整排骤变触发；保持至下一路段，便于诊断。 */
     RouteStopCallback stop_callback;
     void *callback_context;
+    bool handoff_early; /* 当前段由短距离离口交接，保持至下一项或 START。 */
+    float segment_start_progress_cm; /* 切段时继承的出口方向位移，供诊断。 */
+    bool turn_exit_branch; /* 本帧为有界中心出口 + 孤立入口侧边缘分支，仅路径航向控制使用。 */
+    uint8_t exit_line_mask; /* 本帧路径出口区域；不修改原始灰度观测。 */
 } RoutePlanner;
 
 extern const RouteStep route[];
@@ -53,8 +58,12 @@ void route_init(RoutePlanner *planner, const RouteStep *steps, size_t count,
 void route_start(RoutePlanner *planner, float distance_cm, uint32_t now_ms);
 void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
                    float heading_rad, uint32_t now_ms);
-/* 非最后一轮的末项 STOP 映射为配置的闭合动作。 */
+/* 返回有效方向：CUSTOM_TURN 按符号映射 LEFT/RIGHT；非末轮 STOP 使用闭合动作。 */
 Action route_current_action(const RoutePlanner *planner);
+/* Effective LEFT/RIGHT above includes CUSTOM_TURN direction; signed target stays unwrapped. */
+float route_turn_target_rad(const RoutePlanner *planner);
+float route_turn_threshold_rad(const RoutePlanner *planner, float right_angle_threshold);
+uint32_t route_action_timeout_ms(const RoutePlanner *planner);
 bool route_is_narrow_line(GrayObservation obs);
 /* Caller MUST physically issue motor_stop / disabled output before dispatch.
  * Called in the main task, never an ISR. Callback must be short/nonblocking. */

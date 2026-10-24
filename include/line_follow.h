@@ -37,6 +37,10 @@ typedef struct {
     float exit_candidate_progress_cm;
     bool exit_candidate_pending;
     uint8_t exit_confirm_samples;
+    bool handoff_early;
+    float segment_start_progress_cm;
+    bool turn_exit_branch;
+    uint8_t exit_line_mask;
 } LineStopSnapshot;
 typedef struct {
     LineState state;

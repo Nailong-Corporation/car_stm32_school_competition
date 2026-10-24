@@ -184,6 +184,8 @@ int main(void)
             g_diagnostics.interval_ms = interval;
             g_diagnostics.raw_mask = observation.raw_mask;
             g_diagnostics.line_mask = observation.line_mask;
+            g_diagnostics.prefilter_mask = observation.prefilter_mask;
+            g_diagnostics.seam_mask = observation.seam_mask;
             g_diagnostics.selected_mask = observation.selected_mask;
             g_diagnostics.observation = observation.kind;
             g_diagnostics.position = observation.position;

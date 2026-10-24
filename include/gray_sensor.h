@@ -14,6 +14,8 @@ typedef struct {
     uint8_t white_count; /* 保留字段名，实际统计目标线路数（白线或黑线） */
     uint8_t region_count;
     float position;
+    uint8_t prefilter_mask; /* 极性转换/多数滤波后、地板细缝过滤前。 */
+    uint8_t seam_mask; /* 本帧被地板模式剔除的独立单路区域；未开启为 0。 */
 } GrayObservation;
 typedef struct {
     uint8_t history[SENSOR_FILTER_SAMPLES];
