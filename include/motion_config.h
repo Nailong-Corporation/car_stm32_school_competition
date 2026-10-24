@@ -34,7 +34,7 @@
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
  */
 #ifndef ROUTE_REPEAT_COUNT
-#define ROUTE_REPEAT_COUNT           1U
+#define ROUTE_REPEAT_COUNT           0U
 #endif
 #if ROUTE_REPEAT_COUNT < 0 || ROUTE_REPEAT_COUNT > 4294967295ULL
 #error "ROUTE_REPEAT_COUNT must be in 0..UINT32_MAX"
@@ -156,14 +156,16 @@
 #define JUNCTION_APPROACH_SPEED_CM_S 20.0f /* 入弯前及候选基础目标，与转弯动作速度独立。 */
 
 /* ==================== 十、路口动作、转角与离口去重 ====================
- * 转弯使用非负前进差速；达到退出几何条件并连续获得中心窄白线后进入离口阶段。
+ * 转弯使用非负前进差速；正常几何出口确认、满 1 s 连续在线或超时在线可进入离口。
  * 转弯与离口分别使用有界超时预算，防止重复推进路径或无限保持。
  */
-#define JUNCTION_ACTION_TIMEOUT_MS   4500U /* 确认路口后的转弯/直行动作时限。 */
+#define JUNCTION_ACTION_TIMEOUT_MS   3000U /* 90° 转弯时限；自定义大角度仍按角度比例扩展。 */
+#define JUNCTION_STRAIGHT_TIMEOUT_MS 4500U /* 直行动作保留原时限。 */
+#define JUNCTION_LINE_EXIT_AFTER_MS  1000U /* 转弯满 1 s 后，连续有效单线可结束转弯。 */
 #define JUNCTION_CLEAR_TIMEOUT_MS    1500U /* 确认出口后的独立离口时限，早交接也不能刷新。 */
-#define JUNCTION_TURN_MIN_RAD         1.35f /* 约 74.5° 后允许连续中心线确认退出。 */
+#define JUNCTION_TURN_MIN_RAD         1.35f /* 约 77.3° 后允许连续中心线确认退出。 */
 /* 编码器估计接近退出角且已连续沿中心出口线前进时，允许有界退出。
- * 仅在 1.25 rad 以上、连续窄线 50 ms 且前进 0.25 cm 时生效，最终仍需连续中心线。 */
+ * 仅在 1.30 rad 以上、连续窄线 50 ms 且前进 0.25 cm 时生效，最终仍需连续中心线。 */
 #define JUNCTION_EXIT_ANGLE_MARGIN_RAD 0.05f
 /* 原角度/连续窄线/前进证据成熟后，回线时允许额外 0.02 rad 角度回差；
  * 无成熟证据不放宽，小角度限制为目标绝对值的 5%。 */

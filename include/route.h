@@ -48,6 +48,9 @@ typedef struct {
     bool handoff_early; /* 当前段由短距离离口交接，保持至下一项或 START。 */
     float segment_start_progress_cm; /* 切段时继承的出口方向位移，供诊断。 */
     bool turn_exit_branch; /* 本帧为有界中心出口 + 孤立入口侧边缘分支，仅路径航向控制使用。 */
+    uint8_t online_samples; /* 执行动作期间相邻有效周期的连续单线样本。 */
+    uint32_t online_ms;
+    bool turn_ended_on_line; /* 本项因满 1 s 在线或超时在线转入离口；切段/START 清零。 */
     uint8_t exit_line_mask; /* 本帧路径出口区域；不修改原始灰度观测。 */
 } RoutePlanner;
 

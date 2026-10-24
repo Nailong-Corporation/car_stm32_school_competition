@@ -37,7 +37,7 @@
 #define SENSOR_FILTER_SAMPLES       3U
 #include "motion_config.h"
 #if ENCODER_CONTROL_ENABLED
-#define SENSOR_MAX_REGION_WIDTH     5U
+#define SENSOR_MAX_REGION_WIDTH     6U /* 连续 1～6 路有效；7～8 路按超宽歧义处理。 */
 #else
 #define SENSOR_MAX_REGION_WIDTH     7U /* 连续 1～7 路有效；8 路全目标缺少位置依据，保持歧义。 */
 #endif

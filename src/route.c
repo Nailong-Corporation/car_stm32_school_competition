@@ -22,6 +22,9 @@ static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     p->segment_start_progress_cm = 0.0f;
     p->turn_exit_branch = false;
     p->exit_line_mask = 0;
+    p->online_samples = 0;
+    p->online_ms = 0;
+    p->turn_ended_on_line = false;
 }
 
 /**
@@ -119,6 +122,7 @@ float route_turn_threshold_rad(const RoutePlanner *p, float threshold)
 
 uint32_t route_action_timeout_ms(const RoutePlanner *p)
 {
+    if (route_current_action(p) == STRAIGHT) return JUNCTION_STRAIGHT_TIMEOUT_MS;
     float scale = fmaxf(1.0f, fabsf(route_turn_target_rad(p)) / JUNCTION_TURN_TARGET_RAD);
     return (uint32_t)ceilf((float)JUNCTION_ACTION_TIMEOUT_MS * scale);
 }
@@ -198,6 +202,9 @@ static void begin_action(RoutePlanner *p, float distance_cm, float heading_rad,
     p->turn_capturing = false;
     p->turn_forced = forced;
     p->exit_count = 0;
+    p->online_samples = 0;
+    p->online_ms = now_ms;
+    p->turn_ended_on_line = false;
 }
 
 /* 普通确认与骤变入口共用计轮逻辑，末项不能漏计或重复计轮。 */
@@ -319,7 +326,8 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
     }
     uint32_t phase_timeout = p->state == ROUTE_CLEARING ? JUNCTION_CLEAR_TIMEOUT_MS :
                              route_action_timeout_ms(p);
-    if ((uint32_t)(now_ms - p->phase_ms) >= phase_timeout) {
+    bool timed_out = (uint32_t)(now_ms - p->phase_ms) >= phase_timeout;
+    if (p->state == ROUTE_CLEARING && timed_out) {
         fail(p, ROUTE_FAILURE_ACTION_TIMEOUT);
         return;
     }
@@ -349,6 +357,28 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             fail(p, turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
             return;
         }
+        /* 满 1 s 后以连续完整单线结束转弯；超时在线也转入离口。
+         * 不借用附带分支选区，不要求旧转角下限；错向/过转检查仍优先。
+         * 相邻采样间隔过长或无线/歧义会清空连续计数。 */
+        bool online = route_is_narrow_line(obs);
+        if (!online || (uint32_t)(now_ms - p->online_ms) > CONTROL_MAX_INTERVAL_MS)
+            p->online_samples = 0;
+        if (online && p->online_samples < LINE_CONFIRM_SAMPLES) ++p->online_samples;
+        p->online_ms = now_ms;
+        bool line_exit = action != STRAIGHT && online &&
+            (timed_out || ((uint32_t)(now_ms - p->phase_ms) >= JUNCTION_LINE_EXIT_AFTER_MS &&
+                           p->online_samples >= LINE_CONFIRM_SAMPLES));
+        if (line_exit) {
+            p->state = ROUTE_CLEARING;
+            p->phase_ms = now_ms;
+            p->clear_cm = distance_cm;
+            p->exit_count = 0;
+            p->exit_candidate_pending = false;
+            p->turn_capturing = p->turn_exit_branch = false;
+            p->turn_ended_on_line = true;
+            return;
+        }
+        if (timed_out) { fail(p, ROUTE_FAILURE_ACTION_TIMEOUT); return; }
         /* 侧边窄线先交给位置反馈捕获；全目标/普通多区域不能进入位置 PID；有界附带分支只用航向控制。
          * 最终退出仍要求足够转角和连续中心线，不能用提前遇到的图形直接退出。 */
         p->turn_capturing = action != STRAIGHT && turn >= route_turn_threshold_rad(p, JUNCTION_CAPTURE_MIN_RAD) &&

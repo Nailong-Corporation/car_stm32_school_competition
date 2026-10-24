@@ -11,20 +11,21 @@
  * {75.0f, 10.0f, CUSTOM_TURN, 60, -135.0f}, 逆时针 135°
  * 有效范围 [-360, 0) 或 (0, 360]；直行用 STRAIGHT。 */
 const RouteStep route[] = {
-    /*** 周博洋的赛道
-    {104.0f, 16.0f, LEFT, 50, 0.0f},
-    {131.0f, 16.0f, LEFT, 50, 0.0f},
-    {60.0f, 10.0f, LEFT, 50, 0.0f},
-    {39.0f, 10.0f, RIGHT, 50, 0.0f},
-    {70.0f, 10.0f, STOP, 50, 0.0f},
-    */
+    /*** 周博洋的赛道  */
+    {104.0f, 16.0f, LEFT, 60, 0.0f},
+    {131.0f, 16.0f, LEFT, 60, 0.0f},
+    {58.0f, 12.0f, LEFT, 60, 0.0f},
+    {55.0f, 12.0f, CUSTOM_TURN, 50, 90.0f},
+    {20.0f, 10.0f, LEFT, 50, 0.0f},
+    {60.0f, 16.0f, STOP, 60, 0.0f},
+
     /* 赛道 2
     {75.0f, 10.0f, LEFT, 60, 0.0f},
     {219.0f, 16.0f, LEFT, 60, 0.0f},
     {75.0f, 10.0f, LEFT, 60, 0.0f},
     {219.0f, 16.0f, STOP, 60, 0.0f},
     */
-    // 赛道 3
+    /* 赛道 3
     //{76.0f, 5.0f, CUSTOM_TURN, 60, 90.0f},
     //{82.0f, 5.0f, CUSTOM_TURN, 60, -90.0f},
     //{10.0f, 5.0f, CUSTOM_TURN, 50, -60.0f},
@@ -34,5 +35,6 @@ const RouteStep route[] = {
     {82.0f, 8.0f, LEFT, 60, 0.0f},
     {80.0f, 8.0f, LEFT, 60, 0.0f},
     {220.0f, 15.0f, STOP, 60, 0.0f},
+    */
 };
 const size_t route_count = sizeof(route) / sizeof(route[0]);
