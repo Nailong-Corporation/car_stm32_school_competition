@@ -29,6 +29,10 @@ typedef struct {
     RouteState state;
     RouteFailure failure;
     float origin_cm, entry_cm, entry_heading, clear_cm, approach_center_cm;
+    float segment_heading_rad, action_start_heading; /* 短段规划入口轴 / 实际动作起始航向。 */
+    bool recovery_window_active;
+    float recovery_window_origin_cm; /* 自动恢复后检测窗口起点；原始路段里程仍保留。 */
+    bool segment_heading_valid; /* 短段继承上一项规划出口轴。 */
     float outgoing_cm, projection_previous_cm, projection_previous_heading; /* 入口灰度参考点以来，灰度中心在出口方向的净位移。 */
     uint32_t segment_ms, phase_ms, approach_center_ms;
     uint32_t exit_candidate_ms;
@@ -61,6 +65,9 @@ extern const size_t route_count;
 void route_init(RoutePlanner *planner, const RouteStep *steps, size_t count,
                  RouteStopCallback callback, void *context);
 void route_start(RoutePlanner *planner, float distance_cm, uint32_t now_ms);
+/* 调用者已完成停车后的连续有效单线确认；保留索引/圈数和真实里程。 */
+bool route_resume(RoutePlanner *planner, RouteState failed_phase, float distance_cm,
+                  float heading_rad, uint32_t now_ms);
 void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
                    float heading_rad, uint32_t now_ms);
 /* 返回有效方向：CUSTOM_TURN 按符号映射 LEFT/RIGHT；非末轮 STOP 使用闭合动作。 */

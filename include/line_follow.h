@@ -9,13 +9,13 @@ typedef enum {
     LINE_STOP_NONE, LINE_STOP_REQUEST, LINE_STOP_LOST, LINE_STOP_FAULT,
     LINE_STOP_ENCODER, LINE_STOP_CALIBRATION, LINE_STOP_ROUTE, LINE_STOP_ROUTE_COMPLETE
 } LineStopReason;
-/* 最近一次启动请求的结果；保留到下一次请求，避免白线门禁静默拒绝。 */
+/* 最近一次启动请求或自动恢复的结果；避免启动门禁静默拒绝。 */
 typedef enum {
     LINE_START_NONE, LINE_START_ACCEPTED, LINE_START_REJECTED_LINE,
     LINE_START_REJECTED_CALIBRATION, LINE_START_REJECTED_ROUTE,
-    LINE_START_REJECTED_FAULT, LINE_START_ALREADY_RUNNING
+    LINE_START_REJECTED_FAULT, LINE_START_ALREADY_RUNNING, LINE_START_AUTO_RESUMED
 } LineStartResult;
-/* 第一次停车时在清零输出之前锁存；正常采样不覆盖，明确 START 接受后清空。
+/* 停车时在清零输出之前锁存；正常采样不覆盖，START/自动恢复接受后清空。
  * 只保存在 RAM，复位/断电后丢失；数据用于停稳后读取，不要求运行中断点。 */
 typedef struct {
     bool valid;
@@ -33,6 +33,7 @@ typedef struct {
     float left_target_cm_s, right_target_cm_s;
     float left_speed_cm_s, right_speed_cm_s;
     float distance_cm, route_progress_cm, clear_progress_cm, turn_rad;
+    float actual_turn_rad; /* 实际动作起点以来的转角；turn_rad 相对规划入口轴。 */
     uint32_t exit_candidate_age_ms;
     float exit_candidate_progress_cm;
     bool exit_candidate_pending;
@@ -64,6 +65,8 @@ typedef struct {
     EncoderCounts sample_counts;
     RouteState route_state_before_update;
     LineStopSnapshot stop_snapshot;
+    LineStopSnapshot auto_resume_snapshot; /* 上次自动恢复前的停车证据。 */
+    uint32_t auto_resume_count, auto_resume_last_ms;
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,

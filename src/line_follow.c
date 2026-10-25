@@ -86,6 +86,7 @@ void line_follow_stop(LineFollow *f, LineStopReason reason)
             .route_progress_cm = f->odometry.distance_cm - f->route.origin_cm,
             .clear_progress_cm = f->odometry.distance_cm - f->route.clear_cm,
             .turn_rad = f->odometry.heading_rad - f->route.entry_heading,
+            .actual_turn_rad = f->odometry.heading_rad - f->route.action_start_heading,
             .exit_candidate_pending = f->route.exit_candidate_pending,
             .exit_candidate_age_ms = f->route.exit_candidate_pending ?
                 (uint32_t)(f->sample_ms - f->route.exit_candidate_ms) : 0U,
@@ -227,6 +228,9 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
 void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request)
 {
+#if ENCODER_CONTROL_ENABLED && PRESET_ROUTE_ENABLED && ROUTE_AUTO_RESUME_ENABLED
+    uint32_t previous_sample_ms = f->sample_ms;
+#endif
     f->sample_ms = now_ms;
     f->sample_dt_s = dt;
     f->observation = obs;
@@ -257,26 +261,50 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         return;
     }
     bool narrow = route_is_narrow_line(obs);
+#if PRESET_ROUTE_ENABLED && ROUTE_AUTO_RESUME_ENABLED
+    if (f->state == LINE_STOPPED && f->stop_reason == LINE_STOP_ROUTE &&
+        (uint32_t)(now_ms-previous_sample_ms) > CONTROL_MAX_INTERVAL_MS) f->valid_count = 0;
+#endif
     if (narrow) {
         if (f->valid_count < LINE_CONFIRM_SAMPLES) ++f->valid_count;
     } else f->valid_count = 0;
     bool stable = f->valid_count >= LINE_CONFIRM_SAMPLES;
     if (f->state == LINE_IDLE || f->state == LINE_STOPPED) {
-        if (!start_request || !start_allowed(f, stable)) return;
-#if PRESET_ROUTE_ENABLED
-        if (!f->route.valid) {
-            line_follow_stop(f, LINE_STOP_ROUTE);
-            f->start_result = LINE_START_REJECTED_ROUTE;
-            return;
+        bool resumed = false;
+#if PRESET_ROUTE_ENABLED && ROUTE_AUTO_RESUME_ENABLED
+        if (!start_request && stable && f->state == LINE_STOPPED &&
+            f->stop_reason == LINE_STOP_ROUTE && f->stop_snapshot.valid) {
+            resumed = route_resume(&f->route, f->stop_snapshot.route_state_before_update,
+                                   f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
+            if (resumed) {
+                f->auto_resume_snapshot = f->stop_snapshot;
+                if (f->auto_resume_count < UINT32_MAX) ++f->auto_resume_count;
+                f->auto_resume_last_ms = now_ms;
+                f->start_result = LINE_START_AUTO_RESUMED;
+                f->route_state_before_update = f->route.state;
+            }
         }
-        route_start(&f->route, f->odometry.distance_cm, now_ms);
 #endif
-        f->start_result = LINE_START_ACCEPTED;
+        if (!resumed) {
+            if (!start_request || !start_allowed(f, stable)) return;
+#if PRESET_ROUTE_ENABLED
+            if (!f->route.valid) {
+                line_follow_stop(f, LINE_STOP_ROUTE);
+                f->start_result = LINE_START_REJECTED_ROUTE;
+                return;
+            }
+            route_start(&f->route, f->odometry.distance_cm, now_ms);
+#endif
+            f->auto_resume_count = f->auto_resume_last_ms = 0;
+            f->auto_resume_snapshot = (LineStopSnapshot){0};
+            f->start_result = LINE_START_ACCEPTED;
+        }
         f->state = LINE_TRACKING;
         f->stop_reason = LINE_STOP_NONE;
         f->stop_snapshot = (LineStopSnapshot){0};
         f->last_reliable_ms = now_ms;
         f->have_reliable = true;
+        f->abnormal = false;
         f->base = 0.0f;
         f->startup_elapsed_s = 0.0f;
         pid_reset(&f->pid);
@@ -320,6 +348,9 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
      * v² 随剩余距离线性变化，对理想跟随目标的直线行驶相当于恒定减速度。
      * 这里只改变速度，不放宽 route_update 的距离/形状确认门禁。
      */
+    if (f->route.recovery_window_active &&
+        (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE))
+        base_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
     float slow_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
     float remaining = speed_step.distance - progress;
     if (f->route.state == ROUTE_CANDIDATE || remaining <= 0.0f) {

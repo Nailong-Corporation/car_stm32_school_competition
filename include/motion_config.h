@@ -29,6 +29,16 @@
 #error "PRESET_ROUTE_ENABLED requires ENCODER_CONTROL_ENABLED=1"
 #endif
 
+/* 路径可恢复停车后，连续有效单线自动恢复当前项；不从第 0 项重跑。
+ * 不恢复按键/最终 STOP、无效路径、反向/过转、编码器或控制故障。
+ */
+#ifndef ROUTE_AUTO_RESUME_ENABLED
+#define ROUTE_AUTO_RESUME_ENABLED     1
+#endif
+#if ROUTE_AUTO_RESUME_ENABLED != 0 && ROUTE_AUTO_RESUME_ENABLED != 1
+#error "ROUTE_AUTO_RESUME_ENABLED must be 0 or 1"
+#endif
+
 /* 预设路径执行轮数：0 无限循环，1 单轮，N 连续执行 N 轮。
  * 非最后一轮的末项 STOP 按 ROUTE_REPEAT_ACTION 转向通过，离口去重后返回第 0 项。
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
@@ -94,7 +104,7 @@
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
 #define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        60.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
+#define WHEEL_TARGET_MAX_CM_S        80.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
@@ -182,7 +192,7 @@
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
-#define JUNCTION_TURN_SPEED_CM_S      18.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
+#define JUNCTION_TURN_SPEED_CM_S      30.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
 #define JUNCTION_CAPTURE_MIN_TURN_CM_S 0.8f /* 最小退出转角前的转向半差下限，防止位置/航向修正抵消。 */

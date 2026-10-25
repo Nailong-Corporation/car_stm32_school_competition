@@ -13,6 +13,7 @@ static void fail(RoutePlanner *p, RouteFailure reason)
 static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
 {
     p->origin_cm = distance_cm;
+    p->recovery_window_active = false;
     p->segment_ms = now_ms;
     p->have_approach_center = false;
     p->approach_center_count = 0;
@@ -79,6 +80,7 @@ void route_start(RoutePlanner *p, float distance_cm, uint32_t now_ms)
 {
     p->index = 0;
     p->completed_laps = 0;
+    p->segment_heading_valid = false;
     p->turn_capturing = p->lap_boundary = false;
     p->turn_forced = false;
     p->corner_arc_complete = false;
@@ -206,7 +208,9 @@ static void begin_action(RoutePlanner *p, float distance_cm, float heading_rad,
     p->state = ROUTE_EXECUTING;
     p->phase_ms = now_ms;
     p->entry_cm = distance_cm;
-    p->entry_heading = heading_rad;
+    /* 短段可能在上一弯尚未对齐时到达；保持路径出口坐标轴，不累加残余偏航。 */
+    p->entry_heading = p->segment_heading_valid ? p->segment_heading_rad : heading_rad;
+    p->action_start_heading = heading_rad;
     p->exit_candidate_pending = false;
     p->outgoing_cm = 0.0f;
     p->projection_previous_cm = distance_cm;
@@ -268,6 +272,56 @@ static bool branch_exit_line(const RoutePlanner *p, GrayObservation obs, float h
     return true;
 }
 
+static void project_outgoing(RoutePlanner *p, float distance_cm, float heading_rad)
+{
+    /* 将车轴中心增量投影至路径目标航向的出口轴；圆弧不等于下一直线长度。
+     * 入口灰度中心近似路口参考点；额外积分前置探头因旋转产生的位移。
+     * 不修改原始轮程/轴中点弧长，也不把探头弧长当作路口间距离。
+     * 中点航向 + sinc 对单次恒曲率增量精确积分，也兼容直行和零半径自转。 */
+    float dh = heading_rad - p->projection_previous_heading;
+    float half = dh * 0.5f;
+    float sinc = fabsf(half) < 0.00001f ? 1.0f : sinf(half) / half;
+    float exit_heading = p->entry_heading + route_turn_target_rad(p);
+    p->outgoing_cm += (distance_cm - p->projection_previous_cm) * sinc *
+        cosf((heading_rad + p->projection_previous_heading) * 0.5f - exit_heading);
+    p->outgoing_cm += GRAY_FORWARD_OFFSET_CM *
+        (cosf(heading_rad - exit_heading) -
+         cosf(p->projection_previous_heading - exit_heading));
+    p->projection_previous_cm = distance_cm;
+    p->projection_previous_heading = heading_rad;
+}
+
+bool route_resume(RoutePlanner *p, RouteState failed_phase, float distance_cm,
+                  float heading_rad, uint32_t now_ms)
+{
+    if (!p->valid || p->index >= p->count || p->state != ROUTE_FAILED ||
+        !isfinite(distance_cm) || !isfinite(heading_rad)) return false;
+    bool follow = (failed_phase == ROUTE_FOLLOW || failed_phase == ROUTE_CANDIDATE) &&
+        (p->failure == ROUTE_FAILURE_WINDOW || p->failure == ROUTE_FAILURE_CONFIRM_TIMEOUT);
+    bool clearing = (failed_phase == ROUTE_EXECUTING || failed_phase == ROUTE_CLEARING) &&
+        p->failure == ROUTE_FAILURE_ACTION_TIMEOUT;
+    if (!follow && !clearing) return false;
+    if (follow) {
+        p->state = ROUTE_FOLLOW;
+        p->recovery_window_active = true;
+        p->recovery_window_origin_cm = distance_cm;
+        p->have_approach_center = false;
+        p->approach_center_count = p->narrow_count = p->candidate_count = 0;
+        p->previous_line_ms = now_ms;
+    } else {
+        project_outgoing(p, distance_cm, heading_rad);
+        p->state = ROUTE_CLEARING;
+        p->clear_cm = distance_cm;
+        p->turn_ended_on_line = true;
+    }
+    p->phase_ms = now_ms;
+    p->failure = ROUTE_FAILURE_NONE;
+    p->exit_count = p->online_samples = 0;
+    p->exit_candidate_pending = p->turn_capturing = p->turn_exit_branch = false;
+    p->stop_pending = false;
+    return true;
+}
+
 /**
  * @brief 依据白线形状、厘米里程、航向和毫秒时基推进路口有限状态机。
  * 窗口内 LEFT/RIGHT 的整排骤变优先按表执行，其余走连续帧/前进距离候选确认。
@@ -285,16 +339,21 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
     }
     RouteStep s = p->steps[p->index];
     float progress = distance_cm - p->origin_cm;
+    float window_progress = p->recovery_window_active ? distance_cm-p->recovery_window_origin_cm : progress;
+    float window_low = p->recovery_window_active ? 0.0f : s.distance-s.tolerance;
+    float window_high = p->recovery_window_active ?
+        fmaxf(2.0f*s.tolerance, GRAY_FORWARD_OFFSET_CM) : s.distance+s.tolerance;
     if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
-        if (progress > s.distance + s.tolerance) {
+        if (window_progress > window_high) {
             fail(p, ROUTE_FAILURE_WINDOW);
             return;
         }
     }
     if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
-        bool in_window = progress >= s.distance - s.tolerance && progress <= s.distance + s.tolerance;
+        bool in_window = window_progress >= window_low && window_progress <= window_high;
         /* 末项的大容差不能使终点提前降速/转向；最早从标称位置前减速区开始确认。 */
-        if (s.action == STOP && progress < s.distance - JUNCTION_APPROACH_DISTANCE_CM)
+        if (!p->recovery_window_active && s.action == STOP &&
+            progress < s.distance - JUNCTION_APPROACH_DISTANCE_CM)
             in_window = false;
         Action action = route_current_action(p);
         bool forced = in_window && (action == LEFT || action == RIGHT) &&
@@ -345,21 +404,8 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         return;
     }
     Action action = route_current_action(p);
-    /* 将车轴中心增量投影至路径目标航向的出口轴；圆弧不等于下一直线长度。
-     * 入口灰度中心近似路口参考点；额外积分前置探头因旋转产生的位移。
-     * 不修改原始轮程/轴中点弧长，也不把探头弧长当作路口间距离。
-     * 中点航向 + sinc 对单次恒曲率增量精确积分，也兼容直行和零半径自转。 */
-    float dh = heading_rad - p->projection_previous_heading;
-    float half = dh * 0.5f;
-    float sinc = fabsf(half) < 0.00001f ? 1.0f : sinf(half) / half;
+    project_outgoing(p, distance_cm, heading_rad);
     float exit_heading = p->entry_heading + route_turn_target_rad(p);
-    p->outgoing_cm += (distance_cm - p->projection_previous_cm) * sinc *
-        cosf((heading_rad + p->projection_previous_heading) * 0.5f - exit_heading);
-    p->outgoing_cm += GRAY_FORWARD_OFFSET_CM *
-        (cosf(heading_rad - exit_heading) -
-         cosf(p->projection_previous_heading - exit_heading));
-    p->projection_previous_cm = distance_cm;
-    p->projection_previous_heading = heading_rad;
     GrayObservation exit_obs=obs;
     bool previous_branch=p->turn_exit_branch;
     p->turn_exit_branch=branch_exit_line(p,obs,heading_rad,&exit_obs);
@@ -370,8 +416,11 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
     }
     if (p->state == ROUTE_EXECUTING) {
         float turn = (heading_rad - p->entry_heading) * (action == LEFT ? -1.0f : 1.0f);
-        if (action != STRAIGHT && (turn > route_turn_threshold_rad(p, JUNCTION_TURN_MAX_RAD) || turn < -JUNCTION_WRONG_WAY_RAD)) {
-            fail(p, turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
+        /* 反向保护从实际动作起点计算；不能将继承的残余偏航误当作本动作倒转。 */
+        float actual_turn = (heading_rad - p->action_start_heading) * (action == LEFT ? -1.0f : 1.0f);
+        if (action != STRAIGHT && (turn > route_turn_threshold_rad(p, JUNCTION_TURN_MAX_RAD) ||
+                                  actual_turn < -JUNCTION_WRONG_WAY_RAD)) {
+            fail(p, actual_turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
             return;
         }
         /* 满 1 s 后以连续完整单线结束转弯；超时在线也转入离口。
@@ -466,7 +515,11 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         } else ++p->index;
         p->turn_capturing = false;
         if (p->index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
+        bool short_segment = p->steps[p->index].distance <
+            CORNER_RADIUS_CM + GRAY_FORWARD_OFFSET_CM + JUNCTION_SHORT_CLEAR_CM;
         begin_segment(p, distance_cm - p->outgoing_cm, now_ms);
+        p->segment_heading_valid = short_segment;
+        p->segment_heading_rad = exit_heading;
         p->segment_start_progress_cm = p->outgoing_cm;
         p->handoff_early = early_clear && !normal_clear;
         if (p->handoff_early) {
