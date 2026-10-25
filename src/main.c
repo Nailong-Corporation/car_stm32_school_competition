@@ -216,6 +216,8 @@ int main(void)
             g_diagnostics.route_turn_rad = follow.odometry.heading_rad - follow.route.entry_heading;
             g_diagnostics.route_index = (uint32_t)follow.route.index;
             g_diagnostics.stop_snapshot = follow.stop_snapshot;
+            g_diagnostics.straight_entry_aligned = follow.straight_entry_aligned;
+            g_diagnostics.straight_entry_handoff = follow.straight_entry_handoff;
             g_diagnostics.auto_resume_snapshot = follow.auto_resume_snapshot;
             g_diagnostics.auto_resume_count = follow.auto_resume_count;
             g_diagnostics.auto_resume_last_ms = follow.auto_resume_last_ms;

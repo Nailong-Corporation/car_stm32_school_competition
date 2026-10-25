@@ -44,7 +44,7 @@
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
  */
 #ifndef ROUTE_REPEAT_COUNT
-#define ROUTE_REPEAT_COUNT           0U
+#define ROUTE_REPEAT_COUNT           1U
 #endif
 #if ROUTE_REPEAT_COUNT < 0 || ROUTE_REPEAT_COUNT > 4294967295ULL
 #error "ROUTE_REPEAT_COUNT must be in 0..UINT32_MAX"
@@ -192,6 +192,7 @@
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
+#define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
 #define JUNCTION_TURN_SPEED_CM_S      30.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */

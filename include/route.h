@@ -7,7 +7,7 @@ typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
 typedef struct {
     float distance;   /* cm from start / previous junction reference point */
     float tolerance;  /* inclusive +/- cm intersection window */
-    Action action;
+    Action action;    /* 显式 STRAIGHT 为里程通过点，不要求图形中心线；转弯/STOP 仍需确认。 */
     int speed;        /* target forward speed, cm/s, NOT PWM */
     float angle_deg;  /* CUSTOM_TURN only: (0, 360] clockwise, [-360, 0) counterclockwise. */
     bool corner_arc_enabled; /* true: 90° 圆弧切角；false: 原转弯控制。 */
@@ -78,6 +78,10 @@ float route_turn_target_rad(const RoutePlanner *planner);
 float route_turn_threshold_rad(const RoutePlanner *planner, float right_angle_threshold);
 uint32_t route_action_timeout_ms(const RoutePlanner *planner);
 bool route_is_narrow_line(GrayObservation obs);
+/* STRAIGHT 后的转弯必须走满本段标称距离，提前容差内仍保持出口航向。 */
+bool route_waiting_after_straight(const RoutePlanner *planner, float distance_cm);
+/* 90° 圆弧后紧接显式 STRAIGHT：图形入口前即按出口航向保护，不能借用普通捕线。 */
+bool route_prepares_straight(const RoutePlanner *planner);
 /* Caller MUST physically issue motor_stop / disabled output before dispatch.
  * Called in the main task, never an ISR. Callback must be short/nonblocking. */
 void route_dispatch_stop_callback(RoutePlanner *planner);

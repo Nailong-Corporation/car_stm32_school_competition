@@ -1,0 +1,1 @@
+left_target=18.200001 right_target=43.399998 position_pid_active=1 heading_error=0.020000 route_state=3
