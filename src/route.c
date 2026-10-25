@@ -18,6 +18,7 @@ static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     p->approach_center_count = 0;
     p->narrow_count = 0;
     p->turn_forced = false;
+    p->corner_arc_complete = false;
     p->handoff_early = false;
     p->segment_start_progress_cm = 0.0f;
     p->turn_exit_branch = false;
@@ -60,7 +61,10 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
             (s.action != CUSTOM_TURN || (isfinite(s.angle_deg) &&
              s.angle_deg != 0.0f && fabsf(s.angle_deg) <= 360.0f)) &&
             (float)s.speed <= WHEEL_TARGET_MAX_CM_S &&
-            (s.action != STOP || i == count - 1U);
+            (s.action != STOP || i == count - 1U) &&
+            (!s.corner_arc_enabled || (isfinite(CORNER_RADIUS_CM) &&
+             CORNER_RADIUS_CM > WHEEL_TRACK_CM * 0.5f &&
+             isfinite(GRAY_FORWARD_OFFSET_CM) && GRAY_FORWARD_OFFSET_CM >= CORNER_RADIUS_CM));
     }
     if (p->valid && steps[count - 1U].action != STOP) p->valid = false;
     p->state = p->valid ? ROUTE_FOLLOW : ROUTE_FAILED;
@@ -77,6 +81,7 @@ void route_start(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     p->completed_laps = 0;
     p->turn_capturing = p->lap_boundary = false;
     p->turn_forced = false;
+    p->corner_arc_complete = false;
     p->narrow_count = 0;
     p->candidate_count = p->exit_count = 0;
     p->stop_pending = p->callback_dispatched = false;
@@ -95,6 +100,13 @@ Action route_current_action(const RoutePlanner *p)
     Action action = p->steps[p->index].action;
     if (action == CUSTOM_TURN) return p->steps[p->index].angle_deg < 0.0f ? LEFT : RIGHT;
     return action == STOP && (p->lap_boundary || another_lap(p)) ? p->repeat_action : action;
+}
+
+/* 普通左右转、闭合左右转及显式 ±90° 共用切角；其他自定义角度保持原策略。 */
+bool route_uses_corner_arc(const RoutePlanner *p)
+{
+    return p->steps[p->index].corner_arc_enabled &&
+        fabsf(fabsf(route_turn_target_rad(p)) - JUNCTION_TURN_TARGET_RAD) < 0.0001f;
 }
 
 /* 编码器航向本身右转为正，不对 ±180°/360° 取模，以保留实际转动方向与圈数。 */
@@ -201,6 +213,7 @@ static void begin_action(RoutePlanner *p, float distance_cm, float heading_rad,
     p->projection_previous_heading = heading_rad;
     p->turn_capturing = false;
     p->turn_forced = forced;
+    p->corner_arc_complete = false;
     p->exit_count = 0;
     p->online_samples = 0;
     p->online_ms = now_ms;
@@ -333,7 +346,8 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
     }
     Action action = route_current_action(p);
     /* 将车轴中心增量投影至路径目标航向的出口轴；圆弧不等于下一直线长度。
-     * 动作触发点作为路口参考点，灰度排到轮轴的偏移/打滑仍需实测校准。
+     * 入口灰度中心近似路口参考点；额外积分前置探头因旋转产生的位移。
+     * 不修改原始轮程/轴中点弧长，也不把探头弧长当作路口间距离。
      * 中点航向 + sinc 对单次恒曲率增量精确积分，也兼容直行和零半径自转。 */
     float dh = heading_rad - p->projection_previous_heading;
     float half = dh * 0.5f;
@@ -341,6 +355,9 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
     float exit_heading = p->entry_heading + route_turn_target_rad(p);
     p->outgoing_cm += (distance_cm - p->projection_previous_cm) * sinc *
         cosf((heading_rad + p->projection_previous_heading) * 0.5f - exit_heading);
+    p->outgoing_cm += GRAY_FORWARD_OFFSET_CM *
+        (cosf(heading_rad - exit_heading) -
+         cosf(p->projection_previous_heading - exit_heading));
     p->projection_previous_cm = distance_cm;
     p->projection_previous_heading = heading_rad;
     GrayObservation exit_obs=obs;

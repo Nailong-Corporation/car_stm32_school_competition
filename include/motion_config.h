@@ -77,6 +77,13 @@
 #define LEFT_COUNTS_PER_WHEEL_REV  1560.0f /* 左输出轮完整一圈的最终四倍频计数。 */
 #define RIGHT_COUNTS_PER_WHEEL_REV 1560.0f /* 右输出轮完整一圈的最终四倍频计数。 */
 #define WHEEL_TRACK_CM              14.5f /* 用户于 2026-10-23 实测左右轮中心间距，单位 cm。 */
+/* 2026-10-25 实测输入：灰度排中心在轮轴中点前方 16 cm。
+ * 90° 切角以轴中点 R=10 cm 规划；须 R>track/2，保证内轮前进。
+ * 灰度触发点近似路口中心：先直行 L-R=6 cm 至圆弧切点。
+ */
+#define GRAY_FORWARD_OFFSET_CM       16.0f
+#define CORNER_RADIUS_CM             10.0f
+#define CORNER_HEADING_KP            8.0f /* 编码器轨迹航向误差到轮速半差。 */
 #define ENCODER_LEFT_SIGN            -1    /* 启动后原始计数 65527 指向负向回绕，取反；实车待复测。 */
 #define ENCODER_RIGHT_SIGN            1    /* 右轮计数方向修正，只允许 +1 或 -1，前进应为正。 */
 
@@ -175,7 +182,7 @@
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
-#define JUNCTION_TURN_SPEED_CM_S      18.0f /* 动作基础速度；未捕获出口时内轮 0、外轮 2 倍，即 16 cm/s（表速足够时）。 */
+#define JUNCTION_TURN_SPEED_CM_S      18.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
 #define JUNCTION_CAPTURE_MIN_TURN_CM_S 0.8f /* 最小退出转角前的转向半差下限，防止位置/航向修正抵消。 */

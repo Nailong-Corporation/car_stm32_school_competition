@@ -346,49 +346,74 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         if (action == LEFT || action == RIGHT) {
             float direction = action == LEFT ? -1.0f : 1.0f;
             float turn = direction * (f->odometry.heading_rad - f->route.entry_heading);
-            if (turn >= route_turn_threshold_rad(&f->route, JUNCTION_TURN_SLOW_RAD))
-                turn_base = fminf(turn_base, JUNCTION_TURN_SLOW_CM_S);
-            if (f->route.turn_capturing) {
-                /* 捕获侧边出口线，向路径目标航向和目标线共同收敛。
-                 * 先前固定支点转到中心才接管，可能把侧边线扫出探头范围。 */
-                turn_base = fminf((float)step.speed, JUNCTION_CAPTURE_SPEED_CM_S);
-                float line_correction=0;
-                if (f->route.turn_exit_branch) pid_reset(&f->pid);
-                else if (!pid_update(&f->pid, obs.position, dt, turn_base, &line_correction)) {
-                    line_follow_stop(f, LINE_STOP_FAULT);
+            bool corner_arc = route_uses_corner_arc(&f->route);
+            float lead = GRAY_FORWARD_OFFSET_CM - CORNER_RADIUS_CM;
+            float arc_distance = f->odometry.distance_cm - f->route.entry_cm - lead;
+            if (corner_arc && turn >= JUNCTION_TURN_TARGET_RAD)
+                f->route.corner_arc_complete = true;
+            bool arc_planning = corner_arc && !f->route.corner_arc_complete;
+            if (arc_planning) {
+                /* 探头触发后先到轴中点切点，再按 s/R 规划航向。
+                 * 不把转弯中途的灰度位置送入 PID；出口判定仍完全由 route_update 决定。 */
+                pid_reset(&f->pid);
+                float track = f->odometry.calibration.track_cm;
+                if (CORNER_RADIUS_CM <= track * 0.5f) {
+                    line_follow_stop(f, LINE_STOP_CALIBRATION);
                     return;
                 }
-                correction = line_correction + JUNCTION_CAPTURE_HEADING_KP *
-                    (f->route.entry_heading + route_turn_target_rad(&f->route) -
-                     f->odometry.heading_rad);
-                /* 最小同向半差防止未到出口角时位置/航向修正抵消。
-                 * 接近出口且连续窄线/前进证据已满足有界退出条件后，允许反向回线：
-                 * 实车 +120° 在 119.16°、position=-3 时被旧下限压住，直至动作超时。
-                 * 证据由本帧 route_update 更新；无线/歧义/不足角度会清空，重新启用下限。
-                 * 中心线确认仍由路径层负责，多区域附带分支不使用此放行。 */
-                bool exit_angle_confirmed = !f->route.turn_exit_branch &&
-                    f->route.exit_candidate_pending &&
-                    (uint32_t)(now_ms - f->route.exit_candidate_ms) >= JUNCTION_EXIT_CONFIRM_MS &&
-                    f->odometry.distance_cm - f->route.exit_candidate_cm >= JUNCTION_EXIT_CONFIRM_CM;
-                if (turn < route_turn_threshold_rad(&f->route, JUNCTION_TURN_MIN_RAD) &&
-                    !exit_angle_confirmed) {
-                    float min_turn = fminf(turn_base, JUNCTION_CAPTURE_MIN_TURN_CM_S);
-                    correction = direction * fmaxf(direction * correction, min_turn);
-                }
+                turn_base = fminf(turn_base, WHEEL_TARGET_MAX_CM_S /
+                                 (1.0f + track / (2.0f * CORNER_RADIUS_CM)));
+                float planned_turn = fmaxf(0.0f, fminf(JUNCTION_TURN_TARGET_RAD,
+                                               arc_distance / CORNER_RADIUS_CM));
+                float planned_base = next_base(f, turn_base, TARGET_RISE_CM_S2, dt);
+                float feedforward = arc_distance >= 0.0f && planned_turn < JUNCTION_TURN_TARGET_RAD ?
+                    planned_base * track / (2.0f * CORNER_RADIUS_CM) : 0.0f;
+                correction = direction * (feedforward + CORNER_HEADING_KP * (planned_turn - turn));
             } else {
-                pid_reset(&f->pid);
-                /* 自定义转角进入末段后按剩余角度收小差速，达到目标角后保持出口航向。
-                 * 原逻辑无线时固定单轮扫线，-120° 会继续转到约-150°的过转保护。
-                 * 此时仍处于 EXECUTING，不能仅凭角度完成路口；需出口线确认或时限停车。
-                 * 目标超调时允许差速反向纠偏，单轮速度仍不为负。 */
-                if (step.action == CUSTOM_TURN &&
-                    turn >= route_turn_threshold_rad(&f->route, JUNCTION_TURN_SLOW_RAD)) {
-                    float heading_correction = JUNCTION_CAPTURE_HEADING_KP *
+                if (!corner_arc && turn >= route_turn_threshold_rad(&f->route, JUNCTION_TURN_SLOW_RAD))
+                    turn_base = fminf(turn_base, JUNCTION_TURN_SLOW_CM_S);
+                if (f->route.turn_capturing) {
+                    /* 捕获侧边出口线，向路径目标航向和目标线共同收敛。
+                     * 先前固定支点转到中心才接管，可能把侧边线扫出探头范围。 */
+                    turn_base = fminf((float)step.speed, JUNCTION_CAPTURE_SPEED_CM_S);
+                    float line_correction=0;
+                    if (f->route.turn_exit_branch) pid_reset(&f->pid);
+                    else if (!pid_update(&f->pid, obs.position, dt, turn_base, &line_correction)) {
+                        line_follow_stop(f, LINE_STOP_FAULT);
+                        return;
+                    }
+                    correction = line_correction + JUNCTION_CAPTURE_HEADING_KP *
                         (f->route.entry_heading + route_turn_target_rad(&f->route) -
                          f->odometry.heading_rad);
-                    correction = fmaxf(-turn_base, fminf(turn_base, heading_correction));
-                } else correction = direction * turn_base;
-            }
+                    /* 最小同向半差防止未到出口角时位置/航向修正抵消。
+                     * 接近出口且连续窄线/前进证据已满足有界退出条件后，允许反向回线：
+                     * 实车 +120° 在 119.16°、position=-3 时被旧下限压住，直至动作超时。
+                     * 证据由本帧 route_update 更新；无线/歧义/不足角度会清空，重新启用下限。
+                     * 中心线确认仍由路径层负责，多区域附带分支不使用此放行。 */
+                    bool exit_angle_confirmed = !f->route.turn_exit_branch &&
+                        f->route.exit_candidate_pending &&
+                        (uint32_t)(now_ms - f->route.exit_candidate_ms) >= JUNCTION_EXIT_CONFIRM_MS &&
+                        f->odometry.distance_cm - f->route.exit_candidate_cm >= JUNCTION_EXIT_CONFIRM_CM;
+                    if (turn < route_turn_threshold_rad(&f->route, JUNCTION_TURN_MIN_RAD) &&
+                        !exit_angle_confirmed) {
+                        float min_turn = fminf(turn_base, JUNCTION_CAPTURE_MIN_TURN_CM_S);
+                        correction = direction * fmaxf(direction * correction, min_turn);
+                    }
+                } else {
+                    pid_reset(&f->pid);
+                    /* 自定义转角进入末段后按剩余角度收小差速，达到目标角后保持出口航向。
+                     * 原逻辑无线时固定单轮扫线，-120° 会继续转到约-150°的过转保护。
+                     * 此时仍处于 EXECUTING，不能仅凭角度完成路口；需出口线确认或时限停车。
+                     * 目标超调时允许差速反向纠偏，单轮速度仍不为负。 */
+                    if (corner_arc || (step.action == CUSTOM_TURN &&
+                        turn >= route_turn_threshold_rad(&f->route, JUNCTION_TURN_SLOW_RAD))) {
+                        float heading_correction = JUNCTION_CAPTURE_HEADING_KP *
+                            (f->route.entry_heading + route_turn_target_rad(&f->route) -
+                             f->odometry.heading_rad);
+                        correction = fmaxf(-turn_base, fminf(turn_base, heading_correction));
+                    } else correction = direction * turn_base;
+                }
+            } /* 圆弧完成后交还原有捕线；非直角使用原控制。 */
         } else {
             correction = HEADING_KP_CM_S_PER_RAD *
                          (f->route.entry_heading - f->odometry.heading_rad);

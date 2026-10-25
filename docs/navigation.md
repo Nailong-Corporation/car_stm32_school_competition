@@ -97,22 +97,26 @@ wheel_speed_cm_s = Δwheel_cm / actual_dt
 `include/route.h` 定义 `Action` 枚举及 `RouteStep` 结构体，`src/route_table.c` 的只读表编译进固件 Flash：
 
 ```c
-typedef enum { LEFT, RIGHT, STRAIGHT, STOP } Action;
+typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
 typedef struct {
     float distance;   // cm
     float tolerance;  // ±cm
     Action action;
     int speed;        // cm/s，不是 PWM
+    float angle_deg;  // CUSTOM_TURN 自定义角度
+    bool corner_arc_enabled; // true 圆弧切角，false 原转弯控制
 } RouteStep;
 
 const RouteStep route[] = {
-    {104.0f, 8.0f, LEFT, 40},
-    {131.0f, 8.0f, LEFT, 40},
-    {60.0f, 5.0f, LEFT, 40},
-    {39.0f, 5.0f, LEFT, 40},
-    {70.0f, 5.0f, STOP, 40}, // 仍要求路口确认
+    {104.0f, 8.0f, LEFT, 40, 0.0f, true},
+    {131.0f, 8.0f, LEFT, 40, 0.0f, true},
+    {60.0f, 5.0f, LEFT, 40, 0.0f, true},
+    {39.0f, 5.0f, LEFT, 40, 0.0f, true},
+    {70.0f, 5.0f, STOP, 40, 0.0f, true}, // 仍要求路口确认
 };
 ```
+
+第六列按路口独立选择圆弧：`true` 对有效 90° 动作启用半径 10 cm、探头前置 16 cm 的规划，`false` 保留原转弯控制；其他自定义角度仍用原控制。非最终轮 STOP 的闭合左右转遵循该 STOP 项的开关，最终轮 STOP 停车行为不变。出口/离口判定及探头出口方向里程修正独立于此开关，详见 [README 圆弧说明](../README.md#直角圆弧几何与距离语义2026-10-25)。
 
 表中距离和容差保留现有设置，保留用户已设定的各段目标 40 cm/s，并同步轮目标上限，未重新测量赛道。首段以明确启动时的里程为零；下一段以“上一动作完成并离开路口消抖区”的位置为零，不是起点累计里程。表项要求正距离、有限且小于距离的非负容差、0…40 范围内的正目标速度；最后一项必须 STOP，STOP 不能位于表中间。启动时会重置路径索引到 0，不自动续跑一半路径。
 

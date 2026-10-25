@@ -10,6 +10,7 @@ typedef struct {
     Action action;
     int speed;        /* target forward speed, cm/s, NOT PWM */
     float angle_deg;  /* CUSTOM_TURN only: (0, 360] clockwise, [-360, 0) counterclockwise. */
+    bool corner_arc_enabled; /* true: 90° 圆弧切角；false: 原转弯控制。 */
 } RouteStep;
 typedef enum {
     ROUTE_FOLLOW, ROUTE_CANDIDATE, ROUTE_EXECUTING, ROUTE_CLEARING,
@@ -28,7 +29,7 @@ typedef struct {
     RouteState state;
     RouteFailure failure;
     float origin_cm, entry_cm, entry_heading, clear_cm, approach_center_cm;
-    float outgoing_cm, projection_previous_cm, projection_previous_heading; /* 路口动作参考点以来的出口方向位移。 */
+    float outgoing_cm, projection_previous_cm, projection_previous_heading; /* 入口灰度参考点以来，灰度中心在出口方向的净位移。 */
     uint32_t segment_ms, phase_ms, approach_center_ms;
     uint32_t exit_candidate_ms;
     float exit_candidate_cm;
@@ -41,6 +42,7 @@ typedef struct {
     float previous_line_position;
     bool have_approach_center;
     bool valid, stop_pending, callback_dispatched;
+    bool corner_arc_complete; /* 90° 轨迹完成后保持捕线，避免纠偏回落时重进圆弧。 */
     bool turn_capturing, lap_boundary; /* 出口线捕获 / 非末轮 STOP 的闭合动作。 */
     bool turn_forced; /* 本项由整排骤变触发；保持至下一路段，便于诊断。 */
     RouteStopCallback stop_callback;
@@ -64,6 +66,7 @@ void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
 /* 返回有效方向：CUSTOM_TURN 按符号映射 LEFT/RIGHT；非末轮 STOP 使用闭合动作。 */
 Action route_current_action(const RoutePlanner *planner);
 /* Effective LEFT/RIGHT above includes CUSTOM_TURN direction; signed target stays unwrapped. */
+bool route_uses_corner_arc(const RoutePlanner *planner);
 float route_turn_target_rad(const RoutePlanner *planner);
 float route_turn_threshold_rad(const RoutePlanner *planner, float right_angle_threshold);
 uint32_t route_action_timeout_ms(const RoutePlanner *planner);
