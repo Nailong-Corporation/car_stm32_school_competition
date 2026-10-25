@@ -4,6 +4,7 @@
 #include "encoder.h"
 #include "motor.h"
 #include "motion_config.h"
+#include <math.h>
 
 volatile uint32_t g_control_request;
 volatile ControlDiagnostics g_diagnostics;
@@ -215,6 +216,14 @@ int main(void)
             g_diagnostics.route_turn_rad = follow.odometry.heading_rad - follow.route.entry_heading;
             g_diagnostics.route_index = (uint32_t)follow.route.index;
             g_diagnostics.stop_snapshot = follow.stop_snapshot;
+            g_diagnostics.auto_resume_snapshot = follow.auto_resume_snapshot;
+            g_diagnostics.auto_resume_count = follow.auto_resume_count;
+            g_diagnostics.auto_resume_last_ms = follow.auto_resume_last_ms;
+            g_diagnostics.route_recovery_window_active = follow.route.recovery_window_active;
+            g_diagnostics.route_recovery_window_progress_cm = follow.route.recovery_window_active ?
+                follow.odometry.distance_cm - follow.route.recovery_window_origin_cm : 0.0f;
+            g_diagnostics.route_recovery_window_limit_cm = follow.route.recovery_window_active ?
+                fmaxf(2.0f * follow.route.steps[follow.route.index].tolerance, GRAY_FORWARD_OFFSET_CM) : 0.0f;
             if (HAL_IWDG_Refresh(&watchdog) != HAL_OK) Error_Handler();
         }
         __WFI(); /* SysTick wakes every ms; no blocking delay or serial output. */

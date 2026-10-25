@@ -17,6 +17,7 @@ void odometry_init(Odometry *o, OdometryCalibration c)
 {
     memset(o, 0, sizeof(*o));
     o->calibration = c;
+    o->sensor_x_cm = GRAY_FORWARD_OFFSET_CM;
     o->ready = c.confirmed && positive(ODOMETRY_DISTANCE_SCALE) &&
         positive(c.left_diameter_cm) && positive(c.right_diameter_cm) &&
         positive(c.left_counts_per_rev) && positive(c.right_counts_per_rev) && positive(c.track_cm) &&
@@ -70,12 +71,27 @@ bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
     o->previous = counts;
     o->left_delta = dl;
     o->right_delta = dr;
-    o->distance_cm += (l + r) * 0.5f;
+    float ds = (l + r) * 0.5f;
+    float dh = (l - r) / o->calibration.track_cm;
+    float half = dh * 0.5f;
+    float sinc = fabsf(half) < 0.00001f ? 1.0f : sinf(half) / half;
+    float mid = o->heading_rad + half;
+    o->left_distance_cm += l;
+    o->right_distance_cm += r;
+    o->distance_cm += ds; /* 有符号轴中点弧长，保留原有诊断/保护语义。 */
+    o->x_cm += ds * sinc * cosf(mid);
+    o->y_cm += ds * sinc * sinf(mid);
+    /* 单周期恒曲率假设下，前置探头速度模长为 hypot(v, L*omega)。 */
+    o->sensor_distance_cm += hypotf(ds, GRAY_FORWARD_OFFSET_CM * dh);
     /* Clockwise/right is positive, matching positive line error and wheel mixing. */
     o->heading_rad += (l - r) / o->calibration.track_cm;
+    o->sensor_x_cm = o->x_cm + GRAY_FORWARD_OFFSET_CM * cosf(o->heading_rad);
+    o->sensor_y_cm = o->y_cm + GRAY_FORWARD_OFFSET_CM * sinf(o->heading_rad);
     float alpha = dt / (SPEED_FILTER_TAU_S + dt);
     o->left_speed_cm_s += alpha * (l / dt - o->left_speed_cm_s);
     o->right_speed_cm_s += alpha * (r / dt - o->right_speed_cm_s);
-    return isfinite(o->distance_cm) && isfinite(o->heading_rad) &&
+    return isfinite(o->x_cm) && isfinite(o->y_cm) &&
+        isfinite(o->left_distance_cm) && isfinite(o->right_distance_cm) &&
+        isfinite(o->sensor_distance_cm) && isfinite(o->distance_cm) && isfinite(o->heading_rad) &&
         isfinite(o->left_speed_cm_s) && isfinite(o->right_speed_cm_s);
 }

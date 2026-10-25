@@ -28,7 +28,7 @@ int main(void)
     request_start(&f);
     assert(f.start_result == LINE_START_ACCEPTED);
     assert(f.state == LINE_TRACKING && f.command.enabled);
-    RouteStep invalid[] = {{75, 10, STOP, (int)WHEEL_TARGET_MAX_CM_S + 1, 0.0f}};
+    RouteStep invalid[] = {{75, 10, STOP, (int)WHEEL_TARGET_MAX_CM_S + 1, 0.0f, true}};
     line_follow_init(&f, calibration, invalid, 1, NULL, NULL);
     assert(!f.route.valid && f.route.failure == ROUTE_FAILURE_INVALID);
     request_start(&f);

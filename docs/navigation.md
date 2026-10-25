@@ -97,32 +97,40 @@ wheel_speed_cm_s = Δwheel_cm / actual_dt
 `include/route.h` 定义 `Action` 枚举及 `RouteStep` 结构体，`src/route_table.c` 的只读表编译进固件 Flash：
 
 ```c
-typedef enum { LEFT, RIGHT, STRAIGHT, STOP } Action;
+typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
 typedef struct {
     float distance;   // cm
     float tolerance;  // ±cm
     Action action;
     int speed;        // cm/s，不是 PWM
+    float angle_deg;  // CUSTOM_TURN 自定义角度
+    bool corner_arc_enabled; // true 圆弧切角，false 原转弯控制
 } RouteStep;
 
 const RouteStep route[] = {
-    {104.0f, 8.0f, LEFT, 40},
-    {131.0f, 8.0f, LEFT, 40},
-    {60.0f, 5.0f, LEFT, 40},
-    {39.0f, 5.0f, LEFT, 40},
-    {70.0f, 5.0f, STOP, 40}, // 仍要求路口确认
+    {104.0f, 8.0f, LEFT, 40, 0.0f, true},
+    {131.0f, 8.0f, LEFT, 40, 0.0f, true},
+    {60.0f, 5.0f, LEFT, 40, 0.0f, true},
+    {39.0f, 5.0f, LEFT, 40, 0.0f, true},
+    {70.0f, 5.0f, STOP, 40, 0.0f, true}, // 仍要求路口确认
 };
 ```
+
+第六列按路口独立选择圆弧：`true` 对有效 90° 动作启用半径 10 cm、探头前置 16 cm 的规划，`false` 保留原转弯控制；其他自定义角度仍用原控制。非最终轮 STOP 的闭合左右转遵循该 STOP 项的开关，最终轮 STOP 停车行为不变。出口/离口判定及探头出口方向里程修正独立于此开关，详见 [README 圆弧说明](../README.md#直角圆弧几何与距离语义2026-10-25)。
 
 表中距离和容差保留现有设置，保留用户已设定的各段目标 40 cm/s，并同步轮目标上限，未重新测量赛道。首段以明确启动时的里程为零；下一段以“上一动作完成并离开路口消抖区”的位置为零，不是起点累计里程。表项要求正距离、有限且小于距离的非负容差、0…40 范围内的正目标速度；最后一项必须 STOP，STOP 不能位于表中间。启动时会重置路径索引到 0，不自动续跑一半路径。
 
 `include/motion_config.h` 中 `ROUTE_REPEAT_COUNT` 为执行总轮数，默认 `0U` 无限；`1U` 单轮、`2U` 两轮。范围 0…UINT32_MAX，修改后重新构建。`route_start()` 清零 `completed_laps`；每轮末项 STOP 在距离窗口内确认后累计一次（无限模式计数饱和）。未到最后一轮时，末项 STOP 从入口判断起映射为 `ROUTE_REPEAT_ACTION`，当前为 LEFT（用户确认末端左转闭合），可改 RIGHT / STRAIGHT。转角、出口和离口仍使用原确认与保护，完成后索引回到 0，保留出口方向位移建立首段基准。不停车、不重置加速历史、不分派 callback；有限轮数的最终 STOP 才进入 FINISHED 并停车回调。末项不允许早于标称距离前 5 cm 进入候选或骤变转向；当前 219±16 cm 的末项最早 214 cm 确认，正常窄线下从 214 cm 开始减速。主机模拟不能证明真实闭合效果。
 
+短于 `CORNER_RADIUS_CM + GRAY_FORWARD_OFFSET_CM + JUNCTION_SHORT_CLEAR_CM`（当前 26.5 cm）的路段，继承上一项规划出口航向作为下一动作的入口参考轴，避免上一弯提前在线退出后的残余偏航累加成下一弯目标误差。实际动作起始航向独立记录用于反向保护。当前 20 cm 短段之前的 +90° 项使用 `corner_arc_enabled=false`；路径距离、容差及出口判定保持，实车效果待复测。
+
+2026-10-25 用户明确授权路径停车后在线自动续当前项。`ROUTE_AUTO_RESUME_ENABLED=1` 时，越窗/候选确认超时后连续三帧有效单线可恢复 FOLLOW，保留索引、圈数和原始里程，另建 `max(2×tolerance, 16 cm)` 的恢复检测区间；动作/离口超时则在线恢复到 CLEARING 并重新完成离口去重。恢复目标从零按 1 s 包络渐升，FOLLOW 不超过 20 cm/s。按键/最终STOP/丢线/非法路径/过转/反向/编码器及控制故障不自动恢复。`auto_resume_snapshot` 保存恢复前证据，当前快照供新停车锁存。完整定义与流程见 README 的“路径停车后的在线自动恢复”段落。
+
 所有动作都要求 `distance - tolerance <= 当前路段里程 <= distance + tolerance`。STOP 不因里程单独到达而成功；没有路口并越过距离窗口上界则以 `LINE_STOP_ROUTE` 停车，不调用成功回调。
 
 按用户最新要求，整段行驶直接取消时间限制：不设置固定 15 s 或按长度/速度计算的预算，不因路段经过的时间而失败停车。启动或推进下一项时仍建立里程基准，并保留 `segment_ms` 用于 `route_elapsed_ms` 诊断；经过毫秒时基回绕也不会触发路段时间停车。越过距离窗口上界、路口候选确认 100 ms、动作 4500 ms、离口独立 1500 ms、丢线/反馈/任务保护仍独立生效。
 
-`g_diagnostics.route_failure` 锁存具体原因至下一次 START：0 无失败、1 非法配置/输入、2 越窗、3 已停用（旧路段超时）、4 候选确认超时、5 动作/离口超时、6 过转、7 反向转弯。结合 `stop_reason`、`route_state`、`route_index`、`route_progress_cm`、`route_elapsed_ms` 定位。`route_elapsed_ms` 为采样当前时间减路段起始时间，停车后仍增长；它不是锁存的停车时刻。可按 START 再启动只排除了部分锁定故障，不能直接判定具体停车原因；整段行驶计时已不再触发停车。
+`g_diagnostics.route_failure` 锁存具体原因至下一次 START 或自动恢复（恢复前快照另存）：0 无失败、1 非法配置/输入、2 越窗、3 已停用（旧路段超时）、4 候选确认超时、5 动作/离口超时、6 过转、7 反向转弯。结合 `stop_reason`、`route_state`、`route_index`、`route_progress_cm`、`route_elapsed_ms` 定位。`route_elapsed_ms` 为采样当前时间减路段起始时间，停车后仍增长；它不是锁存的停车时刻。可按 START 再启动只排除了部分锁定故障，不能直接判定具体停车原因；整段行驶计时已不再触发停车。
 
 `RouteStopCallback` 为 `void (*)(size_t step_index, void *context)`。最终轮 STOP 确认后路口状态进入 `ROUTE_FINISHED`，控制器立即清空目标和 PWM 命令、复位各 PID。主循环下发 `motor_stop()` 后调用 `route_dispatch_stop_callback()`，先锁存一次性标志再调用用户代码，重复分派及回调重入都不会重复执行。
 

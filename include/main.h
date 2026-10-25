@@ -28,7 +28,11 @@ typedef struct {
     uint8_t route_candidate_samples;
     float route_turn_rad;
     uint32_t route_index, route_stop_events, route_stopped_step;
-    LineStopSnapshot stop_snapshot; /* 停车前控制/传感器快照，保持至下一次接受 START。 */
+    LineStopSnapshot stop_snapshot; /* 当前停车快照；接受 START/自动恢复时清空。 */
+    LineStopSnapshot auto_resume_snapshot; /* 最近一次自动恢复前的快照。 */
+    uint32_t auto_resume_count, auto_resume_last_ms;
+    bool route_recovery_window_active;
+    float route_recovery_window_progress_cm, route_recovery_window_limit_cm;
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */
