@@ -139,6 +139,18 @@ static void targets(LineFollow *f, float base, float correction, float dt)
     f->left_target_cm_s = f->base + f->correction;
     f->right_target_cm_s = f->base - f->correction;
 }
+
+#if PRESET_ROUTE_ENABLED
+/* STRAIGHT 按表速通过；满轮速时只钳外轮，仍允许内轮降速纠偏，避免航向半差被钳成零。 */
+static void straight_targets(LineFollow *f, float base, float correction, float dt)
+{
+    targets(f, base, 0.0f, dt);
+    f->left_target_cm_s = fmaxf(0.0f, fminf(WHEEL_TARGET_MAX_CM_S, f->base + correction));
+    f->right_target_cm_s = fmaxf(0.0f, fminf(WHEEL_TARGET_MAX_CM_S, f->base - correction));
+    f->correction = 0.5f * (f->left_target_cm_s - f->right_target_cm_s);
+    f->base = 0.5f * (f->left_target_cm_s + f->right_target_cm_s);
+}
+#endif
 #else
 /**
  * @brief 在普通 PWM 模式限制基础指令上升速率并混合左右轮输出。
@@ -228,6 +240,10 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
 void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request)
 {
+#if ENCODER_CONTROL_ENABLED && PRESET_ROUTE_ENABLED
+    bool was_waiting_after_straight = f->route.state == ROUTE_FOLLOW &&
+        route_waiting_after_straight(&f->route, f->odometry.distance_cm);
+#endif
 #if ENCODER_CONTROL_ENABLED && PRESET_ROUTE_ENABLED && ROUTE_AUTO_RESUME_ENABLED
     uint32_t previous_sample_ms = f->sample_ms;
 #endif
@@ -297,6 +313,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
 #endif
             f->auto_resume_count = f->auto_resume_last_ms = 0;
             f->auto_resume_snapshot = (LineStopSnapshot){0};
+            f->straight_entry_aligned = f->straight_entry_handoff = (StraightEntrySnapshot){0};
             f->start_result = LINE_START_ACCEPTED;
         }
         f->state = LINE_TRACKING;
@@ -318,9 +335,22 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     }
 #if PRESET_ROUTE_ENABLED
     RouteState previous_route = f->route.state;
+    size_t previous_index = f->route.index;
+    bool previous_prepares_straight = route_prepares_straight(&f->route);
     route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
     if (f->route.state == ROUTE_FAILED) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
     if (f->route.state == ROUTE_FINISHED) { line_follow_stop(f, LINE_STOP_ROUTE_COMPLETE); return; }
+    if (was_waiting_after_straight &&
+        !route_waiting_after_straight(&f->route, f->odometry.distance_cm)) {
+        /* 有意保持航向的无中心线行驶结束，普通丢线预算从此刻起算。
+         * 不伪造稳定线证据，也不借用保护期间的 PID/连续样本历史。 */
+        f->last_reliable_ms = now_ms;
+        f->have_reliable = false;
+        f->valid_count = 0;
+        stable = false;
+        f->abnormal = false;
+        pid_reset(&f->pid);
+    }
     if (previous_route == ROUTE_EXECUTING && f->route.state == ROUTE_CLEARING) {
         /* A completed, confirmed maneuver establishes a fresh line history. */
         pid_reset(&f->pid);
@@ -333,7 +363,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     RouteStep step = f->route.steps[f->route.index];
     RouteStep speed_step = step;
     float progress = f->odometry.distance_cm - f->route.origin_cm;
-    if (f->route.state == ROUTE_CLEARING) {
+    if (f->route.state == ROUTE_CLEARING && step.action != STRAIGHT) {
         /* 转弯与中心出口线已确认，立即按下一段提速，不再受旧路口窗口的低速锁定。
          * 路径索引/里程起点在离口去重后推进；紧邻下一路口可用 0.5 cm + 连续窄线早交接。
          * 下一段按路口参考点的出口方向位移计程，预看实际进度以约束短段。 */
@@ -348,14 +378,14 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
      * v² 随剩余距离线性变化，对理想跟随目标的直线行驶相当于恒定减速度。
      * 这里只改变速度，不放宽 route_update 的距离/形状确认门禁。
      */
-    if (f->route.recovery_window_active &&
+    if (speed_step.action != STRAIGHT && f->route.recovery_window_active &&
         (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE))
         base_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
     float slow_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
     float remaining = speed_step.distance - progress;
-    if (f->route.state == ROUTE_CANDIDATE || remaining <= 0.0f) {
+    if (speed_step.action != STRAIGHT && (f->route.state == ROUTE_CANDIDATE || remaining <= 0.0f)) {
         base_speed = slow_speed;
-    } else if (remaining < JUNCTION_APPROACH_DISTANCE_CM) {
+    } else if (speed_step.action != STRAIGHT && remaining < JUNCTION_APPROACH_DISTANCE_CM) {
         float fraction = remaining / JUNCTION_APPROACH_DISTANCE_CM;
         base_speed = sqrtf(slow_speed * slow_speed +
                            (base_speed * base_speed - slow_speed * slow_speed) * fraction);
@@ -374,6 +404,7 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         float turn_base = fminf((float)step.speed, JUNCTION_TURN_SPEED_CM_S);
         float correction;
         Action action = route_current_action(&f->route);
+        if (action == STRAIGHT) turn_base = (float)step.speed;
         if (action == LEFT || action == RIGHT) {
             float direction = action == LEFT ? -1.0f : 1.0f;
             float turn = direction * (f->odometry.heading_rad - f->route.entry_heading);
@@ -382,7 +413,8 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
             float arc_distance = f->odometry.distance_cm - f->route.entry_cm - lead;
             if (corner_arc && turn >= JUNCTION_TURN_TARGET_RAD)
                 f->route.corner_arc_complete = true;
-            bool arc_planning = corner_arc && !f->route.corner_arc_complete;
+            bool arc_planning = corner_arc &&
+                (!f->route.corner_arc_complete || route_prepares_straight(&f->route));
             if (arc_planning) {
                 /* 探头触发后先到轴中点切点，再按 s/R 规划航向。
                  * 不把转弯中途的灰度位置送入 PID；出口判定仍完全由 route_update 决定。 */
@@ -449,7 +481,38 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
             correction = HEADING_KP_CM_S_PER_RAD *
                          (f->route.entry_heading - f->odometry.heading_rad);
         }
-        targets(f, turn_base, correction, dt);
+        if (action == STRAIGHT) straight_targets(f, turn_base, correction, dt);
+        else targets(f, turn_base, correction, dt);
+    } else if (f->route.state == ROUTE_CLEARING && route_prepares_straight(&f->route)) {
+        /* 圆弧出口尚在本项离口时就可能扫到电阻侧线：全程保持规划出口轴。 */
+        pid_reset(&f->pid);
+        f->state = LINE_JUNCTION;
+        f->abnormal = false;
+        straight_targets(f, base_speed,
+                HEADING_KP_CM_S_PER_RAD * (f->route.entry_heading +
+                    route_turn_target_rad(&f->route) - f->odometry.heading_rad), dt);
+    } else if (f->route.state == ROUTE_FOLLOW &&
+               route_waiting_after_straight(&f->route, f->odometry.distance_cm)) {
+        /* 电阻出口之后仍须直行到下一转弯的标称点；侧线既不能提前派发转弯，也不能进入 PID。 */
+        pid_reset(&f->pid);
+        f->state = LINE_TRACKING;
+        f->abnormal = false;
+        straight_targets(f, base_speed,
+                HEADING_KP_CM_S_PER_RAD * (f->route.segment_heading_rad - f->odometry.heading_rad), dt);
+    } else if (step.action == STRAIGHT && f->route.state == ROUTE_FOLLOW) {
+        /* 连续 STRAIGHT 之间也可能仍在电阻内部：窗口前沿用路段轴，不能重新跟随侧线。 */
+        pid_reset(&f->pid);
+        f->state = LINE_TRACKING;
+        f->abnormal = false;
+        straight_targets(f, base_speed,
+                HEADING_KP_CM_S_PER_RAD * (f->route.segment_heading_rad - f->odometry.heading_rad), dt);
+    } else if (f->route.state == ROUTE_CLEARING && route_current_action(&f->route) == STRAIGHT) {
+        /* 直行离口去重也保持入口航向，防止短暂回线后又被电阻侧线拉走。 */
+        pid_reset(&f->pid);
+        f->state = LINE_JUNCTION;
+        f->abnormal = false;
+        straight_targets(f, base_speed,
+                HEADING_KP_CM_S_PER_RAD * (f->route.entry_heading - f->odometry.heading_rad), dt);
     } else if (f->route.state == ROUTE_CLEARING && f->route.turn_exit_branch) {
         /* 原始观测仍为多区域，禁止送入普通位置 PID；短离口期间仅保持出口航向。 */
         pid_reset(&f->pid);
@@ -500,5 +563,26 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     if (!speed_control_update(&f->speed, f->left_target_cm_s, f->right_target_cm_s,
                               f->odometry.left_speed_cm_s, f->odometry.right_speed_cm_s,
                               dt, &f->command)) line_follow_stop(f, LINE_STOP_ENCODER);
+#if PRESET_ROUTE_ENABLED
+    StraightEntrySnapshot *entry_snapshot = NULL;
+    float entry_axis = f->route.segment_heading_rad;
+    if (previous_prepares_straight && previous_route == ROUTE_EXECUTING &&
+        f->route.state == ROUTE_CLEARING) {
+        entry_snapshot = &f->straight_entry_aligned;
+        entry_axis = f->route.entry_heading + route_turn_target_rad(&f->route);
+    } else if (previous_prepares_straight && previous_route == ROUTE_CLEARING &&
+               f->route.index != previous_index && f->route.state == ROUTE_FOLLOW) {
+        entry_snapshot = &f->straight_entry_handoff;
+    }
+    if (entry_snapshot != NULL && !entry_snapshot->valid) {
+        *entry_snapshot = (StraightEntrySnapshot){
+            .valid = true, .pid_active = f->pid.primed, .sample_ms = now_ms,
+            .route_index = (uint32_t)f->route.index, .route_state = f->route.state,
+            .observation = obs, .heading_rad = f->odometry.heading_rad,
+            .target_heading_rad = entry_axis, .outgoing_cm = f->route.outgoing_cm,
+            .left_target_cm_s = f->left_target_cm_s, .right_target_cm_s = f->right_target_cm_s
+        };
+    }
+#endif
 #endif
 }

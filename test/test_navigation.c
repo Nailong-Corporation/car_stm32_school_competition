@@ -149,10 +149,12 @@ static void test_corner_kinematics(void)
             tick(&f,&c,&now,0,0,phase%2?0x04:0,false);
             CHECK(f.route.state==ROUTE_EXECUTING && !f.pid.primed);
             if (phase==0) {
-                NEAR(f.left_target_cm_s,18); NEAR(f.right_target_cm_s,18);
+                NEAR(f.left_target_cm_s,JUNCTION_TURN_SPEED_CM_S);
+                NEAR(f.right_target_cm_s,JUNCTION_TURN_SPEED_CM_S);
             } else {
-                NEAR(f.left_target_cm_s,mirror?31.05f:4.95f);
-                NEAR(f.right_target_cm_s,mirror?4.95f:31.05f);
+                float half_diff=JUNCTION_TURN_SPEED_CM_S*WHEEL_TRACK_CM/(2*CORNER_RADIUS_CM);
+                NEAR(f.left_target_cm_s,JUNCTION_TURN_SPEED_CM_S+(mirror?half_diff:-half_diff));
+                NEAR(f.right_target_cm_s,JUNCTION_TURN_SPEED_CM_S+(mirror?-half_diff:half_diff));
                 NEAR(WHEEL_TRACK_CM*f.base/fabsf(f.left_target_cm_s-f.right_target_cm_s),10);
             }
             if (phase==3) {
@@ -307,7 +309,8 @@ static void test_routes(void)
         }
         for(unsigned i=0;i<3;++i) route_update(&p,mask(0x18),distance,heading,60+5*i);
         CHECK(p.state==ROUTE_CLEARING && p.index==0);
-        route_update(&p,mask(0xff),distance+3.1f,heading,80); CHECK(p.index==0);
+        route_update(&p,mask(0xff),distance+3.1f,heading,80);
+        CHECK(p.index==(a==STRAIGHT?1U:0U));
         for(unsigned i=0;i<3;++i) route_update(&p,mask(0x18),distance+3.2f,heading,85+5*i);
         CHECK(p.index==1 && p.state==ROUTE_FOLLOW);
         confirm(&p,0xff,distance+3.3f,100); CHECK(p.state==ROUTE_FOLLOW);
@@ -316,6 +319,7 @@ static void test_routes(void)
     }
     init_route_once(&p,table,2,NULL,NULL); route_start(&p,0,0);
     route_update(&p,mask(0x18),12.01f,0,50); CHECK(p.state==ROUTE_FAILED);
+    table[0].action=LEFT; /* 转弯仍须运动和形状确认；STRAIGHT 已改为里程点。 */
     init_route_once(&p,table,2,NULL,NULL); route_start(&p,0,0);
     for(unsigned i=0;i<3;++i) route_update(&p,mask(0xff),9,0,10+5*i);
     CHECK(p.state==ROUTE_CANDIDATE); /* stationary pattern cannot confirm */
@@ -1285,9 +1289,10 @@ static void test_l_corner_confirmation(void)
         RoutePlanner p;
         init_route_once(&p,steps,action==STOP?1:2,NULL,NULL); route_start(&p,0,0);
         confirm(&p,0x18,9,10); confirm(&p,0x03,9.2f,30);
-        CHECK(p.state==ROUTE_FOLLOW && !p.stop_pending && p.completed_laps==0);
+        CHECK(p.state==(action==STRAIGHT ? ROUTE_EXECUTING : ROUTE_FOLLOW) &&
+              !p.stop_pending && p.completed_laps==0);
         confirm(&p,0x0e,9.4f,50);
-        CHECK(p.state==ROUTE_FOLLOW && !p.stop_pending);
+        CHECK(p.state==(action==STRAIGHT ? ROUTE_EXECUTING : ROUTE_FOLLOW) && !p.stop_pending);
     }
 }
 
@@ -1359,7 +1364,8 @@ static void test_route_abrupt_priority(void)
         steps[0].action=(Action)action;
         init_route_once(&p,steps,action==STOP?1:2,NULL,NULL); route_start(&p,0,0);
         confirm(&p,0x18,9,5); route_update(&p,mask(0),9.2f,0,20);
-        CHECK(p.state==ROUTE_FOLLOW && !p.turn_forced && !p.stop_pending);
+        CHECK(p.state==(action==STRAIGHT ? ROUTE_EXECUTING : ROUTE_FOLLOW) &&
+              !p.turn_forced && !p.stop_pending);
     }
     /* 使用生产极性/多数滤波：孤立原始全丢线被滤除，持续骤变在滤波输出变化当帧触发。 */
     steps[0].action=LEFT;
@@ -1557,6 +1563,7 @@ static void test_short_segment_handoff(void)
             uint32_t now=scenario==8 ? 100+JUNCTION_CLEAR_TIMEOUT_MS : 105+5*i;
             route_update(&p,mask(shapes[scenario]),cm,0,now);
         }
+        if (scenario==5) { CHECK(p.index==1 && !p.handoff_early && p.state==ROUTE_FOLLOW); continue; }
         CHECK(p.index==0 && !p.handoff_early);
         CHECK(scenario==8 ? p.state==ROUTE_FAILED && p.failure==ROUTE_FAILURE_ACTION_TIMEOUT :
                             p.state==ROUTE_CLEARING);
@@ -1696,10 +1703,10 @@ static void test_turn_online_exit(void)
     /* 直行仍使用原预算，不能借转弯在线规则提前消费路径。 */
     const RouteStep straight[]={{10,2,STRAIGHT,40,0, true},{100,5,STOP,40,0, true}};
     RoutePlanner p; init_route_once(&p,straight,2,NULL,NULL); route_start(&p,0,0);
-    p.state=ROUTE_EXECUTING; p.phase_ms=0;
-    for(unsigned i=0;i<3;++i) route_update(&p,mask(0x38),0,0,990+5*i);
+    route_update(&p,mask(0x38),8,0,0);
+    for(unsigned i=0;i<3;++i) route_update(&p,mask(0x38),8,0,990+5*i);
     CHECK(p.state==ROUTE_EXECUTING);
-    route_update(&p,mask(0x38),0,0,JUNCTION_STRAIGHT_TIMEOUT_MS);
+    route_update(&p,mask(0x38),8,0,JUNCTION_STRAIGHT_TIMEOUT_MS);
     CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
     /* 真实控制链：执行一秒后退出动作、输出仍启用，离口完成后进入下一项。 */
     const RouteStep steps[]={{1,.3f,LEFT,40,0, true},{100,5,STOP,40,0, true}};
@@ -1912,9 +1919,234 @@ static void test_route_resume_phases(void)
     }
 }
 
+/* 两个 STRAIGHT 无中心线也必须按标称里程交接，后续 LEFT/RIGHT 不能被直行保护吞掉。 */
+static void test_straight_resistor(void)
+{
+    const uint8_t shapes[]={0xff,0x81,0x01,0x80,0x00,0x83};
+    for (unsigned mirror=0;mirror<2;++mirror) {
+        const RouteStep steps[]={{20,10,STRAIGHT,80,0,false},{20,10,STRAIGHT,80,0,false},
+            {20,10,mirror?RIGHT:LEFT,40,0,false},{100,5,STOP,40,0,false}};
+        LineFollow f; EncoderCounts c; uint32_t now=0;
+        start(&f,&c,&now,steps,4);
+        f.startup_elapsed_s=STARTUP_RAMP_TIME_S; f.base=80;
+        GraySensor sensor; gray_sensor_init(&sensor);
+        unsigned frames=0;
+        while (f.route.index<2 && frames++<150) {
+            uint8_t line=f.odometry.distance_cm<10?0x18:shapes[frames%sizeof(shapes)];
+            GrayObservation obs=gray_sensor_update(&sensor,raw_for_line(line),true,0);
+            c.left+=40; c.right+=40; now+=5;
+            line_follow_update(&f,obs,c,now,.005f,false);
+            CHECK(f.command.enabled && f.state!=LINE_STOPPED);
+            if (f.route.index<2) {
+                NEAR(f.base,80); NEAR(f.left_target_cm_s,80); NEAR(f.right_target_cm_s,80);
+                if (f.route.state==ROUTE_EXECUTING || f.route.state==ROUTE_CLEARING)
+                    CHECK(!f.pid.primed);
+            }
+        }
+        CHECK(f.route.index==2 && f.route.state==ROUTE_FOLLOW);
+        NEAR(f.route.origin_cm,40); /* 两次 20 cm，不能按提前或滞后出现的分支重建起点。 */
+        CHECK(f.odometry.distance_cm>=43 && f.odometry.distance_cm<44);
+        while (f.odometry.distance_cm<59.9f) {
+            tick(&f,&c,&now,10,10,(now%3)?0xff:0x01,false);
+            if (f.odometry.distance_cm<60) {
+                CHECK(f.route.state==ROUTE_FOLLOW && !f.pid.primed);
+                NEAR(f.left_target_cm_s,f.right_target_cm_s);
+            }
+        }
+        for (unsigned i=0;i<6 && f.route.state!=ROUTE_EXECUTING;++i)
+            tick(&f,&c,&now,10,10,0xff,false);
+        tick(&f,&c,&now,20,20,0xff,false);
+        CHECK(f.route.state==ROUTE_EXECUTING && route_current_action(&f.route)==(mirror?RIGHT:LEFT));
+        CHECK(mirror ? f.left_target_cm_s>f.right_target_cm_s : f.left_target_cm_s<f.right_target_cm_s);
+    }
+    const RouteStep steps[]={{20,10,STRAIGHT,80,0,false},{100,5,STOP,40,0,false}};
+    /* 满速保护仍能纠偏；没有预设的 20/30 cm/s 上限。 */
+    LineFollow f; EncoderCounts c; uint32_t now=0; start(&f,&c,&now,steps,2);
+    f.odometry.distance_cm=15; f.startup_elapsed_s=STARTUP_RAMP_TIME_S; f.base=80;
+    tick(&f,&c,&now,40,40,0xff,false);
+    CHECK(f.route.state==ROUTE_EXECUTING); NEAR(f.base,80);
+    tick(&f,&c,&now,41,39,0x01,false);
+    CHECK(f.left_target_cm_s<f.right_target_cm_s); NEAR(f.right_target_cm_s,80);
+    CHECK(!f.pid.primed);
+    /* 复现板上滞后交接：当前项进入时已有 27.833 cm，持续全黑也须迅速交给下一项。 */
+    RoutePlanner p; init_route_once(&p,steps,2,NULL,NULL); route_start(&p,70.4290161f,0);
+    route_update(&p,mask(0x1b),98.2920685f,0,5);
+    CHECK(p.state==ROUTE_EXECUTING);
+    route_update(&p,mask(0xff),98.4f,0,10);
+    route_update(&p,mask(0xff),98.5f,0,15);
+    CHECK(p.index==1 && p.state==ROUTE_FOLLOW); NEAR(p.origin_cm,90.4290161f);
+    /* 两个直行之后始终多区域，下一路口仍通过原形状+位移确认 LEFT，不能直行吞掉。 */
+    const RouteStep follow_left[]={{20,10,STRAIGHT,80,0,false},{20,10,STRAIGHT,80,0,false},
+        {20,10,LEFT,40,0,false},{100,5,STOP,40,0,false}};
+    init_route_once(&p,follow_left,4,NULL,NULL); route_start(&p,0,0);
+    for (unsigned i=1;i<=610;++i) {
+        float distance=.1f*(float)i;
+        route_update(&p,mask(distance>=59.5f?0xff:0x81),distance,0,5*i);
+        if (p.index==2 && p.state==ROUTE_EXECUTING) break;
+    }
+    CHECK(p.index==2 && p.state==ROUTE_EXECUTING && route_current_action(&p)==LEFT);
+    CHECK(p.entry_cm>=60 && p.entry_cm<60.4f); CHECK(!p.turn_forced);
+    /* 下一路口窗口离直行里程点不足 3 cm 时，必须及时交接，不丢窗口。 */
+    const RouteStep close_left[]={{20,10,STRAIGHT,80,0,false},{2,1,LEFT,40,0,false},
+        {100,5,STOP,40,0,false}};
+    init_route_once(&p,close_left,3,NULL,NULL); route_start(&p,0,0);
+    route_update(&p,mask(0xff),19,0,5);
+    route_update(&p,mask(0xff),20,0,10);
+    route_update(&p,mask(0xff),21,0,15);
+    CHECK(p.index==1 && p.state==ROUTE_FOLLOW); NEAR(p.origin_cm,20);
+    for (unsigned i=0;i<3;++i) route_update(&p,mask(0xff),22.1f+.06f*i,0,20+5*i);
+    CHECK(p.state==ROUTE_EXECUTING && route_current_action(&p)==LEFT);
+    /* 静止不能结束直行；保留动作超时和窗口越界保护。 */
+    init_route_once(&p,steps,2,NULL,NULL); route_start(&p,0,0);
+    route_update(&p,mask(0),9,0,5); CHECK(p.state==ROUTE_FOLLOW);
+    route_update(&p,mask(0),10,0,10); CHECK(p.state==ROUTE_EXECUTING);
+    route_update(&p,mask(0),10,0,10+JUNCTION_STRAIGHT_TIMEOUT_MS);
+    CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
+    route_start(&p,0,0); route_update(&p,mask(0x18),30.01f,0,5);
+    CHECK(p.failure==ROUTE_FAILURE_WINDOW);
+}
+
+/* STRAIGHT 后的 20±10 cm 转弯不能在 10 cm 提前窗口被电阻分支触发。 */
+static void test_after_straight_turn_gate(void)
+{
+    for (unsigned action=0;action<4;++action) for (unsigned recovery=0;recovery<2;++recovery) {
+        RouteStep steps[]={{20,10,STRAIGHT,80,0,false},
+            {20,10,action<2?(action?RIGHT:LEFT):CUSTOM_TURN,40,action==2?-60:60,false},
+            {100,5,STOP,40,0,false}};
+        RoutePlanner p; init_route_once(&p,steps,3,NULL,NULL); route_start(&p,0,0);
+        p.index=1; p.origin_cm=20;
+        if (recovery) {
+            p.state=ROUTE_FAILED; p.failure=ROUTE_FAILURE_WINDOW;
+            CHECK(route_resume(&p,ROUTE_FOLLOW,30,0,0));
+        }
+        const uint8_t premature[]={0xff,0x1f,0xf8,0x81,0x00,0x03,0xc0};
+        for (unsigned i=0;i<sizeof(premature);++i) {
+            float distance=30+.2f*i;
+            route_update(&p,mask(0x18),distance,0,5+20*i);
+            route_update(&p,mask(0x18),distance+.05f,0,10+20*i);
+            route_update(&p,mask(0x18),distance+.1f,0,15+20*i);
+            route_update(&p,mask(premature[i]),distance+.15f,0,20+20*i);
+            CHECK(p.state==ROUTE_FOLLOW && !p.turn_forced && p.candidate_count==0);
+        }
+        route_update(&p,mask(0xff),39.999f,0,180);
+        CHECK(p.state==ROUTE_FOLLOW && route_waiting_after_straight(&p,39.999f));
+        route_update(&p,mask(0xff),40,0,185);
+        CHECK(p.state==ROUTE_CANDIDATE && !route_waiting_after_straight(&p,40));
+        route_update(&p,mask(0xff),40.06f,0,190);
+        route_update(&p,mask(0xff),40.12f,0,195);
+        CHECK(p.state==ROUTE_EXECUTING && !p.turn_forced);
+        CHECK(route_current_action(&p)==((action==0 || action==2)?LEFT:RIGHT));
+        /* 标称位置刚到时的骤变仍能按原优先规则执行。 */
+        route_start(&p,0,0); p.index=1; p.origin_cm=20;
+        confirm(&p,0x18,39.5f,5);
+        route_update(&p,mask(0),40,0,20);
+        CHECK(p.state==ROUTE_EXECUTING && p.turn_forced);
+        route_start(&p,0,0); p.index=1; p.origin_cm=20;
+        route_update(&p,mask(0xff),50.01f,0,5);
+        CHECK(p.failure==ROUTE_FAILURE_WINDOW);
+    }
+    /* 前一保护期长期无中心线，不应在 20 cm 门槛释放时立即用旧时间戳判丢线。
+     * 到点后若仍没有路口/目标线，新的 400 ms 预算仍必须停车。 */
+    const RouteStep held[]={{20,10,STRAIGHT,80,0,false},{20,10,LEFT,40,0,false},
+        {100,5,STOP,40,0,false}};
+    LineFollow f; EncoderCounts counts; uint32_t now=1000;
+    start(&f,&counts,&now,held,3);
+    f.route.index=1; f.route.origin_cm=0; f.odometry.distance_cm=19.8f;
+    f.route.segment_heading_valid=true; f.route.segment_heading_rad=0;
+    f.last_reliable_ms=0; f.have_reliable=false; f.abnormal=false;
+    while(f.odometry.distance_cm<20) tick(&f,&counts,&now,5,5,0,false);
+    CHECK(f.state!=LINE_STOPPED && f.abnormal && !f.have_reliable);
+    uint32_t released=now;
+    while(now-released<INTERFERENCE_TIMEOUT_MS-5) {
+        tick(&f,&counts,&now,2,2,0,false);
+        CHECK(f.state!=LINE_STOPPED);
+    }
+    tick(&f,&counts,&now,2,2,0,false);
+    CHECK(f.stop_reason==LINE_STOP_LOST && f.stop_snapshot.valid);
+    /* 不紧跟 STRAIGHT 的普通转弯保留原来的提前容差。 */
+    const RouteStep steps[]={{20,10,LEFT,40,0,false},{100,5,STOP,40,0,false}};
+    RoutePlanner p; init_route_once(&p,steps,2,NULL,NULL); route_start(&p,0,0);
+    confirm(&p,0xff,10,5); CHECK(p.state==ROUTE_EXECUTING);
+}
+
+/* 电阻入口可能在前一个圆弧的 EXECUTING/CLEARING 中进入灰度视野。
+ * 未切到 STRAIGHT 前，单侧线也不能通过普通出口 PID 让车辆反向偏转。 */
+static void test_corner_into_straight_entry(void)
+{
+    const uint8_t shapes[]={0x01,0x03,0x81,0xff,0x00,0x80,0xc0,0x18};
+    for (unsigned mirror=0;mirror<2;++mirror) {
+        float direction=mirror?-1.0f:1.0f;
+        const RouteStep steps[]={{76,5,CUSTOM_TURN,80,direction*90,true},
+            {20,10,STRAIGHT,80,0,false},{20,10,STRAIGHT,80,0,false},
+            {20,10,LEFT,80,0,true},{100,5,STOP,40,0,false}};
+        LineFollow f; EncoderCounts c; uint32_t now=0; start(&f,&c,&now,steps,5);
+        f.route.state=ROUTE_EXECUTING; f.route.phase_ms=now;
+        f.route.entry_cm=76; f.route.entry_heading=f.route.action_start_heading=0;
+        f.route.projection_previous_cm=f.odometry.distance_cm=96;
+        f.route.projection_previous_heading=f.odometry.heading_rad=direction*1.4f;
+        f.route.outgoing_cm=10*(1-cosf(1.4f))+16*sinf(1.4f);
+        f.startup_elapsed_s=STARTUP_RAMP_TIME_S; f.base=JUNCTION_TURN_SPEED_CM_S;
+        now+=JUNCTION_LINE_EXIT_AFTER_MS;
+        for (unsigned i=0;i<12;++i) {
+            tick(&f,&c,&now,0,0,i<3?0x18:shapes[i%sizeof(shapes)],false);
+            CHECK(f.route.state==ROUTE_EXECUTING && !f.pid.primed);
+            CHECK(direction*(f.left_target_cm_s-f.right_target_cm_s)>0);
+            CHECK(!f.route.turn_capturing && !f.route.turn_ended_on_line);
+        }
+        /* 接近 90° 后用连续编码器航向对齐确认，输入可完全没有目标线。 */
+        f.odometry.heading_rad=direction*(JUNCTION_TURN_TARGET_RAD-.02f);
+        f.odometry.distance_cm=76+6+10*(JUNCTION_TURN_TARGET_RAD-.02f);
+        for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) tick(&f,&c,&now,0,0,0,false);
+        CHECK(f.route.state==ROUTE_CLEARING && !f.pid.primed);
+        CHECK(!f.route.turn_ended_on_line);
+        CHECK(f.straight_entry_aligned.valid && !f.straight_entry_aligned.pid_active);
+        CHECK(f.straight_entry_aligned.route_index==0 && f.straight_entry_aligned.observation.line_mask==0);
+        NEAR(f.straight_entry_aligned.target_heading_rad,direction*JUNCTION_TURN_TARGET_RAD);
+        /* 同一几何下左右边线、全目标、多区域/无线都产生相同目标，不能左线拉左。 */
+        float expected_left=0,expected_right=0;
+        for(unsigned i=0;i<sizeof(shapes);++i) {
+            LineFollow copy=f; EncoderCounts sample=c; uint32_t time=now;
+            tick(&copy,&sample,&time,0,0,shapes[i],false);
+            CHECK(copy.route.state==ROUTE_CLEARING && !copy.pid.primed && !copy.abnormal);
+            CHECK(direction*(copy.left_target_cm_s-copy.right_target_cm_s)>0);
+            if(i==0) {expected_left=copy.left_target_cm_s; expected_right=copy.right_target_cm_s;}
+            NEAR(copy.left_target_cm_s,expected_left); NEAR(copy.right_target_cm_s,expected_right);
+        }
+        for(unsigned i=0;i<20 && f.route.index==0;++i) tick(&f,&c,&now,5,5,0x01,false);
+        CHECK(f.route.index==1 && f.route.state==ROUTE_FOLLOW && !f.pid.primed);
+        CHECK(f.route.handoff_early && f.command.enabled);
+        CHECK(f.straight_entry_handoff.valid && !f.straight_entry_handoff.pid_active);
+        CHECK(f.straight_entry_handoff.route_index==1 && f.straight_entry_handoff.observation.line_mask==0x01);
+        uint32_t aligned_ms=f.straight_entry_aligned.sample_ms, handoff_ms=f.straight_entry_handoff.sample_ms;
+        line_follow_stop(&f,LINE_STOP_REQUEST);
+        CHECK(f.straight_entry_aligned.sample_ms==aligned_ms && f.straight_entry_handoff.sample_ms==handoff_ms);
+        for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) tick(&f,&c,&now,0,0,0x18,i==LINE_CONFIRM_SAMPLES-1U);
+        CHECK(f.start_result==LINE_START_ACCEPTED && !f.straight_entry_aligned.valid && !f.straight_entry_handoff.valid);
+        /* 有界对齐门槛：过期帧、偏航中断不能拼接；超时在线也不得跳过。 */
+        RoutePlanner p; init_route_once(&p,steps,5,NULL,NULL); route_start(&p,0,0);
+        p.state=ROUTE_EXECUTING; p.phase_ms=100; p.entry_cm=p.projection_previous_cm=76;
+        p.entry_heading=p.action_start_heading=0;
+        route_update(&p,mask(0x18),96,direction*JUNCTION_TURN_TARGET_RAD,105);
+        route_update(&p,mask(0x18),96,direction*(JUNCTION_TURN_TARGET_RAD-.1f),110);
+        CHECK(p.exit_count==0 && p.state==ROUTE_EXECUTING);
+        route_update(&p,mask(0x01),96,direction*JUNCTION_TURN_TARGET_RAD,115);
+        route_update(&p,mask(0x01),96,direction*JUNCTION_TURN_TARGET_RAD,120);
+        route_update(&p,mask(0x01),96,direction*JUNCTION_TURN_TARGET_RAD,140);
+        CHECK(p.exit_count==1 && p.state==ROUTE_EXECUTING);
+        route_update(&p,mask(0x18),96,direction*JUNCTION_TURN_TARGET_RAD,100+JUNCTION_ACTION_TIMEOUT_MS);
+        CHECK(p.state==ROUTE_FAILED && p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
+        route_start(&p,0,0); p.state=ROUTE_EXECUTING;
+        route_update(&p,mask(0),96,-direction*(JUNCTION_WRONG_WAY_RAD+.01f),5);
+        CHECK(p.failure==ROUTE_FAILURE_WRONG_WAY);
+        route_start(&p,0,0); p.state=ROUTE_EXECUTING;
+        route_update(&p,mask(0),96,direction*(JUNCTION_TURN_MAX_RAD+.01f),5);
+        CHECK(p.failure==ROUTE_FAILURE_TURN_LIMIT);
+    }
+}
+
 int main(void)
 {
-    test_route_auto_resume(); test_route_resume_phases(); test_short_segment_heading_reference(); test_spatial_short_s(); test_offset_odometry(); test_corner_mode_switch(); test_corner_kinematics(); test_turn_online_exit();
+    test_corner_into_straight_entry(); test_after_straight_turn_gate(); test_straight_resistor(); test_route_auto_resume(); test_route_resume_phases(); test_short_segment_heading_reference(); test_spatial_short_s(); test_offset_odometry(); test_corner_mode_switch(); test_corner_kinematics(); test_turn_online_exit();
     test_custom_turn_heading_limit(); test_custom_exit_angle_hysteresis(); test_custom_capture_recentering(); test_branch_exit_capture(); test_short_segment_handoff(); test_custom_turns(); test_odometry(); test_measured_distance_scale(); test_speed(); test_left_encoder_direction(); test_routes(); test_controller(); test_full_route_pipeline(); test_post_turn_stop_snapshot(); test_raw_pipeline();
     test_startup_ramp(); test_junction_approach_speed(); test_early_exit_acceleration(); test_long_straight_without_timeout(); test_reference_path(); test_route_repeats(); test_loop_end_corner(); test_corner_distance_projection(); test_capture_cancellation(); test_near_angle_exit(); test_exit_evidence_boundaries(); test_relaxed_exit_acceleration(); test_late_turn_clear_budget(); test_turn_capture(); test_l_corner_confirmation(); test_route_abrupt_priority(); test_spatial_corner();
     printf("PASS: odometry, nested loops, junction FSM, interference and route STOP; %u checks\n",checks);

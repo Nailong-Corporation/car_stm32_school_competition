@@ -20,27 +20,29 @@ const RouteStep route[] = {
     {104.0f, 16.0f, LEFT, 80, 0.0f, true},
     {131.0f, 16.0f, LEFT, 80, 0.0f, true},
     {62.0f, 10.0f, LEFT, 60, 0.0f, true},
-    /* 下一路口仅 20 cm：关闭本弯圆弧，提前交给原灰度捕线。 */
     {60.0f, 12.0f, CUSTOM_TURN, 50, 90.0f, false},
     {20.0f, 10.0f, LEFT, 80, 0.0f, true},
     {70.0f, 16.0f, STOP, 80, 0.0f, true},
-
+    
     /* 赛道 2
     {75.0f, 10.0f, LEFT, 60, 0.0f, true},
     {219.0f, 16.0f, LEFT, 60, 0.0f, true},
     {75.0f, 10.0f, LEFT, 60, 0.0f, true},
     {219.0f, 16.0f, STOP, 60, 0.0f, true},
     */
-    /* 赛道 3
-    //{76.0f, 5.0f, CUSTOM_TURN, 60, 90.0f, true},
-    //{82.0f, 5.0f, CUSTOM_TURN, 60, -90.0f, true},
-    //{10.0f, 5.0f, CUSTOM_TURN, 50, -60.0f, true},
-    {55.0f, 10.0f, CUSTOM_TURN, 60, 120.0f, true},
-    {70.0f, 10.0f, CUSTOM_TURN, 60, -60.0f, true},
-    {52.0f, 8.0f, LEFT, 60, 0.0f, true},
-    {82.0f, 8.0f, LEFT, 60, 0.0f, true},
-    //{80.0f, 8.0f, LEFT, 60, 0.0f, true},
-    {220.0f, 15.0f, STOP, 60, 0.0f, true},
+    /* 赛道 3 
+    {67.0f, 5.0f, CUSTOM_TURN, 120, 90.0f, true},
+    {20.0f, 10.0f, STRAIGHT, 120, 0.0f, false},
+    {20.0f, 10.0f, STRAIGHT, 120, 0.0f, false},
+    {30.0f, 10.0f, LEFT, 120, 0.0f, true},
+    //{82.0f, 5.0f, CUSTOM_TURN, 80, -90.0f, true},
+    {30.0f, 10.0f, CUSTOM_TURN, 120, -60.0f, false},
+    {55.0f, 10.0f, CUSTOM_TURN, 120, 140.0f, true},
+    {70.0f, 10.0f, CUSTOM_TURN, 120, -60.0f, true},
+    {52.0f, 8.0f, LEFT, 120, 0.0f, true},
+    {82.0f, 8.0f, LEFT, 120, 0.0f, true},
+    //{80.0f, 8.0f, LEFT, 80, 0.0f, true},
+    {220.0f, 15.0f, STOP, 120, 0.0f, true},
     */
 };
 const size_t route_count = sizeof(route) / sizeof(route[0]);

@@ -15,6 +15,15 @@ typedef enum {
     LINE_START_REJECTED_CALIBRATION, LINE_START_REJECTED_ROUTE,
     LINE_START_REJECTED_FAULT, LINE_START_ALREADY_RUNNING, LINE_START_AUTO_RESUMED
 } LineStartResult;
+/* 每次人工 START 后首次圆弧接 STRAIGHT 的对齐/交接证据，后续停车不会覆盖。 */
+typedef struct {
+    bool valid, pid_active;
+    uint32_t sample_ms, route_index;
+    RouteState route_state;
+    GrayObservation observation;
+    float heading_rad, target_heading_rad, outgoing_cm;
+    float left_target_cm_s, right_target_cm_s;
+} StraightEntrySnapshot;
 /* 停车时在清零输出之前锁存；正常采样不覆盖，START/自动恢复接受后清空。
  * 只保存在 RAM，复位/断电后丢失；数据用于停稳后读取，不要求运行中断点。 */
 typedef struct {
@@ -67,6 +76,7 @@ typedef struct {
     LineStopSnapshot stop_snapshot;
     LineStopSnapshot auto_resume_snapshot; /* 上次自动恢复前的停车证据。 */
     uint32_t auto_resume_count, auto_resume_last_ms;
+    StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,

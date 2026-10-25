@@ -44,7 +44,7 @@
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
  */
 #ifndef ROUTE_REPEAT_COUNT
-#define ROUTE_REPEAT_COUNT           0U
+#define ROUTE_REPEAT_COUNT           1U
 #endif
 #if ROUTE_REPEAT_COUNT < 0 || ROUTE_REPEAT_COUNT > 4294967295ULL
 #error "ROUTE_REPEAT_COUNT must be in 0..UINT32_MAX"
@@ -104,7 +104,7 @@
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
 #define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        80.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
+#define WHEEL_TARGET_MAX_CM_S        120.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
@@ -192,6 +192,7 @@
 #define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
+#define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
 #define JUNCTION_TURN_SPEED_CM_S      30.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
