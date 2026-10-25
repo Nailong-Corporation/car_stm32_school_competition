@@ -104,7 +104,7 @@
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
 #define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        80.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
+#define WHEEL_TARGET_MAX_CM_S        120.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
