@@ -44,7 +44,7 @@
  * 每次明确 START 清零已完成轮数；仅路径模式使用，赛道须能闭合回到首段。
  */
 #ifndef ROUTE_REPEAT_COUNT
-#define ROUTE_REPEAT_COUNT           1U
+#define ROUTE_REPEAT_COUNT           0U
 #endif
 #if ROUTE_REPEAT_COUNT < 0 || ROUTE_REPEAT_COUNT > 4294967295ULL
 #error "ROUTE_REPEAT_COUNT must be in 0..UINT32_MAX"
