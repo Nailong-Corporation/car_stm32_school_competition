@@ -1,0 +1,12 @@
+{
+  "components": 35,
+  "pins": 149,
+  "schematic_vs_A13_networks_equal": true,
+  "pcb_pin_networks_match": true,
+  "j10_part": "C492418",
+  "j10_rotation_degrees": 180,
+  "j10_pad_positions_unchanged": true,
+  "j10_front_positive_board_y": true,
+  "library_outline_overhang_board_mm": 2.014,
+  "physical_fit_verified": false
+}

@@ -1,0 +1,27 @@
+{
+  "c2_pad_center_mm": [
+    37.30049,
+    30.80017
+  ],
+  "conservative_mask_opening_bounds_mm": [
+    1.5115999999999998,
+    1.45162
+  ],
+  "via_center_mm": [
+    38.481,
+    29.845
+  ],
+  "via_finished_drill_mm": 0.508,
+  "conservative_drill_edge_to_mask_opening_mm": 0.2287,
+  "prior_position_gap_mm_approx": 0.061,
+  "assumes_nominal_gerber_geometry": true,
+  "via_top_tented_in_export": true,
+  "motor_feed_trace_width_mm": 1.524,
+  "motor_feed_trace_length_mm": 99.86,
+  "copper_assumed_um": 35,
+  "copper_resistivity_assumed_ohm_m": 1.72e-08,
+  "approx_feed_resistance_ohm_20C": 0.0322,
+  "approx_drop_at_4A_V": 0.129,
+  "approx_heating_at_4A_W": 0.515,
+  "note": "Estimates exclude connector, vias, other loads, temperature and transient behavior; not a measured thermal rating."
+}

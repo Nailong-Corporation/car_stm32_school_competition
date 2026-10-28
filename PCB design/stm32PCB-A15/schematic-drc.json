@@ -1,0 +1,13 @@
+[
+  {
+    "type": "warn",
+    "rule": "ATTRMATCHCODE",
+    "primitives": [
+      {
+        "primitiveId": "e5b80e6c91cba157",
+        "sheet": "236c9a1b5b8d0556",
+        "name": "U4($3I54)"
+      }
+    ]
+  }
+]

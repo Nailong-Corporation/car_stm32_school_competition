@@ -1,0 +1,18 @@
+{
+  "board_mm": [
+    100,
+    90
+  ],
+  "npth_holes": 4,
+  "connector_drills_checked": 100,
+  "row_spacing_mm": 15.24,
+  "smd_copper_flashes_checked": 46,
+  "bom_components": 35,
+  "placement_rows": 35,
+  "source_zip_matches_disk": true,
+  "c2_ground_via_mm": [
+    38.481,
+    29.845,
+    0.508
+  ]
+}

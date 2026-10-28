@@ -1,0 +1,33 @@
+{
+  "components": 35,
+  "pins_compared": 149,
+  "schematic_pcb_mismatches": 0,
+  "baseline_changes": [
+    [
+      "C1",
+      "1",
+      "VM",
+      "DC_RAW"
+    ],
+    [
+      "C2",
+      "1",
+      "VM",
+      "DC_RAW"
+    ],
+    [
+      "J8",
+      "1",
+      "VM",
+      "DC_RAW"
+    ]
+  ],
+  "new_headers": [
+    "J14",
+    "J15",
+    "J16"
+  ],
+  "gerber_header_plated_hole_diameter_mm": 1.10002,
+  "gerber_header_holes_checked": 6,
+  "pick_and_place_header_positions_checked": 3
+}

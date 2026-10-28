@@ -1,0 +1,8 @@
+{
+  "independent_geometry_connected_nets": 48,
+  "disconnected_copper_groups": 0,
+  "shorted_net_pairs": 0,
+  "vin_parallel_vias_connected_on_both_layers": 6,
+  "native_ground_fill_holes_read": 79,
+  "coordinate_tolerance_mm": 0.005
+}

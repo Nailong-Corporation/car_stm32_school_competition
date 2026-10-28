@@ -1,0 +1,12 @@
+{
+  "components": 35,
+  "pins": 149,
+  "pcb_schematic_match": true,
+  "other_components_pin_networks_equal_A14": true,
+  "D1_C22452": {
+    "A": "DC_FUSED",
+    "K": "VIN_PROTECTED"
+  },
+  "R3_C22797_ohm": 13000,
+  "resistor_pin_net_swap_is_electrically_symmetric": true
+}

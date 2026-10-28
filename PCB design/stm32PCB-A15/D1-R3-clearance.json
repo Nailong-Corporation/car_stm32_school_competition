@@ -1,0 +1,26 @@
+{
+  "D1.1": {
+    "net": "DC_FUSED",
+    "clearance_mm": 0.304147,
+    "nearest": "fill:657d756cd1e7bdb0",
+    "nearest_net": "GND"
+  },
+  "D1.2": {
+    "net": "VIN_PROTECTED",
+    "clearance_mm": 0.56642,
+    "nearest": "fill:657d756cd1e7bdb0",
+    "nearest_net": "GND"
+  },
+  "R3.2": {
+    "net": "BUCK_FB",
+    "clearance_mm": 0.248796,
+    "nearest": "fill:657d756cd1e7bdb0",
+    "nearest_net": "GND"
+  },
+  "R3.1": {
+    "net": "GND",
+    "clearance_mm": 0.6985,
+    "nearest": "R3.2",
+    "nearest_net": "BUCK_FB"
+  }
+}
