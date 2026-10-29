@@ -18,12 +18,12 @@ void odometry_init(Odometry *o, OdometryCalibration c)
     memset(o, 0, sizeof(*o));
     o->calibration = c;
     o->sensor_x_cm = GRAY_FORWARD_OFFSET_CM;
-    o->ready = c.confirmed && positive(ODOMETRY_DISTANCE_SCALE) &&
+    o->ready = c.confirmed && positive(ODOMETRY_DISTANCE_SCALE) && positive(ODOMETRY_HEADING_SCALE) &&
         positive(c.left_diameter_cm) && positive(c.right_diameter_cm) &&
         positive(c.left_counts_per_rev) && positive(c.right_counts_per_rev) && positive(c.track_cm) &&
         (c.left_sign == 1 || c.left_sign == -1) && (c.right_sign == 1 || c.right_sign == -1);
     if (!o->ready) return;
-    /* 同一物理距离换算同时供里程、速度和航向使用，避免只改停车门槛后单位失配。 */
+    /* 轮程与轮速共享距离换算；轮差转航向另乘独立转角比例。 */
     o->left_cm_per_count = 3.14159265359f * c.left_diameter_cm / c.left_counts_per_rev *
         ODOMETRY_DISTANCE_SCALE;
     o->right_cm_per_count = 3.14159265359f * c.right_diameter_cm / c.right_counts_per_rev *
@@ -72,7 +72,7 @@ bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
     o->left_delta = dl;
     o->right_delta = dr;
     float ds = (l + r) * 0.5f;
-    float dh = (l - r) / o->calibration.track_cm;
+    float dh = (l - r) / o->calibration.track_cm * ODOMETRY_HEADING_SCALE;
     float half = dh * 0.5f;
     float sinc = fabsf(half) < 0.00001f ? 1.0f : sinf(half) / half;
     float mid = o->heading_rad + half;
@@ -84,7 +84,7 @@ bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
     /* 单周期恒曲率假设下，前置探头速度模长为 hypot(v, L*omega)。 */
     o->sensor_distance_cm += hypotf(ds, GRAY_FORWARD_OFFSET_CM * dh);
     /* Clockwise/right is positive, matching positive line error and wheel mixing. */
-    o->heading_rad += (l - r) / o->calibration.track_cm;
+    o->heading_rad += dh;
     o->sensor_x_cm = o->x_cm + GRAY_FORWARD_OFFSET_CM * cosf(o->heading_rad);
     o->sensor_y_cm = o->y_cm + GRAY_FORWARD_OFFSET_CM * sinf(o->heading_rad);
     float alpha = dt / (SPEED_FILTER_TAU_S + dt);

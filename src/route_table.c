@@ -24,26 +24,19 @@ const RouteStep route[] = {
     {20.0f, 10.0f, LEFT, 80, 0.0f, true},
     {70.0f, 16.0f, STOP, 80, 0.0f, true},
     */
-    /* 赛道 2*/
+    /* 赛道 2
     {75.0f, 10.0f, LEFT, 120, 0.0f, true},
     {219.0f, 16.0f, LEFT, 120, 0.0f, true},
     {75.0f, 10.0f, LEFT, 120, 0.0f, true},
     {219.0f, 16.0f, STOP, 120, 0.0f, true},
-    
-    /* 赛道 3 
-    {67.0f, 5.0f, CUSTOM_TURN, 120, 90.0f, true},
-    {20.0f, 10.0f, STRAIGHT, 120, 0.0f, false},
-    {20.0f, 10.0f, STRAIGHT, 120, 0.0f, false},
-    {30.0f, 10.0f, LEFT, 120, 0.0f, true},
-    //{82.0f, 5.0f, CUSTOM_TURN, 80, -90.0f, true},
-    {30.0f, 10.0f, CUSTOM_TURN, 120, -60.0f, false},
-    {55.0f, 10.0f, CUSTOM_TURN, 120, 140.0f, true},
-    {70.0f, 10.0f, CUSTOM_TURN, 120, -60.0f, true},
-    {52.0f, 8.0f, LEFT, 120, 0.0f, true},
-    {82.0f, 8.0f, LEFT, 120, 0.0f, true},
-    //{80.0f, 8.0f, LEFT, 80, 0.0f, true},
-    {220.0f, 15.0f, STOP, 120, 0.0f, true},
     */
-    
+    /* 赛道 3 */
+    {200.0f, 15.0f, RIGHT, 120, 0.0f, false},
+    {82.0f, 8.0f, RIGHT, 120, 0.0f, false},
+    {52.0f, 8.0f, CUSTOM_TURN, 120, 60.0f, false},
+    {70.0f, 10.0f, CUSTOM_TURN, 120, -60.0f, false},
+    {20.0f, 5.0f, LEFT, 80, 0.0f, false},
+    {120.0f, 10.0f, STOP, 120, 0.0f, false},
+    //{80.0f, 8.0f, LEFT, 80, 0.0f, true},
 };
 const size_t route_count = sizeof(route) / sizeof(route[0]);

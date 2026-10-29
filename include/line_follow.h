@@ -51,7 +51,19 @@ typedef struct {
     float segment_start_progress_cm;
     bool turn_exit_branch;
     uint8_t exit_line_mask;
+    bool exit_recovery_active;
+    float exit_lateral_error_cm;
 } LineStopSnapshot;
+typedef struct {
+    bool valid, handed_off;
+    bool capture_seen;
+    uint32_t capture_ms;
+    float capture_turn_rad, capture_left_target_cm_s, capture_right_target_cm_s;
+    uint8_t capture_mask;
+    uint32_t clearing_ms, handoff_ms;
+    float clearing_turn_rad, minimum_turn_rad, handoff_turn_rad;
+    uint8_t clearing_mask, handoff_mask;
+} TurnExitDiagnostics;
 typedef struct {
     LineState state;
     LineStopReason stop_reason;
@@ -66,6 +78,8 @@ typedef struct {
     float reliable_position, base, correction, left_target_cm_s, right_target_cm_s;
     float hold_heading_rad, abnormal_origin_cm;
     float held_pwm_correction; /* Open-loop interference hold, not measured heading. */
+    bool exit_anchor_valid, exit_recovery_active;
+    float exit_anchor_x_cm, exit_anchor_y_cm, exit_axis_rad, exit_lateral_error_cm;
     float startup_elapsed_s; /* 每次明确 START 重新计时，两种模式均使用 1 s 启动包络。 */
     uint32_t last_reliable_ms;
     uint32_t sample_ms;
@@ -77,6 +91,7 @@ typedef struct {
     LineStopSnapshot auto_resume_snapshot; /* 上次自动恢复前的停车证据。 */
     uint32_t auto_resume_count, auto_resume_last_ms;
     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
+    TurnExitDiagnostics turn_exit[2]; /* 前两个弯的离口角度记录，START清零。 */
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,

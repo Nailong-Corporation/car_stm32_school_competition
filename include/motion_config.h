@@ -62,7 +62,7 @@
  */
 #define OPEN_LOOP_BASE_PWM          255.0f  /* 目标线居中时满占空比，按上升斜坡达到。 */
 #define OPEN_LOOP_CORRECTION_MAX_PWM 127.5f /* 半差上限；外轮满输出时内轮最低为零。 */
-#define OPEN_LOOP_HOLD_PWM           35.0f  /* 丢线/干扰期间的基础 PWM 上限，不主动加速。 */
+#define OPEN_LOOP_HOLD_PWM           35.0f  /* 完全丢线期间的基础 PWM 上限，不主动加速；歧义沿用正常基准。 */
 #define OPEN_LOOP_PWM_RISE_PER_S (OPEN_LOOP_BASE_PWM / STARTUP_RAMP_TIME_S)
 #define OPEN_LOOP_POSITION_KP         8.0f  /* 位置比例项，输出左右 PWM 的半差。 */
 #define OPEN_LOOP_POSITION_KI         0.0f  /* 位置积分项初值，未标定前暂不启用。 */
@@ -80,6 +80,12 @@
  * 保留下面的轮径/每圈计数原值，不重复补偿；直线测距通过不代表转角/路径已实测。
  */
 #define ODOMETRY_DISTANCE_SCALE       1.53f
+/* 2026-10-29：本轮编码器估计97.59°，用户目测约75°，暂取75/97.59≈0.77。
+ * 只修正轮差到航向的比例，不改直线距离/轮速；目测初值，非精确转角标定。
+ * 主机理想几何回归可显式置1，生产固件仅使用本头文件默认值。 */
+#ifndef ODOMETRY_HEADING_SCALE
+#define ODOMETRY_HEADING_SCALE        0.77f
+#endif
 #define LEFT_WHEEL_DIAMETER_CM        4.8f /* 左轮有效直径，单位 cm。 */
 #define RIGHT_WHEEL_DIAMETER_CM       4.8f /* 右轮有效直径，单位 cm。 */
 /* 用户提供 L150PRO 参数：电机轴单相 13 周期/圈、减速比 30，TI12 四倍频后
@@ -137,9 +143,9 @@
 
 /* ==================== 八、丢线、图形干扰与航向保持 ====================
  * 两模式均冻结普通位置 PID，并从最后稳定白线起计时；孤立有效帧不刷新预算。
- * 编码器模式降速并纠正估计航向，另检查厘米距离；PWM 模式只衰减历史差值。
+ * 歧义不额外降速；完全丢线按保持上限降速。编码器纠正估计航向并检查厘米距离；PWM 衰减历史差值。
  */
-#define HOLD_SPEED_CM_S              40.0f   /* 编码器模式干扰保持的基础速度上限，单位 cm/s。 */
+#define HOLD_SPEED_CM_S              40.0f   /* 编码器模式完全丢线保持的基础速度上限，单位 cm/s。 */
 #define HEADING_KP_CM_S_PER_RAD       12.0f /* 每 rad 航向误差产生的目标速度半差，单位 (cm/s)/rad。 */
 #define INTERFERENCE_TIMEOUT_MS     400U   /* 两模式共用：最后稳定观测起的异常总时限，单位 ms。 */
 #define INTERFERENCE_MAX_DISTANCE_CM 8.0f  /* 仅编码器模式：进入异常后允许的里程偏移上限，单位 cm。 */
@@ -180,7 +186,7 @@
 #define JUNCTION_STRAIGHT_TIMEOUT_MS 4500U /* 直行动作保留原时限。 */
 #define JUNCTION_LINE_EXIT_AFTER_MS  1000U /* 转弯满 1 s 后，连续有效单线可结束转弯。 */
 #define JUNCTION_CLEAR_TIMEOUT_MS    1500U /* 确认出口后的独立离口时限，早交接也不能刷新。 */
-#define JUNCTION_TURN_MIN_RAD         1.35f /* 约 77.3° 后允许连续中心线确认退出。 */
+#define JUNCTION_TURN_MIN_RAD         1.35f /* 旧几何门槛供圆弧/原策略；普通非圆弧直角还须达到目标90°。 */
 /* 编码器估计接近退出角且已连续沿中心出口线前进时，允许有界退出。
  * 仅在 1.30 rad 以上、连续窄线 50 ms 且前进 0.25 cm 时生效，最终仍需连续中心线。 */
 #define JUNCTION_EXIT_ANGLE_MARGIN_RAD 0.05f
@@ -193,14 +199,24 @@
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
 #define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
-#define JUNCTION_TURN_SPEED_CM_S      30.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
+#define JUNCTION_TURN_SPEED_CM_S      60.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
+#define JUNCTION_CAPTURE_MAX_HALF_DIFF_CM_S 12.0f /* 非圆弧见线后位置半差上限，不再叠加高速放大。 */
+#define JUNCTION_CAPTURE_LOSS_GRACE_MS 30U /* 已见线后短暂失线先直行，避免立即恢复大差速扫转。 */
+#define JUNCTION_CLEAR_CENTER_MS       50U /* 离口交接须连续中心线，不能偶尔扫过中心就成功。 */
+#define JUNCTION_CLEAR_CENTER_CM       2.0f
+#define JUNCTION_CLEAR_MAX_CM         20.0f /* 尚未稳定回线时禁止沿旧航向跑出数十厘米。 */
+#define JUNCTION_RECAPTURE_LOOKAHEAD_CM 8.0f /* 以已见中心线点和规划出口轴进行有界回线。 */
+#define JUNCTION_RECAPTURE_BIAS_RAD    0.35f
+#define JUNCTION_RECAPTURE_MAX_HALF_RATIO 0.4f /* 回线半差请求比例上限；反馈分配后内轮仍保持正向。 */
+#define STEERING_FEEDBACK_MIN_CM_S      5.0f /* 外轮已可靠前进时，用实测轮速保留内轮纠偏余量。 */
+#define STEERING_FEEDBACK_MIN_HALF_CM_S 0.1f
 #define JUNCTION_CAPTURE_MIN_TURN_CM_S 0.8f /* 最小退出转角前的转向半差下限，防止位置/航向修正抵消。 */
 #define JUNCTION_CAPTURE_HEADING_KP   8.0f /* 捕获阶段向入口 ±90° 施加的航向半差，单位 (cm/s)/rad。 */
 #define JUNCTION_TURN_TARGET_RAD      1.570796327f /* 直角动作的估计航向目标，单位 rad。 */
 #define JUNCTION_TURN_SLOW_RAD        1.25f /* 约 72° 后降低外轮目标，减少冲过出口目标线。 */
-#define JUNCTION_TURN_SLOW_CM_S       3.0f /* 无可靠出口线时慢速扫线的基础值，半差同值，内轮目标为零。 */
+#define JUNCTION_TURN_SLOW_CM_S       3.0f /* 有线航向修正的速度归一化参考；无线续转不采用此低速上限。 */
 #define JUNCTION_CLEAR_DISTANCE_CM    3.0f /* 直行退出的最小前进距离，以及离口去重阶段的额外距离，单位 cm。 */
 /* 下一路口已进入标称位置前 5 cm 时，允许缩短上一弯的离口去重距离。
  * 仅已完成转角/出口确认的转弯使用；仍需这里的前进距离及新的连续窄线保持。 */

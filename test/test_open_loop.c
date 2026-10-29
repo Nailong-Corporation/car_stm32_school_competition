@@ -105,7 +105,8 @@ int main(void)
     CHECK(f.command.left<f.command.right); NEAR(f.command.right, OPEN_LOOP_BASE_PWM);
     float before=f.base, integral=f.pid.integral, derivative=f.pid.derivative;
     tick(&f,&now,0x19,false); /* selected multi-region target is still interference */
-    CHECK(f.state==LINE_GAP_HOLD && f.base<=before && f.base<=OPEN_LOOP_HOLD_PWM);
+    CHECK(f.state==LINE_GAP_HOLD); NEAR(f.base,before);
+    NEAR(f.command.right,OPEN_LOOP_BASE_PWM);
     NEAR(f.pid.integral,integral); NEAR(f.pid.derivative,derivative);
     CHECK(f.command.left<f.command.right);
     float difference=f.command.right-f.command.left;
@@ -116,6 +117,8 @@ int main(void)
     for (unsigned i=0; i<LINE_CONFIRM_SAMPLES; ++i) tick(&f,&now,0x7e,false);
     CHECK(f.state==LINE_TRACKING && !f.abnormal);
     uint32_t reliable=f.last_reliable_ms;
+    tick(&f,&now,0,false);
+    CHECK(f.state==LINE_GAP_HOLD && f.base<=OPEN_LOOP_HOLD_PWM);
     for (unsigned i=0; i<100 && f.state!=LINE_STOPPED; ++i)
         tick(&f,&now,i%4U==3U ? 0x18 : 0,false);
     CHECK(f.stop_reason==LINE_STOP_LOST && now-reliable==INTERFERENCE_TIMEOUT_MS);

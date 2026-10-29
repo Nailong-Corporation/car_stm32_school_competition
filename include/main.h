@@ -34,6 +34,9 @@ typedef struct {
     bool route_recovery_window_active;
     float route_recovery_window_progress_cm, route_recovery_window_limit_cm;
     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
+    TurnExitDiagnostics turn_exit[2];
+    bool exit_anchor_valid, exit_recovery_active;
+    float exit_lateral_error_cm;
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */

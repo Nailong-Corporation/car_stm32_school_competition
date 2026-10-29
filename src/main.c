@@ -218,6 +218,11 @@ int main(void)
             g_diagnostics.stop_snapshot = follow.stop_snapshot;
             g_diagnostics.straight_entry_aligned = follow.straight_entry_aligned;
             g_diagnostics.straight_entry_handoff = follow.straight_entry_handoff;
+            g_diagnostics.turn_exit[0] = follow.turn_exit[0];
+            g_diagnostics.turn_exit[1] = follow.turn_exit[1];
+            g_diagnostics.exit_anchor_valid = follow.exit_anchor_valid;
+            g_diagnostics.exit_recovery_active = follow.exit_recovery_active;
+            g_diagnostics.exit_lateral_error_cm = follow.exit_lateral_error_cm;
             g_diagnostics.auto_resume_snapshot = follow.auto_resume_snapshot;
             g_diagnostics.auto_resume_count = follow.auto_resume_count;
             g_diagnostics.auto_resume_last_ms = follow.auto_resume_last_ms;

@@ -20,7 +20,8 @@ typedef enum {
 typedef enum {
     ROUTE_FAILURE_NONE, ROUTE_FAILURE_INVALID, ROUTE_FAILURE_WINDOW,
     ROUTE_FAILURE_CONFIRM_TIMEOUT = 4, /* 旧路段超时值 3 停用，其余诊断编号保持。 */
-    ROUTE_FAILURE_ACTION_TIMEOUT, ROUTE_FAILURE_TURN_LIMIT, ROUTE_FAILURE_WRONG_WAY
+    ROUTE_FAILURE_ACTION_TIMEOUT, ROUTE_FAILURE_TURN_LIMIT, ROUTE_FAILURE_WRONG_WAY,
+    ROUTE_FAILURE_EXIT_RECAPTURE /* 8：捕获/离口超距仍未稳定回线；不自动恢复跳段。 */
 } RouteFailure;
 typedef void (*RouteStopCallback)(size_t step_index, void *context);
 typedef struct {
@@ -48,6 +49,13 @@ typedef struct {
     bool valid, stop_pending, callback_dispatched;
     bool corner_arc_complete; /* 90° 轨迹完成后保持捕线，避免纠偏回落时重进圆弧。 */
     bool turn_capturing, lap_boundary; /* 出口线捕获 / 非末轮 STOP 的闭合动作。 */
+    bool capture_line_seen, line_exit_confirmed;
+    uint32_t capture_line_ms;
+    float capture_start_cm;
+    float line_exit_heading_rad; /* 连续实线确认后保存实际捕获航向，不再强凑估计90°。 */
+    bool clear_center_pending;
+    uint32_t clear_center_ms, clear_sample_ms;
+    float clear_center_cm;
     bool turn_forced; /* 本项由整排骤变触发；保持至下一路段，便于诊断。 */
     RouteStopCallback stop_callback;
     void *callback_context;

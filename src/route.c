@@ -21,6 +21,8 @@ static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     p->turn_forced = false;
     p->corner_arc_complete = false;
     p->handoff_early = false;
+    p->capture_line_seen = p->line_exit_confirmed = false;
+    p->clear_center_pending = false;
     p->segment_start_progress_cm = 0.0f;
     p->turn_exit_branch = false;
     p->exit_line_mask = 0;
@@ -239,6 +241,10 @@ static void begin_action(RoutePlanner *p, float distance_cm, float heading_rad,
     p->projection_previous_heading = heading_rad;
     p->turn_capturing = false;
     p->turn_forced = forced;
+    p->capture_line_seen = p->line_exit_confirmed = false;
+    p->capture_line_ms = 0;
+    p->clear_center_pending = false;
+    p->clear_sample_ms = now_ms;
     p->corner_arc_complete = false;
     p->exit_count = 0;
     p->online_samples = 0;
@@ -323,6 +329,16 @@ bool route_resume(RoutePlanner *p, RouteState failed_phase, float distance_cm,
     bool clearing = (failed_phase == ROUTE_EXECUTING || failed_phase == ROUTE_CLEARING) &&
         p->failure == ROUTE_FAILURE_ACTION_TIMEOUT;
     if (!follow && !clearing) return false;
+    /* 动作超时后的自动恢复也不能直接跳过未完成的普通90°转向。 */
+    if (clearing && failed_phase == ROUTE_EXECUTING && !route_uses_corner_arc(p) &&
+        p->steps[p->index].action != CUSTOM_TURN) {
+        Action action=route_current_action(p);
+        if (action==LEFT || action==RIGHT) {
+            float turn=(heading_rad-p->entry_heading)*(action==LEFT?-1.0f:1.0f);
+            if (turn < fabsf(route_turn_target_rad(p)) || turn > JUNCTION_TURN_MAX_RAD)
+                return false;
+        }
+    }
     if (follow) {
         p->state = ROUTE_FOLLOW;
         p->recovery_window_active = true;
@@ -340,6 +356,8 @@ bool route_resume(RoutePlanner *p, RouteState failed_phase, float distance_cm,
     p->failure = ROUTE_FAILURE_NONE;
     p->exit_count = p->online_samples = 0;
     p->exit_candidate_pending = p->turn_capturing = p->turn_exit_branch = false;
+    p->clear_center_pending = false;
+    p->clear_sample_ms = now_ms;
     p->stop_pending = false;
     return true;
 }
@@ -458,13 +476,13 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             return;
         }
         if (route_prepares_straight(p)) {
-            /* 前置灰度可能先扫到电阻入口，不能把入口侧线当作本弯出口。
-             * 此处只用连续合法周期的编码器航向对齐，原转角/时限保护仍优先。 */
+            /* 接直行也必须实际检测到出口中心线，不能只凭航向对齐离口。 */
             if (timed_out) { fail(p, ROUTE_FAILURE_ACTION_TIMEOUT); return; }
             bool aligned = fabsf(heading_rad - exit_heading) <= STRAIGHT_ENTRY_ALIGN_RAD;
-            if (!aligned || (uint32_t)(now_ms - p->online_ms) > CONTROL_MAX_INTERVAL_MS)
+            bool exit_seen=route_is_narrow_line(obs) && fabsf(obs.position)<=JUNCTION_CENTER_LIMIT;
+            if (!aligned || !exit_seen || (uint32_t)(now_ms - p->online_ms) > CONTROL_MAX_INTERVAL_MS)
                 p->exit_count = 0;
-            if (aligned && p->exit_count < LINE_CONFIRM_SAMPLES) ++p->exit_count;
+            if (aligned && exit_seen && p->exit_count < LINE_CONFIRM_SAMPLES) ++p->exit_count;
             p->online_ms = now_ms;
             p->turn_capturing = p->turn_exit_branch = p->exit_candidate_pending = false;
             if (p->exit_count >= LINE_CONFIRM_SAMPLES) {
@@ -478,15 +496,31 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         /* 满 1 s 后以连续完整单线结束转弯；超时在线也转入离口。
          * 不借用附带分支选区，不要求旧转角下限；错向/过转检查仍优先。
          * 相邻采样间隔过长或无线/歧义会清空连续计数。 */
-        bool online = route_is_narrow_line(obs);
+        bool ordinary_turn = !route_uses_corner_arc(p) && s.action != CUSTOM_TURN &&
+                             action != STRAIGHT;
+        if(ordinary_turn && p->capture_line_seen &&
+           distance_cm-p->capture_start_cm>JUNCTION_CLEAR_MAX_CM) {
+            fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);
+            return;
+        }
+        /* 普通非圆弧直角必须实际达到估计目标角；在线/超时不能绕过角度门禁。
+         * 角度不足的样本也不能提前积累时间退出的连续帧。 */
+        bool target_angle_reached = !ordinary_turn || turn >= fabsf(route_turn_target_rad(p));
+        bool online = route_is_narrow_line(obs) && target_angle_reached &&
+            (!ordinary_turn || fabsf(obs.position) <= JUNCTION_CENTER_LIMIT);
         if (!online || (uint32_t)(now_ms - p->online_ms) > CONTROL_MAX_INTERVAL_MS)
             p->online_samples = 0;
         if (online && p->online_samples < LINE_CONFIRM_SAMPLES) ++p->online_samples;
         p->online_ms = now_ms;
         bool line_exit = action != STRAIGHT && online &&
-            (timed_out || ((uint32_t)(now_ms - p->phase_ms) >= JUNCTION_LINE_EXIT_AFTER_MS &&
+            ((timed_out && (!ordinary_turn || p->online_samples >= LINE_CONFIRM_SAMPLES)) ||
+             ((uint32_t)(now_ms - p->phase_ms) >= JUNCTION_LINE_EXIT_AFTER_MS &&
                            p->online_samples >= LINE_CONFIRM_SAMPLES));
         if (line_exit) {
+            if (ordinary_turn && !p->turn_exit_branch) {
+                p->line_exit_confirmed=true;
+                p->line_exit_heading_rad=heading_rad;
+            }
             p->state = ROUTE_CLEARING;
             p->phase_ms = now_ms;
             p->clear_cm = distance_cm;
@@ -511,6 +545,11 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
          * 最终退出仍要求足够转角和连续中心线，不能用提前遇到的图形直接退出。 */
         p->turn_capturing = action != STRAIGHT && turn >= route_turn_threshold_rad(p, JUNCTION_CAPTURE_MIN_RAD) &&
             route_is_narrow_line(exit_obs);
+        if (p->turn_capturing && !p->turn_exit_branch) {
+            if(!p->capture_line_seen) p->capture_start_cm=distance_cm;
+            p->capture_line_seen=true;
+            p->capture_line_ms=now_ms;
+        }
         bool departed = action == STRAIGHT ? distance_cm - p->entry_cm >= JUNCTION_CLEAR_DISTANCE_CM :
             turn >= route_turn_threshold_rad(p, JUNCTION_TURN_MIN_RAD);
         bool centered = route_is_narrow_line(exit_obs) && fabsf(exit_obs.position) <= JUNCTION_CENTER_LIMIT;
@@ -528,8 +567,11 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         if (exit_evidence_ready && !p->turn_exit_branch)
             exit_margin += fminf(JUNCTION_EXIT_HYSTERESIS_RAD,
                                 fabsf(route_turn_target_rad(p)) * 0.05f);
+        float capture_threshold = ordinary_turn && !p->turn_exit_branch ?
+            route_turn_threshold_rad(p,JUNCTION_CAPTURE_MIN_RAD) :
+            route_turn_threshold_rad(p,JUNCTION_TURN_MIN_RAD)-exit_margin;
         bool near_exit = action != STRAIGHT && route_is_narrow_line(exit_obs) &&
-            turn >= route_turn_threshold_rad(p, JUNCTION_TURN_MIN_RAD) - exit_margin;
+            turn >= capture_threshold;
         if (!near_exit) p->exit_candidate_pending = false;
         else if (!p->exit_candidate_pending) {
             p->exit_candidate_pending = true;
@@ -545,6 +587,10 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
                 (uint32_t)(now_ms-p->exit_candidate_ms)>=JUNCTION_BRANCH_EXIT_CONFIRM_MS &&
                 distance_cm-p->exit_candidate_cm>=JUNCTION_BRANCH_EXIT_CONFIRM_CM;
         }
+        bool line_priority_ready=ordinary_turn && !p->turn_exit_branch && near_exit &&
+            (uint32_t)(now_ms-p->exit_candidate_ms)>=JUNCTION_EXIT_CONFIRM_MS &&
+            distance_cm-p->exit_candidate_cm>=JUNCTION_EXIT_CONFIRM_CM;
+        departed = departed && (target_angle_reached || line_priority_ready);
         p->exit_count = departed && centered ? (uint8_t)(p->exit_count + 1U) : 0U;
         if (p->exit_count >= LINE_CONFIRM_SAMPLES) {
             p->state = ROUTE_CLEARING;
@@ -552,16 +598,48 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             p->turn_capturing = false;
             p->clear_cm = distance_cm;
             p->exit_count = 0;
+            if (ordinary_turn && !p->turn_exit_branch) {
+                p->line_exit_confirmed=true;
+                p->line_exit_heading_rad=heading_rad;
+            }
         }
     } else if (p->state == ROUTE_CLEARING) {
+        bool ordinary_turn = !route_uses_corner_arc(p) && s.action != CUSTOM_TURN &&
+                             action != STRAIGHT;
+        float directed_turn=(heading_rad-p->entry_heading)*(action==LEFT?-1.0f:1.0f);
+        bool heading_ready=!ordinary_turn || (p->line_exit_confirmed ?
+            directed_turn>=route_turn_threshold_rad(p,JUNCTION_CAPTURE_MIN_RAD) :
+            directed_turn>=fabsf(route_turn_target_rad(p)));
         if (!route_is_narrow_line(exit_obs) ||
+            (ordinary_turn && (!heading_ready || fabsf(exit_obs.position)>JUNCTION_CENTER_LIMIT)) ||
             (action == STRAIGHT && fabsf(exit_obs.position) > JUNCTION_CENTER_LIMIT)) p->exit_count = 0;
         else if (p->exit_count < LINE_CONFIRM_SAMPLES) ++p->exit_count;
         size_t next_index = p->lap_boundary ? 0U : p->index + 1U;
         if (next_index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
         float clearance = distance_cm - p->clear_cm;
+        if(action!=STRAIGHT && p->outgoing_cm>p->steps[next_index].distance+p->steps[next_index].tolerance) {
+            fail(p,ROUTE_FAILURE_WINDOW);
+            return; /* 不把已越过的下一路口交接成合法新路段。 */
+        }
+        bool stable_clear=true;
+        if(ordinary_turn && !p->turn_exit_branch) {
+            if(clearance>JUNCTION_CLEAR_MAX_CM) { fail(p,ROUTE_FAILURE_EXIT_RECAPTURE); return; }
+            bool center=heading_ready && route_is_narrow_line(exit_obs) &&
+                fabsf(exit_obs.position)<=JUNCTION_CENTER_LIMIT;
+            if(!center || (uint32_t)(now_ms-p->clear_sample_ms)>CONTROL_MAX_INTERVAL_MS)
+                p->clear_center_pending=false;
+            if(center && !p->clear_center_pending) {
+                p->clear_center_pending=true;
+                p->clear_center_ms=now_ms;
+                p->clear_center_cm=distance_cm;
+            }
+            p->clear_sample_ms=now_ms;
+            stable_clear=p->clear_center_pending &&
+                (uint32_t)(now_ms-p->clear_center_ms)>=JUNCTION_CLEAR_CENTER_MS &&
+                distance_cm-p->clear_center_cm>=JUNCTION_CLEAR_CENTER_CM;
+        }
         bool normal_clear = p->exit_count >= LINE_CONFIRM_SAMPLES &&
-                            clearance >= JUNCTION_CLEAR_DISTANCE_CM;
+                            clearance >= JUNCTION_CLEAR_DISTANCE_CM && stable_clear;
         if (s.action == STRAIGHT) {
             /* 下一窗口比常规 3 cm 去重更近时，在该窗口起点交接，不能压过下一路口。 */
             float straight_clear = fminf(JUNCTION_CLEAR_DISTANCE_CM,
@@ -577,7 +655,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             p->outgoing_cm >= p->steps[next_index].distance - JUNCTION_APPROACH_DISTANCE_CM &&
             p->outgoing_cm <= p->steps[next_index].distance + p->steps[next_index].tolerance &&
             clearance >= JUNCTION_SHORT_CLEAR_CM &&
-            (route_prepares_straight(p) || p->exit_count >= LINE_CONFIRM_SAMPLES);
+            (route_prepares_straight(p) || p->exit_count >= LINE_CONFIRM_SAMPLES) && stable_clear;
         if (!normal_clear && !early_clear) return;
         /* Debounce the physical junction before consuming another table entry. */
         if (p->lap_boundary) {
