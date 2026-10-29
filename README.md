@@ -1,6 +1,6 @@
 # STM32 八路数字灰度巡线小车
 
-STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度，C / STM32Cube HAL 实现。支持普通 PWM 巡线、编码器双环仅巡线、编码器双环预设路径三种模式；位置误差为正时左轮加速、右轮减速，右转为正航向。路径使用 cm / cm/s，编码器定位为相对估计，不能消除打滑。
+STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度，C / STM32Cube HAL 实现。支持普通 PWM 巡线、编码器双环仅巡线、编码器双环预设路径三种模式，并可选用 MPU6050 I²C 陀螺仪航向；位置误差为正时左轮加速、右轮减速，右转为正航向。路径使用 cm / cm/s，编码器定位为相对估计，不能消除打滑。
 
 **2026-10-27 文档整理：** 本次按现有源码与 A10 设计资料更新当前配置，合并每日优化记录，并新增[下一步优化方案](#next-optimization)。方案以保留现有 PCB 为约束，尚未实现新增算法或传感器；没有修改固件参数、烧录或操作电机。现有参数中的速度是目标值，不是实测性能。
 
@@ -14,7 +14,7 @@ STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度，C / STM32Cube HAL 实现�
 | --- | --- |
 | 用户最新硬件信息 | 电池 12 V / 1200 mAh；PCB 降压 5 V；电机额定 7.4 V、减速箱 1:20；八路数字灰度。电池化学体系、满充电压、电机额定/堵转电流及全车质量待测 |
 | PCB | A10 设计为板载 5 V VM 驱动电机，经 R4 给核心板 +5V；本轮不改板、不改反馈电阻、不切线 |
-| 当前编译模式 | `ENCODER_CONTROL_ENABLED=1`、`PRESET_ROUTE_ENABLED=1`、`GRAY_INVERT_ENABLED=0`（巡黑线） |
+| 当前编译模式 | `ENCODER_CONTROL_ENABLED=1`、`PRESET_ROUTE_ENABLED=1`、`MPU6050_ENABLED=1`（IMU 偏航角）、`MPU6050_PITCH_STOP_ENABLED=1`（40° 俯仰锁定停车）、`GRAY_INVERT_ENABLED=0`（巡黑线） |
 | 当前路径 | `200±15 RIGHT → 82±8 RIGHT → 52±8 +60° → 70±10 -60° → 20±5 LEFT → 120±10 STOP`，第五项 80 cm/s、其余120 cm/s，圆弧开关均false；无限循环，非最终轮 STOP 按 LEFT 闭合 |
 | 速度与阶段参数 | 轮目标上限 120 cm/s；计数合理性基准 100 cm/s；接近上限 20、圆弧轴中点上限60、圆弧捕线6、非圆弧捕线半差上限12、异常保持上限 40 cm/s；这些组合需重新验证 |
 | 当前保护配置 | `LOST_LINE_STOP_ENABLED=0`、`ROUTE_AUTO_RESUME_ENABLED=1`、`FLOOR_SEAM_FILTER_ENABLED=0`；反馈/时序/路径保护仍存在，自动恢复仅限合格路径原因 |
@@ -96,6 +96,15 @@ flowchart LR
     SELECT -->|1| ROUTE{"PRESET_ROUTE_ENABLED"}
     ROUTE -->|0| ONLY["仅巡线 / ROUTE_DISABLED<br/>LINE_FOLLOW_SPEED_CM_S"]
     ROUTE -->|1| TABLE["预设路径 / 路口 FSM<br/>路径速度 / 转向 / STOP"]
+    ENC["TIM1/TIM4 编码器<br/>轮程、轮速"] --> SOURCE{"MPU6050_ENABLED"}
+    IMU["PB8/PB9 I²C1<br/>MPU6050 Z 轴角速度积分"] -->|1| SOURCE
+    IMU --> ACC["加速度计重力俯仰<br/>40°持续50ms判断"]
+    SOURCE -->|0：编码器轮差角| HEADING["统一航向 odometry.heading_rad<br/>右转正"]
+    SOURCE -->|1：IMU 角度| HEADING
+    HEADING --> POSE["轮轴及前探头位姿<br/>转角、航向保持、离口投影"]
+    POSE --> TABLE
+    POSE --> HOLD
+    ENC --> INNER
     ONLY --> CASCADE["目标线位置外环 + 双轮速度内环"]
     TABLE --> PRIORITY{"窗口内左右转/自定义角度 + 整排骤变？"}
     PRIORITY -->|否| CASCADE
@@ -104,9 +113,11 @@ flowchart LR
     INNER --> PWM
     CASCADE --> PWM
     GPIO --> BAD["未提交路径动作的丢线 / 干扰"]
-    BAD --> HOLD["0：历史 PWM 差值衰减<br/>1：编码器航向保持"]
+    BAD --> HOLD["PWM：历史差值衰减<br/>双环：所选航向源保持"]
     HOLD --> PWM
-    STOP["明确停止 / 超时 / 故障<br/>STBY 低"] --> PWM
+    IMU -->|读取失败：锁定停车| STOP["明确停止 / 超时 / 故障<br/>STBY 低"]
+    ACC -->|倾斜确认：锁定停车| STOP
+    STOP --> PWM
 ```
 
 2026-10-23 按用户要求只保留 `genericSTM32F103C8` 一个编译环境，移除原有两个通过 `-D` 强制模式的环境。`pio run` 和 PlatformIO 一键上传均按头文件编译：模式以 `include/motion_config.h` 为准，颜色以 `include/control_config.h` 为准。当前为编码器 1、路径 1、巡黑线 0、标定确认 1。上传协议及调试器明确为 ST-Link；`-g` 为同一份固件保留 ELF 变量调试信息，不改变 release 优化等级。`g_diagnostics.encoder_control_enabled`、`preset_route_enabled` 显示实际模式；PWM 模式的里程/轮速字段为 0，不代表已测得零速。
@@ -133,8 +144,30 @@ flowchart LR
 | 启动 / 停止按键 | PB10 | 常开按键另一端接 GND，内部上拉 |
 | 左轮编码器 A / B | PA8、PA9 | 开关为 1 时使用 TIM1_CH1 / TIM1_CH2 |
 | 右轮编码器 A / B | PB6、PB7 | 开关为 1 时使用 TIM4_CH1 / TIM4_CH2 |
+| MPU6050 SCL | PB8 / I²C1 重映射 SCL | A10 J12.5，SCL 上拉至 3.3 V |
+| MPU6050 SDA | PB9 / I²C1 重映射 SDA | A10 J12.6，SDA 上拉至 3.3 V |
+| MPU6050 VCC | +3V3 | A10 J12.10，模块必须兼容 3.3 V 电源 |
+| MPU6050 GND | GND | A10 J11.10，与 STM32 共地 |
+| MPU6050 AD0（有时误读成 ADC） | GND | I²C 7 位地址 0x68；接 3.3 V 为 0x69，需修改配置 |
+| MPU6050 XDA / XCL / INT | 不连接 | 辅助 I²C、数据中断；代码轮询主 I²C |
 | SWD | PA13、PA14 | 保留 SWDIO / SWCLK，另接调试器 GND |
 | 原调试串口预留变更 | PA9 已分配给编码器，PA10 仍未使用 | 不再将 PA9/PA10 作为可用的完整 USART1 默认接线对 |
+
+### MPU6050 接线和航向开关（2026-10-29）
+
+在 `include/motion_config.h` 中设置 `MPU6050_ENABLED`：当前为 **1**，从 MPU6050 陀螺仪得到全部航向；设为 **0** 则恢复原有编码器轮差估角，必须同时开启 `ENCODER_CONTROL_ENABLED=1`，修改后重新 `pio run` 编译。连接 PB8/PB9 时 I²C1 启用 remap（PB6/PB7 已用于编码器，不改变）；I²C 时钟 400 kHz。SCL/SDA 均须上拉到 **3.3 V**，如模块板上已经有连接 3.3 V 的电阻无需重复并联；否则各加约 4.7 kΩ。切勿把两根线通过上拉拉到 5 V。模块上标着 `ADC` 的排针如不确定是否为 `AD0`，先查实物丝印或模块电路，不要猜测其功能。
+
+模块初始化时先读 `WHO_AM_I=0x68`，设定陀螺仪 ±2000°/s、约 42 Hz 低通和 1 kHz 输出速率。**上电保持小车静止**，驱动待机状态下读取 128 次 Z 轴采样估计零偏；控制循环每 5 ms 检查数据就绪，启用俯仰保护时一次读 14 字节获取加速度计 XYZ、温度及陀螺仪 XYZ，关闭保护时只读取 Z 轴角速度。扣除零偏后按实际间隔积分为连续相对航向（rad）。启用后所有共用 `odometry.heading_rad` 的角度计算，包括路口转角/出口、圆弧规划反馈、异常航向保持、二维轮轴与灰度探头位姿及离口位移投影，都改用 IMU。**轮程、轮速、路径厘米位置及双轮速度 PID 仍使用编码器**。陀螺仪不能直接给出位移。
+
+用户确认 MPU6050 **倒置安装**（芯片 Z 正轴朝下，板面仍基本水平），因此 `MPU6050_YAW_SIGN=+1`，水平面导航仅积分 Z 轴偏航角；新增俯仰角只参与拿起停机保护，不参与航向计算或位置 PID。先手持缓慢右转并观察 `g_diagnostics.heading_rad` 是否增加，若实际模块轴向与假定不同再调整正负号。**歪斜安装时单纯 Z 轴读数只是车身真实转动在该轴的投影**，当前没有安装矩阵补偿，应把板子倒扣并水平固定。上电标定时不可移动或让电机震动，否则会产生角度偏差。
+
+**俯仰拿起保护（2026-10-29，默认启用）：** `include/motion_config.h` 中 `MPU6050_PITCH_STOP_ENABLED=1`；设置为 `0` 时禁用该判定（保留 MPU6050 偏航角），重新构建生效。该功能只在 `MPU6050_ENABLED=1` 时采样/生效；若关闭 IMU，旧编码器角度模式保持可用，不会请求加速度计。传感器 **X 轴须与车体前后轴平行**，倒置水平安装使 Z 轴朝下；`tilt_guard.c` 用加速度计读数计算 `abs(atan2(ax, sqrt(ay²+az²)))` 的角度（单位度），所以抬头与低头、倒置极性都触发同一个绝对值阈值。**俯仰绝对值大于 40°、连续 50 ms**，触发 `LINE_STOP_TILT` 锁定停车，STBY 拉低；姿态恢复水平后也不会自动启动，需要复位重新初始化。`MPU6050_PITCH_FILTER_TAU_S=0.040f` 进行低通；加速度模长明显偏离 1g（低于 0.70g 或高于 1.30g）的采样不累计确认时间，以减轻强烈加减速造成的假俯仰。可读 `g_diagnostics.pitch_stop_enabled`、`pitch_deg`、`pitch_over_threshold_ms` 与 `pitch_stop_latched`；这次停车的 `stop_reason`/`stop_snapshot.reason` 为 `LINE_STOP_TILT`。已有电机/看门狗故障保护独立生效。
+
+注意这是**车体前后俯仰超限停机**，并不直接检测人手接触。把小车基本水平地抬起来，或者只向左右滚转而没有明显俯仰，都不一定触发。激烈运动时加速度也可能影响倾角估计，滤波与近 1g 判定是暂定保护，不是实车验证的安全认证。模块若绕 Z 轴旋转了 90°，X 轴便不能表示小车前后俯仰；必须确认实际芯片轴向并调整安装后再测试。
+
+启用 IMU 后，初始化/I²C/数据就绪/非有限航向失败均触发停车：启动失败进入错误处理，运行中触发锁定 `LINE_STOP_IMU`，要求复位并重新标定，不会在动作中悄悄改用编码器角度。可在 `g_diagnostics` 观察 `imu_enabled`、`imu_ready`、`imu_gyro_z_raw`、`imu_gyro_z_bias_lsb` 及已切换的 `heading_rad`。I²C 事务设置有限超时，仍需实测高负载下 5 ms 任务预算。MPU6050 只有角速度积分偏航，温漂和零偏会积累；这里完成用户要求的严格来源切换，没有实现磁航向、姿态融合或编码器与 IMU 交叉验证。
+
+**2026-10-29 启动故障排查：** ST-Link 只读检查确认当时 MCU PC 停在 `Error_Handler`，`control_count=0`，程序尚未进入巡线控制循环。当前资料不能确定具体失败的是 I²C 初始化、模块地址、配置写入还是零偏校准；从启动顺序看 MPU6050 初始化是重点排查对象。新固件在上电时检测 MPU6050 的 0x68/0x69 两种地址，校验 `WHO_AM_I=0x68` 后才继续配置，失败依旧禁止驱动。发生初始化失败时保留 `g_diagnostics.imu_init_failure_stage`：1=STM32 I²C 初始化失败、2=两个地址均无法读取匹配的 WHO_AM_I、3=MPU6050 配置写入失败、4=静止零偏采样失败；`imu_address_7bit` 记录最后探测地址。成功为 0。此诊断需将新固件**另行烧录后**才能读取，不应把当前板上旧固件的 RAM 按新结构解释。地址探测不能替代 SCL/SDA 到 PB8/PB9、共地、3.3V 供电及正确上拉的实物检查；尚未进行实机修复验证。
 
 供电以用户 2026-10-27 信息为准：电池 12 V / 1200 mAh，电机额定 **7.4 V、减速箱 1:20**，现由 PCB 降压后的约 5 V VM 驱动。A10 设计路径为 `J13 → F1 → D1 → TPS54302/L1 → VM → TB6612`；`VM → R4（0 Ω）→ 核心板 +5V`，核心板再提供 +3V3。TB6612 逻辑 VCC 与灰度使用 3.3 V，各模块共地。设计标称 VM 约 5.077 V，实际值及电机负载下的压降待测；“3 A 降压芯片”不等于整板或双电机可持续输出 3 A。
 

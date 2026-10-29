@@ -17,6 +17,12 @@ typedef struct {
     float position, left_command, right_command;
     uint16_t left_encoder, right_encoder;
     bool encoder_control_enabled, preset_route_enabled, odometry_ready;
+    bool imu_enabled, imu_ready;
+    int16_t imu_gyro_z_raw;
+    float imu_gyro_z_bias_lsb;
+    uint8_t imu_init_failure_stage, imu_address_7bit;
+    bool pitch_stop_enabled, pitch_stop_latched;
+    float pitch_deg, pitch_over_threshold_ms;
     float distance_cm, heading_rad, left_speed_cm_s, right_speed_cm_s;
     float left_target_cm_s, right_target_cm_s;
     RouteState route_state;

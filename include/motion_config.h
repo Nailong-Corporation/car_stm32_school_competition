@@ -29,6 +29,48 @@
 #error "PRESET_ROUTE_ENABLED requires ENCODER_CONTROL_ENABLED=1"
 #endif
 
+/* MPU6050 航向选择：0 维持编码器轮差估角；1 所有角度/位姿改用 IMU Z 轴积分。
+ * 默认 0，接好 PB8/PB9 和 3.3 V、确认装配方向后再改 1 并重新编译。
+ * 编码器仍负责里程和左右轮速度闭环；IMU 不提供绝对偏航或厘米位移。
+ */
+#ifndef MPU6050_ENABLED
+#define MPU6050_ENABLED                1
+#endif
+#if MPU6050_ENABLED != 0 && MPU6050_ENABLED != 1
+#error "MPU6050_ENABLED must be 0 or 1"
+#endif
+#if MPU6050_ENABLED && !ENCODER_CONTROL_ENABLED
+#error "MPU6050_ENABLED requires ENCODER_CONTROL_ENABLED=1"
+#endif
+
+/* AD0 接 GND 时 7-bit 地址 0x68；若 AD0 接 3.3 V 则改为 0x69。 */
+#define MPU6050_ADDRESS_7BIT           0x68U
+/* 实际 MPU6050 倒置安装（芯片面朝下、芯片 Z 正轴朝地面），车体右转时
+ * 在传感器坐标下读得正 Z 角速度：+1 对应全系统右转正航向。
+ * 仅使用水平面偏航角，不融合俯仰/横滚；必须近似水平固定并手持右转核实。 */
+#define MPU6050_YAW_SIGN               1
+#define MPU6050_GYRO_BIAS_SAMPLES      128U
+#define MPU6050_GYRO_CALIBRATION_MS    5U
+#define MPU6050_I2C_TIMEOUT_MS         2U
+
+/* MPU6050 俯仰防拿起保护：默认开启，只有 MPU6050_ENABLED=1 时生效。
+ * 通过加速度计重力方向计算车体前后俯仰角的绝对值，超过 40° 连续
+ * 50ms 后锁定停车；不参与原有水平面偏航导航。
+ * 倒置安装仅改变符号，绝对值门槛保持不变。传感器 X 轴必须沿车体前后方向。
+ */
+#ifndef MPU6050_PITCH_STOP_ENABLED
+#define MPU6050_PITCH_STOP_ENABLED     1
+#endif
+#if MPU6050_PITCH_STOP_ENABLED != 0 && MPU6050_PITCH_STOP_ENABLED != 1
+#error "MPU6050_PITCH_STOP_ENABLED must be 0 or 1"
+#endif
+#define MPU6050_PITCH_STOP_DEG         40.0f
+#define MPU6050_PITCH_CONFIRM_MS       50U
+#define MPU6050_PITCH_FILTER_TAU_S     0.040f
+/* 重力加速度偏离过大时姿态不可信（例如瞬态加速），不计入持续倾斜时间。 */
+#define MPU6050_PITCH_MIN_G            0.70f
+#define MPU6050_PITCH_MAX_G            1.30f
+
 /* 路径可恢复停车后，连续有效单线自动恢复当前项；不从第 0 项重跑。
  * 不恢复按键/最终 STOP、无效路径、反向/过转、编码器或控制故障。
  */

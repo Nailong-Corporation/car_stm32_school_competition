@@ -4,7 +4,7 @@ project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 test_binary=$(mktemp "${TMPDIR:-/tmp}/car_stm32_test.XXXXXX")
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
 # 生产转角比例与理想几何分开验证；不覆盖PlatformIO固件配置。
-"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+"${CC:-cc}" -DMPU6050_ENABLED=0 -std=c11 -Wall -Wextra -Werror -pedantic -g \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -I"$project_dir/include" "$project_dir/test/test_heading_scale.c" \
     "$project_dir/src/odometry.c" "$project_dir/src/gray_sensor.c" \
@@ -12,10 +12,27 @@ trap 'rm -f "$test_binary"' EXIT HUP INT TERM
     "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
     "$project_dir/src/speed_control.c" -lm -o "$test_binary"
 "$test_binary"
+# 含倒置正反号、40°门槛、瞬态滤波、持续确认和锁定逻辑。
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" "$project_dir/test/test_tilt_guard.c" \
+    "$project_dir/src/tilt_guard.c" -lm -o "$test_binary"
+"$test_binary"
+# 启用 IMU 的独立航向输入：车轮差不能代替真实车身角度；IMU 掉样锁定停车。
+"${CC:-cc}" -DMPU6050_ENABLED=1 -DODOMETRY_HEADING_SCALE=1.0f \
+    -DGRAY_INVERT_ENABLED=1 -DFLOOR_SEAM_FILTER_ENABLED=0 \
+    -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" \
+    "$project_dir/test/test_imu_heading.c" "$project_dir/src/odometry.c" \
+    "$project_dir/src/gray_sensor.c" "$project_dir/src/line_follow.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/route.c" \
+    "$project_dir/src/speed_control.c" -lm -o "$test_binary"
+"$test_binary"
 # 以下合成导航用例按无打滑理想几何生成计数，显式使用单位转角比例。
 for invert in 1 0; do
     echo "GRAY_INVERT_ENABLED=$invert"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/include" \
         "$project_dir/test/test_logic.c" \
@@ -23,19 +40,19 @@ for invert in 1 0; do
         "$project_dir/src/motor_command.c" \
         -lm -o "$test_binary"
     "$test_binary"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/test/fakes" -I"$project_dir/include" \
         "$project_dir/test/test_encoder_hal.c" "$project_dir/src/encoder.c" \
         -o "$test_binary"
     "$test_binary"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/test/fakes" -I"$project_dir/include" \
         "$project_dir/test/test_motor_hal.c" "$project_dir/src/motor.c" \
         "$project_dir/src/motor_command.c" -lm -o "$test_binary"
     "$test_binary"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/include" \
         -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
@@ -45,7 +62,7 @@ for invert in 1 0; do
         "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
         -lm -o "$test_binary"
     "$test_binary"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/include" \
         -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
@@ -55,7 +72,7 @@ for invert in 1 0; do
         "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
         -lm -o "$test_binary"
     "$test_binary"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/include" \
         -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=0 \
@@ -78,7 +95,7 @@ done
 for loss_stop in 1 0; do
     for mode in "0 0" "1 0" "1 1"; do
         set -- $mode
-        "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -std=c11 -Wall -Wextra -Werror -pedantic -g \
+        "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -std=c11 -Wall -Wextra -Werror -pedantic -g \
             -fsanitize=address,undefined -fno-omit-frame-pointer \
             -I"$project_dir/include" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED="$loss_stop" \
             -DENCODER_CONTROL_ENABLED="$1" -DPRESET_ROUTE_ENABLED="$2" \
@@ -96,7 +113,7 @@ for invert in 1 0; do
     for seam_filter in 1 0; do
         for mode in "0 0" "1 0" "1 1"; do
             set -- $mode
-            "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -std=c11 -Wall -Wextra -Werror -pedantic -g \
+            "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -std=c11 -Wall -Wextra -Werror -pedantic -g \
                 -fsanitize=address,undefined -fno-omit-frame-pointer \
                 -I"$project_dir/include" -DGRAY_INVERT_ENABLED="$invert" \
                 -DFLOOR_SEAM_FILTER_ENABLED="$seam_filter" -DLOST_LINE_STOP_ENABLED=1 \

@@ -4,6 +4,7 @@
 #include "encoder.h"
 #include "motor.h"
 #include "motion_config.h"
+#include "mpu6050.h"
 #include <math.h>
 
 volatile uint32_t g_control_request;
@@ -11,6 +12,9 @@ volatile ControlDiagnostics g_diagnostics;
 static IWDG_HandleTypeDef watchdog;
 static GraySensor sensor;
 static LineFollow follow;
+#if MPU6050_ENABLED
+static Mpu6050 imu;
+#endif
 
 void route_stop_callback(size_t step_index, void *context)
 {
@@ -111,6 +115,14 @@ int main(void)
     motor_safe_gpio_init();
     if (HAL_Init() != HAL_OK || !clock_init()) Error_Handler();
     sensor_gpio_init();
+#if MPU6050_ENABLED
+    /* Calibrate while the motor is in reset-safe standby, before enabling IWDG. */
+    if (!mpu6050_init(&imu)) {
+        g_diagnostics.imu_init_failure_stage = imu.init_failure_stage;
+        g_diagnostics.imu_address_7bit = imu.address_7bit;
+        Error_Handler();
+    }
+#endif
 #if ENCODER_CONTROL_ENABLED
     if (!encoder_init()) Error_Handler();
 #endif
@@ -130,6 +142,13 @@ int main(void)
     g_diagnostics.encoder_control_enabled = ENCODER_CONTROL_ENABLED != 0;
     g_diagnostics.preset_route_enabled = PRESET_ROUTE_ENABLED != 0;
     g_diagnostics.odometry_ready = follow.odometry.ready;
+    g_diagnostics.imu_enabled = MPU6050_ENABLED != 0;
+    g_diagnostics.pitch_stop_enabled = MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED;
+#if MPU6050_ENABLED
+    g_diagnostics.imu_ready = imu.ready;
+    g_diagnostics.imu_gyro_z_bias_lsb = imu.gyro_z_bias_lsb;
+    g_diagnostics.imu_address_7bit = imu.address_7bit;
+#endif
     if (!watchdog_init()) Error_Handler();
     uint32_t last_control_ms = HAL_GetTick();
     bool start_pending = false;
@@ -157,13 +176,31 @@ int main(void)
 #endif
             GrayObservation observation = gray_sensor_update(&sensor, read_raw(),
                 line_follow_have_recent_position(&follow, now_ms), follow.reliable_position);
+            bool imu_valid = false;
+            float imu_heading_rad = 0.0f;
+#if MPU6050_ENABLED
+            imu_valid = mpu6050_update(&imu, (float)interval / 1000.0f, &imu_heading_rad);
+            g_diagnostics.imu_ready = imu_valid;
+            g_diagnostics.imu_gyro_z_raw = imu.gyro_z_raw;
+#if MPU6050_PITCH_STOP_ENABLED
+            g_diagnostics.pitch_deg = imu.pitch_guard.pitch_deg;
+            g_diagnostics.pitch_over_threshold_ms = imu.pitch_guard.above_threshold_s * 1000.0f;
+            g_diagnostics.pitch_stop_latched = imu.pitch_guard.tripped;
+#endif
+#endif
             if (start_pending) {
                 ++g_diagnostics.start_request_count;
                 g_diagnostics.start_raw_mask = observation.raw_mask;
                 g_diagnostics.start_line_mask = observation.line_mask;
             }
-            line_follow_update(&follow, observation, counts, now_ms,
-                               (float)interval / 1000.0f, start_pending);
+            line_follow_update_heading(&follow, observation, counts, now_ms,
+                               (float)interval / 1000.0f, start_pending,
+                               imu_valid, imu_heading_rad);
+#if MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED
+            /* Tilt is a latched safety stop even in IDLE or a route auto-resume.
+             * Run before motor_apply so no motor command from this cycle reaches STBY. */
+            if (imu.pitch_guard.tripped) line_follow_stop(&follow, LINE_STOP_TILT);
+#endif
             start_pending = false; /* One-shot; failed start is never queued for later. */
             uint32_t duration = (uint32_t)(HAL_GetTick() - now_ms);
             if (duration >= CONTROL_PERIOD_MS) line_follow_stop(&follow, LINE_STOP_FAULT);

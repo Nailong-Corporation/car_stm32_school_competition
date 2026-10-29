@@ -39,4 +39,9 @@
  * Open-drain outputs need a verified external pull-up, preferably to 3.3 V. */
 #define ENCODER_INPUT_PULL GPIO_NOPULL
 
+/* MPU6050 I2C1 remap: PB8=SCL, PB9=SDA; 3.3 V external pull-ups required. */
+#define IMU_I2C_PORT GPIOB
+#define IMU_I2C_SCL_PIN GPIO_PIN_8
+#define IMU_I2C_SDA_PIN GPIO_PIN_9
+
 #endif

@@ -7,7 +7,8 @@
 typedef enum { LINE_IDLE, LINE_TRACKING, LINE_GAP_HOLD, LINE_JUNCTION, LINE_STOPPED } LineState;
 typedef enum {
     LINE_STOP_NONE, LINE_STOP_REQUEST, LINE_STOP_LOST, LINE_STOP_FAULT,
-    LINE_STOP_ENCODER, LINE_STOP_CALIBRATION, LINE_STOP_ROUTE, LINE_STOP_ROUTE_COMPLETE
+    LINE_STOP_ENCODER, LINE_STOP_CALIBRATION, LINE_STOP_ROUTE, LINE_STOP_ROUTE_COMPLETE,
+    LINE_STOP_IMU, LINE_STOP_TILT
 } LineStopReason;
 /* 最近一次启动请求或自动恢复的结果；避免启动门禁静默拒绝。 */
 typedef enum {
@@ -99,5 +100,9 @@ void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
 void line_follow_stop(LineFollow *follow, LineStopReason reason);
 void line_follow_update(LineFollow *follow, GrayObservation observation, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request);
+/* IMU 已启用时主循环每个控制周期必须给出有效实测航向；丢样锁定停车。 */
+void line_follow_update_heading(LineFollow *follow, GrayObservation observation,
+                        EncoderCounts counts, uint32_t now_ms, float dt, bool start_request,
+                        bool imu_valid, float imu_heading_rad);
 bool line_follow_have_recent_position(const LineFollow *follow, uint32_t now_ms);
 #endif

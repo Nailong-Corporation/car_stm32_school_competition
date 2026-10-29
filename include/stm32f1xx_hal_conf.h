@@ -9,6 +9,7 @@
 #define HAL_FLASH_MODULE_ENABLED
 #define HAL_PWR_MODULE_ENABLED
 #define HAL_TIM_MODULE_ENABLED
+#define HAL_I2C_MODULE_ENABLED
 #define HAL_IWDG_MODULE_ENABLED
 #define HSE_VALUE 8000000U /* Unused: application selects HSI/2 * 16. */
 #define HSE_STARTUP_TIMEOUT 100U
@@ -28,6 +29,7 @@
 #include "stm32f1xx_hal_pwr.h"
 #include "stm32f1xx_hal_dma.h"
 #include "stm32f1xx_hal_tim.h"
+#include "stm32f1xx_hal_i2c.h"
 #include "stm32f1xx_hal_iwdg.h"
 #define assert_param(expr) ((void)0U)
 

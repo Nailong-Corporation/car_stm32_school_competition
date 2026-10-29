@@ -9,7 +9,8 @@
  */
 static bool locked(LineStopReason reason)
 {
-    return reason == LINE_STOP_FAULT || reason == LINE_STOP_ENCODER;
+    return reason == LINE_STOP_FAULT || reason == LINE_STOP_ENCODER ||
+           reason == LINE_STOP_IMU || reason == LINE_STOP_TILT;
 }
 
 /* 只记录请求结果，不排队、不放宽连续白线与故障门禁。 */
@@ -291,9 +292,14 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
  * 编码器模式用 counts 更新里程和速度内环，仅开启路径时推进路口；PWM 模式忽略 counts。
  * 非法观测或时序进入故障停车；启动请求为一次性，超时判断先于恢复确认。
  */
-void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
-                        uint32_t now_ms, float dt, bool start_request)
+void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCounts counts,
+                        uint32_t now_ms, float dt, bool start_request,
+                        bool imu_valid, float imu_heading_rad)
 {
+#if !MPU6050_ENABLED
+    (void)imu_valid;
+    (void)imu_heading_rad;
+#endif
 #if ENCODER_CONTROL_ENABLED && PRESET_ROUTE_ENABLED
     bool was_waiting_after_straight = f->route.state == ROUTE_FOLLOW &&
         route_waiting_after_straight(&f->route, f->odometry.distance_cm);
@@ -325,7 +331,20 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
         }
         return;
     }
-    if (!odometry_update(&f->odometry, counts, dt)) {
+#if MPU6050_ENABLED
+    if (!imu_valid || !isfinite(imu_heading_rad)) {
+        line_follow_stop(f, LINE_STOP_IMU);
+        if (start_request) f->start_result = LINE_START_REJECTED_FAULT;
+        return;
+    }
+#endif
+    if (!odometry_update_with_heading(&f->odometry, counts, dt,
+#if MPU6050_ENABLED
+                                      true, imu_heading_rad
+#else
+                                      false, 0.0f
+#endif
+                                      )) {
         line_follow_stop(f, LINE_STOP_ENCODER);
         if (start_request) f->start_result = LINE_START_REJECTED_FAULT;
         return;
@@ -775,4 +794,10 @@ void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts
     }
 #endif
 #endif
+}
+
+void line_follow_update(LineFollow *f, GrayObservation obs, EncoderCounts counts,
+                        uint32_t now_ms, float dt, bool start_request)
+{
+    line_follow_update_heading(f, obs, counts, now_ms, dt, start_request, false, 0.0f);
 }

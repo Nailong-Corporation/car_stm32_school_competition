@@ -50,13 +50,20 @@ static int32_t delta(uint16_t now, uint16_t before)
  * 首帧只建立计数基准；右转航向为正，倒退保留距离符号。
  * 标定无效、时序异常或计数跳变超限返回 false；不补偿打滑或多圈采样混叠。
  */
-bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
+bool odometry_update_with_heading(Odometry *o, EncoderCounts counts, float dt,
+                                 bool use_imu, float imu_heading_rad)
 {
     if (!o->ready || !isfinite(dt) || dt <= 0.0f ||
-        dt > (float)CONTROL_MAX_INTERVAL_MS / 1000.0f) return false;
+        dt > (float)CONTROL_MAX_INTERVAL_MS / 1000.0f ||
+        (use_imu && !isfinite(imu_heading_rad))) return false;
     if (!o->primed) {
         o->previous = counts;
         o->primed = true;
+        if (use_imu) {
+            o->heading_rad = imu_heading_rad;
+            o->sensor_x_cm = o->x_cm + GRAY_FORWARD_OFFSET_CM * cosf(o->heading_rad);
+            o->sensor_y_cm = o->y_cm + GRAY_FORWARD_OFFSET_CM * sinf(o->heading_rad);
+        }
         return true;
     }
     int32_t dl = delta(counts.left, o->previous.left);
@@ -72,7 +79,8 @@ bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
     o->left_delta = dl;
     o->right_delta = dr;
     float ds = (l + r) * 0.5f;
-    float dh = (l - r) / o->calibration.track_cm * ODOMETRY_HEADING_SCALE;
+    float encoder_dh = (l - r) / o->calibration.track_cm * ODOMETRY_HEADING_SCALE;
+    float dh = use_imu ? imu_heading_rad - o->heading_rad : encoder_dh;
     float half = dh * 0.5f;
     float sinc = fabsf(half) < 0.00001f ? 1.0f : sinf(half) / half;
     float mid = o->heading_rad + half;
@@ -84,7 +92,7 @@ bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
     /* 单周期恒曲率假设下，前置探头速度模长为 hypot(v, L*omega)。 */
     o->sensor_distance_cm += hypotf(ds, GRAY_FORWARD_OFFSET_CM * dh);
     /* Clockwise/right is positive, matching positive line error and wheel mixing. */
-    o->heading_rad += dh;
+    o->heading_rad = use_imu ? imu_heading_rad : o->heading_rad + dh;
     o->sensor_x_cm = o->x_cm + GRAY_FORWARD_OFFSET_CM * cosf(o->heading_rad);
     o->sensor_y_cm = o->y_cm + GRAY_FORWARD_OFFSET_CM * sinf(o->heading_rad);
     float alpha = dt / (SPEED_FILTER_TAU_S + dt);
@@ -94,4 +102,9 @@ bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
         isfinite(o->left_distance_cm) && isfinite(o->right_distance_cm) &&
         isfinite(o->sensor_distance_cm) && isfinite(o->distance_cm) && isfinite(o->heading_rad) &&
         isfinite(o->left_speed_cm_s) && isfinite(o->right_speed_cm_s);
+}
+
+bool odometry_update(Odometry *o, EncoderCounts counts, float dt)
+{
+    return odometry_update_with_heading(o, counts, dt, false, 0.0f);
 }
