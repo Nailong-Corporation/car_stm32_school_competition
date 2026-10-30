@@ -14,8 +14,8 @@
 #define MOTOR_RIGHT_IN2 GPIO_PIN_15
 #define MOTOR_STBY_PORT GPIOB
 #define MOTOR_STBY_PIN GPIO_PIN_5
-/* Change only after suspended-wheel forward-direction verification. */
-#define MOTOR_LEFT_FORWARD_IN1_HIGH 1
+/* 2026-10-29 按用户更正：电机极性左 -1（IN1 低）、右 +1（IN1 高）。 */
+#define MOTOR_LEFT_FORWARD_IN1_HIGH 0
 #define MOTOR_RIGHT_FORWARD_IN1_HIGH 1
 #define MOTOR_PWM_PORT GPIOA
 #define MOTOR_PWM_PINS (GPIO_PIN_6 | GPIO_PIN_7)

@@ -1,0 +1,8 @@
+0x080047a8 in main () at src/main.c:284
+284	        __WFI(); /* SysTick wakes every ms; no blocking delay or serial output. */
+$1 = {left_diameter_cm = 4.80000019, right_diameter_cm = 4.80000019, left_counts_per_rev = 1560, right_counts_per_rev = 1560, track_cm = 14.5, left_sign = -1, right_sign = 1, confirmed = true}
+$2 = LINE_START_ACCEPTED
+$3 = {valid = true, reason = LINE_STOP_ENCODER, state_before_stop = LINE_TRACKING, route_state = ROUTE_FOLLOW, route_state_before_update = ROUTE_FOLLOW, route_failure = ROUTE_FAILURE_NONE, speed_fault = SPEED_FAULT_REVERSE, speed_fault_wheel = 1 '\001', observation = {kind = GRAY_VALID, raw_mask = 16 '\020', line_mask = 16 '\020', selected_mask = 16 '\020', white_count = 1 '\001', region_count = 1 '\001', position = 1, prefilter_mask = 16 '\020', seam_mask = 0 '\000'}, counts = {left = 1, right = 0}, sample_ms = 1566, reliable_age_ms = 0, route_phase_age_ms = 1566, route_index = 0, dt_s = 0.00499999989, base = 4.59999943, left_target_cm_s = 6.39999962, right_target_cm_s = 2.79999948, left_speed_cm_s = -0.593795598, right_speed_cm_s = 0, distance_cm = -0.0103914235, route_progress_cm = -0.0103914235, clear_progress_cm = -0.0103914235, turn_rad = -0.00288671069, actual_turn_rad = -0.00288671069, exit_candidate_age_ms = 0, exit_candidate_progress_cm = 0, exit_candidate_pending = false, exit_confirm_samples = 0 '\000', handoff_early = false, segment_start_progress_cm = 0, turn_exit_branch = false, exit_line_mask = 0 '\000', exit_recovery_active = false, exit_lateral_error_cm = 0}
+[Inferior 1 (Remote target) detached]
+shutdown command invoked
+Protocol error with Rcmd: 06.

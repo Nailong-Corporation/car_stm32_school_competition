@@ -9,6 +9,7 @@
 typedef struct {
     I2C_HandleTypeDef i2c;
     float gyro_z_bias_lsb;
+    float gyro_z_calibration_span_lsb; /* Max-min during startup; retained on rejected calibration. */
     float heading_rad; /* Continuous relative yaw: clockwise/right is positive. */
     int16_t gyro_z_raw;
     uint8_t address_7bit;

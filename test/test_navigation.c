@@ -48,8 +48,8 @@ static void tick(LineFollow *f, EncoderCounts *counts, uint32_t *now,
     counts->right = (uint16_t)(counts->right + r);
     *now += 5U;
     line_follow_update(f, mask(line), *counts, *now, 0.005f, start);
-    CHECK(f->command.left >= 0 && f->command.left <= MOTOR_PWM_LIMIT);
-    CHECK(f->command.right >= 0 && f->command.right <= MOTOR_PWM_LIMIT);
+    CHECK(f->command.left >= (MOTOR_REVERSE_BRAKE_ENABLED ? -REVERSE_BRAKE_MAX_PWM : 0) && f->command.left <= MOTOR_PWM_LIMIT);
+    CHECK(f->command.right >= (MOTOR_REVERSE_BRAKE_ENABLED ? -REVERSE_BRAKE_MAX_PWM : 0) && f->command.right <= MOTOR_PWM_LIMIT);
     CHECK(f->left_target_cm_s >= 0 && f->left_target_cm_s <= WHEEL_TARGET_MAX_CM_S);
     CHECK(f->right_target_cm_s >= 0 && f->right_target_cm_s <= WHEEL_TARGET_MAX_CM_S);
     if (f->state == LINE_STOPPED || f->state == LINE_IDLE) CHECK(!f->command.enabled);
@@ -104,7 +104,9 @@ static void test_corner_mode_switch(void)
         tick(&f,&c,&now,0,0,0,false);
         CHECK(route_uses_corner_arc(&f.route)==(enabled!=0));
         if (enabled) {
-            NEAR(f.left_target_cm_s,8); NEAR(f.right_target_cm_s,8);
+            CHECK(f.left_target_cm_s>0 && f.right_target_cm_s>0);
+            CHECK(mirror ? f.left_target_cm_s>f.right_target_cm_s :
+                           f.left_target_cm_s<f.right_target_cm_s);
         } else {
             NEAR(f.left_target_cm_s,mirror?8:0);
             NEAR(f.right_target_cm_s,mirror?0:8);
@@ -128,7 +130,30 @@ static void test_corner_mode_switch(void)
     CHECK(p.valid && !route_uses_corner_arc(&p)); /* 省略新增字段时默认为 false。 */
 }
 
-/* 已标定几何下，切点前两轮前进；圆弧中窄线不改变 R=10 的规划轮速。 */
+static void test_arc_exit_requires_center(void)
+{
+    for (unsigned side=0;side<2;++side) {
+        RouteStep steps[]={{100,10,side?RIGHT:LEFT,40,0,true},{200,10,STOP,40,0,true}};
+        RoutePlanner p; init_route_once(&p,steps,2,NULL,NULL); route_start(&p,0,0);
+        p.state=ROUTE_EXECUTING; p.entry_cm=0; p.phase_ms=0;
+        float heading=(side?1.0f:-1.0f)*JUNCTION_TURN_TARGET_RAD;
+        for (unsigned t=5;t<=100;t+=5) route_update(&p,mask(0),t*.01f,heading,t);
+        CHECK(p.state==ROUTE_EXECUTING && p.corner_arc_complete);
+        for (unsigned t=105;t<=200;t+=5) route_update(&p,mask(0x60),t*.01f,heading,t);
+        CHECK(p.state==ROUTE_EXECUTING);
+        for (unsigned t=205;t<=245;t+=5) route_update(&p,mask(0x18),t*.01f,heading,t);
+        route_update(&p,mask(0),2.50f,heading,250);
+        CHECK(p.state==ROUTE_EXECUTING && !p.exit_candidate_pending);
+        for (unsigned t=255;t<=305;t+=5) route_update(&p,mask(0x18),t*.01f,heading,t);
+        CHECK(p.state==ROUTE_CLEARING && p.turn_ended_on_line);
+        init_route_once(&p,steps,2,NULL,NULL); route_start(&p,0,0);
+        p.state=ROUTE_EXECUTING; p.entry_cm=0; p.phase_ms=0;
+        route_update(&p,mask(0),1,heading,JUNCTION_ACTION_TIMEOUT_MS);
+        CHECK(p.state==ROUTE_FAILED && p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
+    }
+}
+
+/* 左右镜像：确认后立即沿 R=16 圆弧，两轮目标均向前。 */
 static void test_corner_kinematics(void)
 {
     for (unsigned mirror=0;mirror<2;++mirror) {
@@ -137,11 +162,11 @@ static void test_corner_kinematics(void)
             LineFollow f; EncoderCounts c; uint32_t now=0;
             start(&f,&c,&now,steps,2);
             f.odometry.calibration.track_cm=WHEEL_TRACK_CM;
-            float angle=phase==0?0:.3f*(float)phase;
+            float angle=.3f*(float)phase;
             f.route.state=ROUTE_EXECUTING;
             f.route.phase_ms=now;
             f.route.entry_cm=0;
-            f.odometry.distance_cm=phase==0?5.9f:6+10*angle;
+            f.odometry.distance_cm=CORNER_RADIUS_CM*angle;
             f.odometry.heading_rad=(mirror?1:-1)*angle;
             f.route.projection_previous_cm=f.odometry.distance_cm;
             f.route.projection_previous_heading=f.odometry.heading_rad;
@@ -149,14 +174,12 @@ static void test_corner_kinematics(void)
             f.base=JUNCTION_TURN_SPEED_CM_S;
             tick(&f,&c,&now,0,0,phase%2?0x04:0,false);
             CHECK(f.route.state==ROUTE_EXECUTING && !f.pid.primed);
-            if (phase==0) {
-                NEAR(f.left_target_cm_s,JUNCTION_TURN_SPEED_CM_S);
-                NEAR(f.right_target_cm_s,JUNCTION_TURN_SPEED_CM_S);
-            } else {
+            {
                 float half_diff=JUNCTION_TURN_SPEED_CM_S*WHEEL_TRACK_CM/(2*CORNER_RADIUS_CM);
                 NEAR(f.left_target_cm_s,JUNCTION_TURN_SPEED_CM_S+(mirror?half_diff:-half_diff));
                 NEAR(f.right_target_cm_s,JUNCTION_TURN_SPEED_CM_S+(mirror?-half_diff:half_diff));
-                NEAR(WHEEL_TRACK_CM*f.base/fabsf(f.left_target_cm_s-f.right_target_cm_s),10);
+                NEAR(WHEEL_TRACK_CM*f.base/fabsf(f.left_target_cm_s-f.right_target_cm_s),CORNER_RADIUS_CM);
+                CHECK(f.left_target_cm_s>0 && f.right_target_cm_s>0);
             }
             if (phase==3) {
                 f.odometry.heading_rad=(mirror?1:-1)*(JUNCTION_TURN_TARGET_RAD+.01f);
@@ -1153,7 +1176,10 @@ static void test_turn_without_line_keeps_direction(void)
         }
         /* 看到中心出口线后走原确认流程；角度到位本身不能代替此观测。 */
         f.odometry.heading_rad=.2f+sign*target;
-        for(unsigned i=0;i<3;++i) tick(&f,&c,&now,0,0,0x18,false);
+        for(unsigned i=0;i<(arc?11U:3U);++i) {
+            if (arc) f.odometry.distance_cm+=0.05f;
+            tick(&f,&c,&now,0,0,0x18,false);
+        }
         CHECK(f.route.state==ROUTE_CLEARING);
     }
 }
@@ -2465,7 +2491,11 @@ static void test_corner_into_straight_entry(void)
         f.odometry.distance_cm=76+6+10*(JUNCTION_TURN_TARGET_RAD-.02f);
         for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) tick(&f,&c,&now,0,0,0,false);
         CHECK(f.route.state==ROUTE_EXECUTING);
-        for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) tick(&f,&c,&now,0,0,0x18,false);
+        f.odometry.heading_rad=direction*JUNCTION_TURN_TARGET_RAD;
+        for(unsigned i=0;i<11;++i) {
+            f.odometry.distance_cm+=0.05f;
+            tick(&f,&c,&now,0,0,0x18,false);
+        }
         CHECK(f.route.state==ROUTE_CLEARING && !f.pid.primed);
         CHECK(!f.route.turn_ended_on_line);
         CHECK(f.straight_entry_aligned.valid && !f.straight_entry_aligned.pid_active);
@@ -2477,7 +2507,7 @@ static void test_corner_into_straight_entry(void)
             LineFollow copy=f; EncoderCounts sample=c; uint32_t time=now;
             tick(&copy,&sample,&time,0,0,shapes[i],false);
             CHECK(copy.route.state==ROUTE_CLEARING && !copy.pid.primed && !copy.abnormal);
-            CHECK(direction*(copy.left_target_cm_s-copy.right_target_cm_s)>0);
+            CHECK(direction*(copy.left_target_cm_s-copy.right_target_cm_s)>=-0.001f);
             if(i==0) {expected_left=copy.left_target_cm_s; expected_right=copy.right_target_cm_s;}
             NEAR(copy.left_target_cm_s,expected_left); NEAR(copy.right_target_cm_s,expected_right);
         }
@@ -2537,7 +2567,7 @@ static void test_ambiguity_keeps_speed(void)
 int main(void)
 {
     test_steering_with_saturated_outer_feedback(); test_exit_requires_stable_center_and_distance_bounds(); test_spatial_exit_recapture(); test_encoder_tracking_pid_at_maximum_speed(); test_line_detection_cancels_sweep(); test_turn_without_line_keeps_direction(); test_nonarc_clearing_uses_line_pid(); test_nonarc_exit_needs_reliable_line(); test_nonarc_keeps_outer_speed(); test_ambiguity_keeps_speed();
-    test_corner_into_straight_entry(); test_after_straight_turn_gate(); test_straight_resistor(); test_route_auto_resume(); test_route_resume_phases(); test_short_segment_heading_reference(); test_spatial_short_s(); test_offset_odometry(); test_corner_mode_switch(); test_corner_kinematics(); test_turn_online_exit();
+    test_corner_into_straight_entry(); test_after_straight_turn_gate(); test_straight_resistor(); test_route_auto_resume(); test_route_resume_phases(); test_short_segment_heading_reference(); test_spatial_short_s(); test_offset_odometry(); test_corner_mode_switch(); test_corner_kinematics(); test_arc_exit_requires_center(); test_turn_online_exit();
     test_plain_turn_overshoot_recovery(); test_custom_turn_heading_limit(); test_custom_exit_angle_hysteresis(); test_custom_capture_recentering(); test_branch_exit_capture(); test_short_segment_handoff(); test_custom_turns(); test_odometry(); test_measured_distance_scale(); test_speed(); test_left_encoder_direction(); test_routes(); test_controller(); test_full_route_pipeline(); test_post_turn_stop_snapshot(); test_raw_pipeline();
     test_startup_ramp(); test_junction_approach_speed(); test_early_exit_acceleration(); test_long_straight_without_timeout(); test_reference_path(); test_route_repeats(); test_loop_end_corner(); test_corner_distance_projection(); test_capture_cancellation(); test_near_angle_exit(); test_exit_evidence_boundaries(); test_relaxed_exit_acceleration(); test_late_turn_clear_budget(); test_turn_capture(); test_l_corner_confirmation(); test_route_abrupt_priority(); test_spatial_corner();
     printf("PASS: odometry, nested loops, junction FSM, interference and route STOP; %u checks\n",checks);

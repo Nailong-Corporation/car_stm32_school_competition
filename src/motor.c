@@ -1,6 +1,7 @@
 #include "motor.h"
 #include "board_config.h"
 #include "control_config.h"
+#include "motion_config.h"
 #include <math.h>
 
 static TIM_HandleTypeDef pwm_timer;
@@ -76,13 +77,16 @@ bool motor_init(void)
 }
 
 /**
- * @brief 将单轮非负 command 经增益、死区和限幅映射到指定 PWM 通道。
+ * @brief 将单轮有符号 command 经增益、死区和限幅映射到指定 PWM 通道。
  * in1/in2 与 in1_forward 决定前进极性；不负责 STBY，单轮零 PWM 不等于整车待机。
  */
 static void set_wheel(uint16_t in1, uint16_t in2, uint32_t channel,
                       float command, float gain, float deadzone, bool in1_forward)
 {
-    uint16_t ccr = motor_command_to_ccr(command, gain, deadzone, BOARD_PWM_PERIOD);
+    uint16_t ccr = motor_command_to_ccr(fabsf(command), gain, command < 0.0f ? 0.0f : deadzone, BOARD_PWM_PERIOD);
+    if (command < 0.0f) in1_forward = !in1_forward;
+    /* Remove PWM before changing direction; no blocking delay in control chain. */
+    __HAL_TIM_SET_COMPARE(&pwm_timer, channel, 0);
     /* For a zero individual wheel, PWM low selects short brake while STBY is high. */
     HAL_GPIO_WritePin(MOTOR_DIRECTION_PORT, in1, in1_forward ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(MOTOR_DIRECTION_PORT, in2, in1_forward ? GPIO_PIN_RESET : GPIO_PIN_SET);
@@ -91,12 +95,16 @@ static void set_wheel(uint16_t in1, uint16_t in2, uint32_t channel,
 
 /**
  * @brief 检查双轮 PWM 命令并写入方向和占空比，最后使能 STBY。
- * 未就绪、禁用、非法/负指令或双轮全零时走独立停车路径，不执行反转。
+ * 未就绪、禁用、非法指令或双轮全零时走独立停车路径；反向指令受制动开关和幅值限制。
  */
 void motor_apply(MotorCommand command)
 {
     if (!pwm_ready || !command.enabled || !isfinite(command.left) || !isfinite(command.right) ||
+#if !MOTOR_REVERSE_BRAKE_ENABLED || !ENCODER_CONTROL_ENABLED
         command.left < 0.0f || command.right < 0.0f ||
+#else
+        command.left < -REVERSE_BRAKE_MAX_PWM || command.right < -REVERSE_BRAKE_MAX_PWM ||
+#endif
         (command.left == 0.0f && command.right == 0.0f)) {
         motor_stop();
         return;

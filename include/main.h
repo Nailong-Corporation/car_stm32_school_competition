@@ -43,6 +43,7 @@ typedef struct {
     TurnExitDiagnostics turn_exit[2];
     bool exit_anchor_valid, exit_recovery_active;
     float exit_lateral_error_cm;
+    float imu_gyro_z_calibration_span_lsb;
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */

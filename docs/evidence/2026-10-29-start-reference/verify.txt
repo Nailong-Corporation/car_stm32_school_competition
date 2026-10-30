@@ -1,0 +1,3 @@
+Flash prefix 37216 bytes matches before.bin: True
+before.bin SHA256: 702ba0d6409d5b4043e0da5b604dbaaf2b4949499b5dd5cfecaed1380d293732
+flash matching prefix SHA256: 702ba0d6409d5b4043e0da5b604dbaaf2b4949499b5dd5cfecaed1380d293732

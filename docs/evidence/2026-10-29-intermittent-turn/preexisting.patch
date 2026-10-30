@@ -1,0 +1,450 @@
+diff --git a/README.md b/README.md
+index 92f6636..b4af1a1 100644
+--- a/README.md
++++ b/README.md
+@@ -15,12 +15,12 @@ STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度，C / STM32Cube HAL 实现
+ | 用户最新硬件信息 | 电池 12 V / 1200 mAh；PCB 降压 5 V；电机额定 7.4 V、减速箱 1:20；八路数字灰度。电池化学体系、满充电压、电机额定/堵转电流及全车质量待测 |
+ | PCB | A10 设计为板载 5 V VM 驱动电机，经 R4 给核心板 +5V；本轮不改板、不改反馈电阻、不切线 |
+ | 当前编译模式 | `ENCODER_CONTROL_ENABLED=1`、`PRESET_ROUTE_ENABLED=1`、`MPU6050_ENABLED=1`（IMU 偏航角）、`MPU6050_PITCH_STOP_ENABLED=1`（40° 俯仰锁定停车）、`GRAY_INVERT_ENABLED=0`（巡黑线） |
+-| 当前路径 | `200±15 RIGHT → 82±8 RIGHT → 52±8 +60° → 70±10 -60° → 20±5 LEFT → 120±10 STOP`，第五项 80 cm/s、其余120 cm/s，圆弧开关均false；无限循环，非最终轮 STOP 按 LEFT 闭合 |
+-| 速度与阶段参数 | 轮目标上限 120 cm/s；计数合理性基准 100 cm/s；接近上限 20、圆弧轴中点上限60、圆弧捕线6、非圆弧捕线半差上限12、异常保持上限 40 cm/s；这些组合需重新验证 |
++| 当前路径 | `65±10 LEFT → 219±16 LEFT → 75±10 LEFT → 219±16 STOP`，各项 120 cm/s，圆弧开关均 true；无限循环，非最终轮 STOP 按 LEFT 闭合 |
++| 速度与阶段参数 | 轮目标上限 120 cm/s；计数合理性基准 100 cm/s；接近上限 20、圆弧轴中点上限40、圆弧捕线6、非圆弧捕线半差上限12、异常保持上限 40 cm/s；这些组合需重新验证 |
+ | 当前保护配置 | `LOST_LINE_STOP_ENABLED=0`、`ROUTE_AUTO_RESUME_ENABLED=1`、`FLOOR_SEAM_FILTER_ENABLED=0`；反馈/时序/路径保护仍存在，自动恢复仅限合格路径原因 |
+-| 几何与编码器配置 | 轮径 4.8 cm、轮距 14.5 cm、灰度前置 16 cm、圆弧 R=10 cm；每轮 1560 count/rev，距离比例 1.53，独立转角比例暂定 0.77，方向左 -1 / 右 +1。旧 1:30 来源与最新 1:20 不一致，须复核，当前源码未改 |
++| 几何与编码器配置 | 轮径 4.8 cm、轮距 14.5 cm、灰度前置 16 cm、圆弧 R=16 cm；每轮 1560 count/rev，距离比例 1.53，独立转角比例暂定 0.77，方向左 -1 / 右 +1。旧 1:30 来源与最新 1:20 不一致，须复核，当前源码未改 |
+ | 已有证据 | 仓库保存主机测试、构建、ST-Link 快照/Flash 比对及用户实车反馈；每份记录仅对当时固件与工况有效 |
+-| 本次验证 | 核对源码、网表、原厂资料和文档链接/差异；仅修改 README，未重新执行固件测试、构建或实车验证 |
++| 本次验证 | 圆弧改动及主机定向验证、PlatformIO 构建；未烧录、未实车验证 |
+ 
+ 上电保持 IDLE，连续有效目标线后需明确 START；硬件接线表是设计依据，具体线束、供电瞬态、轮速、制动距离与比赛成功率仍须实测。历史测试通过不能推定当前 120 cm/s 配置已经通过完整赛道。
+ 
+@@ -282,7 +282,7 @@ flowchart LR
+     OBS -->|编码器 1：连续 1～6 路单线位置反馈| OUTER["正常目标线位置 PID 外环<br/>输出速度差 cm/s"]
+     FSM --> MODE["控制模式选择"]
+     OUTER --> MODE
+-    FSM --> ARC["本项圆弧开关=true 且 90°：直行 6 cm 至切点<br/>R=10 cm 圆弧 / 冻结位置 PID / 允许离线"]
++    FSM --> ARC["本项圆弧开关=true 且 90°：确认后 R=16 cm 圆弧 / 冻结位置 PID / 允许离线"]
+     ARC --> MODE
+     ODOM -->|轮程与航向反馈| ARC
+     FSM --> CAPTURE["非圆弧见线：受限位置PID，停止扫转<br/>外轮饱和：按实测轮速为内轮保留纠偏余量<br/>失线：中心线点+规划出口轴有界回线<br/>圆弧/有界附带分支：原有捕获规则"]
+@@ -315,7 +315,7 @@ flowchart LR
+ 
+ ## 直角圆弧几何与距离语义（2026-10-25）
+ 
+-每个 `RouteStep` 第六列 `corner_arc_enabled` 独立控制本路口：`true` 且有效动作是 90° 左右转（含 `CUSTOM_TURN ±90°`）时使用圆弧；`false` 使用原转弯控制。省略字段按 C 初始化规则为 `false`，建议所有表项显式填写。STRAIGHT、最终轮 STOP 和非 ±90° 自定义转角不使用圆弧；非最终轮 STOP 映射为闭合左右转时，按该 STOP 项的开关选择。当前启用的赛道3各项均为`false`；旧六项赛道的短段前 +90° 曾设为 `false`，该记录不代表当前路径。开关只选择轨迹，出口/离口判定与几何里程修正保持。
++每个 `RouteStep` 第六列 `corner_arc_enabled` 独立控制本路口：`true` 且有效动作是 90° 左右转（含 `CUSTOM_TURN ±90°`）时使用圆弧；`false` 使用原转弯控制。省略字段按 C 初始化规则为 `false`，建议所有表项显式填写。STRAIGHT、最终轮 STOP 和非 ±90° 自定义转角不使用圆弧；非最终轮 STOP 映射为闭合左右转时，按该 STOP 项的开关选择。当前启用赛道2的各项均为 `true`；非最终轮 STOP 映射 LEFT 时也走圆弧。入口识别与距离窗口保持，圆弧出口要求真实中心线确认。
+ 
+ ```c
+ {104.0f, 16.0f, LEFT,        60,  0.0f, true},  // 圆弧左转
+@@ -348,7 +348,7 @@ flowchart LR
+ 
+ 原始轮程与轴中点弧长不作人为扣减，`ODOMETRY_DISTANCE_SCALE=1.53` 只在 cm/count 换算应用一次。里程修正不等于消除打滑误差，也不将探头弧长加到路径表中。
+ 
+-以入口探头恰在几何路口为前提，轴中点从路口前 16 cm 走至前 10 cm，再相切转弯；结束时轴中点在出口方向 10 cm 处，探头在 26 cm 处。因此 **R=10 / L=16 与历史赛道中转弯后仅 20 cm 的短段存在几何冲突**：探头可能在回线前越过下一路口，3 cm 离口或 0.5 cm 早交接也无法让探头回到已越过的位置。代码保留路径表、真实继承进度、窗口和所有原出口判定，不以清零进度掩盖该问题。完整圆弧若需在 20 cm 前回线，需 R≤4 cm，但这小于轮距一半 7.25 cm、会要求内轮反向，与本次非负轮速方案不兼容；历史处理是将这个短段前一弯的开关改为 false，使用原捕线控制；当前赛道3包含20 cm短段且全部使用非圆弧，若切回圆弧仍须复核；是否有足够实际捕线余量仍需赛道复测。原满 1 s 在线退出也可能使圆弧提前结束，不能同时承诺严格走完 90° 与原退出规则完全保持。
++理想几何中，入口探头恰在路口中心时，R=L=16 cm 可从识别处开始圆弧，90° 后探头在出口方向约 32 cm；轮距 14.5 cm 时理想内/外轮目标之比约 0.376。该模型不包含轮速响应、滑移和触发点偏差。出口附近短于约 32 cm 的路段存在越过下一路口的风险，须按实际赛道确认。
+ 
+ 短段方向基准：下一段标称距离小于 `CORNER_RADIUS_CM + GRAY_FORWARD_OFFSET_CM + JUNCTION_SHORT_CLEAR_CM`（当前 26.5 cm）时，切段保存上一项的规划出口航向。下一动作以该轴计算目标航向、几何进度与出口投影，不以未对齐的车头方向重新旋转整整 90°。`action_start_heading` 保存实际动作起始航向，反向保护仍按真实动作增量判断；`turn_rad` 是相对规划入口轴的进度，停车快照 `actual_turn_rad` 才是本次实际转动量。长段保留原来以实际入弯航向建立基准的行为，START 清理继承轴。
+ 
+@@ -364,7 +364,7 @@ flowchart LR
+ 
+ 转角比例独立于直线距离：当前 `ODOMETRY_DISTANCE_SCALE=1.53` 保持用户确认的直线换算，新增 `ODOMETRY_HEADING_SCALE=0.77` 暂定值。航向增量为 `Δθ=(Δ左轮程-Δ右轮程)/14.5 × 0.77`；轮程、中心累计路程及轮速不再乘此转角系数，轴中点/灰度探头位姿和出口投影则使用修正后的航向。依据是本轮板上估计约97.59°、用户更正目测约75°，`75/97.59≈0.7685` 后取0.77；这是一组目测数据得到的初值，尚非精确标定，左右一致性及不同速度/地面的打滑影响仍未验证。普通非圆弧现以可靠出口线优先，取消见线后强凑90°的扫转，外轮表速保留；相同编码器数据下估计航向降低，使控制器继续完成转向，不能据此宣称实际角度已校准。[本轮证据与验证](docs/evidence/2026-10-29-heading-scale.md)。
+ 
+-当前 `src/route_table.c` 启用赛道3，其余赛道处于注释中。路径编译进 Flash，关闭路径开关时不读取或校验它：
++当前 `src/route_table.c` 启用赛道2，其余赛道处于注释中。路径编译进 Flash，关闭路径开关时不读取或校验它：
+ 
+ ```c
+ typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
+@@ -378,12 +378,10 @@ typedef struct {
+ } RouteStep;
+ 
+ const RouteStep route[] = {
+-    {200.0f, 15.0f, RIGHT,       120,   0.0f, false},
+-    {82.0f,   8.0f, RIGHT,       120,   0.0f, false},
+-    {52.0f,   8.0f, CUSTOM_TURN, 120,  60.0f, false},
+-    {70.0f,  10.0f, CUSTOM_TURN, 120, -60.0f, false},
+-    {20.0f,   5.0f, LEFT,         80,   0.0f, false},
+-    {120.0f, 10.0f, STOP,        120,   0.0f, false},
++    {65.0f,  10.0f, LEFT, 120, 0.0f, true},
++    {219.0f, 16.0f, LEFT, 120, 0.0f, true},
++    {75.0f,  10.0f, LEFT, 120, 0.0f, true},
++    {219.0f, 16.0f, STOP, 120, 0.0f, true},
+ };
+ ```
+ 
+@@ -469,7 +467,7 @@ flowchart TD
+     CONFIRM -->|最终轮 STOP 确认| DONE["ROUTE_FINISHED<br/>停车后 callback 一次"]
+     DONE --> STOPPED
+     CONFIRM -->|还有下一轮的 STOP / 配置 LEFT 闭合| EXEC
+-    CONFIRM -->|LEFT / RIGHT / STRAIGHT| EXEC["LINE_JUNCTION / ROUTE_EXECUTING<br/>本项开关=true 且90°：直行6 cm → R=10圆弧<br/>本项开关=false：外轮保持表速，只降低内轮<br/>圆弧后：灰度重新捕线<br/>未见可靠出口线：继续本项指定方向<br/>达到/超过目标角也不改为直行<br/>检测到线后立即取消扫转<br/>非圆弧：位置PID半差≤12 cm/s<br/>不再叠加补角或高速倍增<br/>普通直角：可靠出口证据成熟后离口<br/>有界角度及沿线证据充分后解除同向下限<br/>成熟证据允许小幅角度回差，中心线确认后离口<br/>受限中心加边缘分支：只保持航向<br/>直行保持入口航向"]
++    CONFIRM -->|LEFT / RIGHT / STRAIGHT| EXEC["LINE_JUNCTION / ROUTE_EXECUTING<br/>本项开关=true 且90°：确认后 R=16 圆弧<br/>本项开关=false：外轮保持表速，只降低内轮<br/>圆弧后：灰度重新捕线<br/>未见可靠出口线：继续本项指定方向<br/>达到/超过目标角也不改为直行<br/>检测到线后立即取消扫转<br/>非圆弧：位置PID半差≤12 cm/s<br/>不再叠加补角或高速倍增<br/>普通直角：可靠出口证据成熟后离口<br/>有界角度及沿线证据充分后解除同向下限<br/>成熟证据允许小幅角度回差，中心线确认后离口<br/>受限中心加边缘分支：只保持航向<br/>直行保持入口航向"]
+     EXEC -->|圆弧接STRAIGHT：航向对齐且中心线连续3帧 / 其他出口规则| CLEAR["ROUTE_CLEARING<br/>圆弧接STRAIGHT：继续保持出口航向，按距离离口<br/>普通非圆弧直角：位置PID沿线离口<br/>失线：已见中心线点+出口轴反馈回线<br/>中心线连续50 ms且前进2 cm才交接<br/>捕获/离口20 cm上限；下一窗口越界即停车<br/>其余转弯：恢复目标线控制 / 按下一段加速<br/>显式 STRAIGHT：标称点后按距离离口 / 保持航向与表速<br/>普通离口 3 cm<br/>紧邻下一路口可 0.5 cm + 连续窄线早交接"]
+     CLEAR -->|显式STRAIGHT按距离 / 转弯连续窄线加去重距离| NEXT["下一项或下一轮第 0 项<br/>保留出口方向进度 / 延续已开始的加速<br/>短段继承规划出口轴"]
+     NEXT --> POST_STRAIGHT{"上一项为 STRAIGHT 且本项转弯<br/>尚未走满本项标称距离？"}
+@@ -489,13 +487,13 @@ flowchart TD
+ 
+ 预设路径开启时，**窗口内当前 LEFT/RIGHT 优先按表强制转向**：前一帧属于连续 3 帧有效单一窄目标线，且与当前帧相隔不超过 15 ms；当前滤波后整排目标线突然全丢，或在至少 2 路目标时满足“四路及以上翻转、目标线路数增加至少两路、至少两路翻转后变为宽线/多区域、窄线位置一次跳变至少 4 权重”任一条件，即在本周期进入 `ROUTE_EXECUTING`。不再等待中心线、指定侧分支、候选 3 帧或前进 0.1 cm；即使当前观测仍为有效窄线，或分支在反侧，也按当前表项转向。触发来自极性转换及三帧多数滤波后的 `line_mask`，不是原始 GPIO 单帧；单个边缘目标点不触发。`JUNCTION_ABRUPT_*` 参数集中在 `motion_config.h`。逐帧平滑横移 2 权重不会触发该强制分支；原有形状候选规则仍独立生效。一维阵列无法可靠识别“非曲线”，这些是待实车标定的形状判据，窗口内虚线突然消失或干扰骤变也可能触发按表转弯。
+ 
+-显式 STRAIGHT 是已知直行里程点：全段冻结位置 PID、按本项表速保持路段轴航向，在距离窗口起点进入动作，越过标称点后按距离离口，净前进 `min(3 cm, 下一项distance-tolerance)` 后交接。它不等待电阻图形内部可能不存在的中心线；STOP 及闭合映射为 STRAIGHT 的 STOP 仍须路口证据。当前启用赛道3无显式STRAIGHT项。
++显式 STRAIGHT 是已知直行里程点：全段冻结位置 PID、按本项表速保持路段轴航向，在距离窗口起点进入动作，越过标称点后按距离离口，净前进 `min(3 cm, 下一项distance-tolerance)` 后交接。它不等待电阻图形内部可能不存在的中心线；STOP 及闭合映射为 STRAIGHT 的 STOP 仍须路口证据。当前启用赛道2无显式STRAIGHT项。
+ 
+ 90° 圆弧后紧接 STRAIGHT 时，转弯末段与离口也冻结位置 PID，须与目标出口轴相差不超过 0.05 rad 且连续 3 帧才离口，单线提前退出不能绕过该对齐。紧跟 STRAIGHT 的转弯必须走满该项标称距离才接受候选/骤变；此前保持出口轴，不让侧边线产生位置转向。两项策略分别防止电阻入口侧线拉偏和出口后提前转弯，仍依赖正确的路线尺寸与编码器航向。
+ 
+ `g_diagnostics.straight_entry_aligned` / `straight_entry_handoff` 锁存人工 START 后首次此类交接的灰度、路径阶段、目标/实际航向、目标轮速与 PID 状态；停车和自动恢复不覆盖，下一次人工 START 清空。复测背景见历史摘要中的三个链接。
+ 
+-未满足上述强制条件时，宽线、全目标线和多个分离区域仍通过距离窗口、目标分支、连续帧与运动距离联合确认。LEFT/RIGHT 另支持 L 弯：同帧中心与目标侧分支覆盖至少 3 路，或先连续 3 帧中心窄线、随后出现至少 2 路的单一目标侧边缘分支；后者中心历史须在 250 ms 内且前进不超过 1.5 cm。两者仍需连续至少 3 帧分支、前进 0.1 cm 并在 100 ms 内确认。普通候选中，没有中心历史的两路侧边线、单个边缘噪点、反方向分支不能确认；STOP 及其非最终轮直行闭合仍要求同帧中心+侧边分支至少 4 路，显式 STRAIGHT 表项按上述里程通过。未提交动作的其余异常按丢线/干扰处理。强制入口仍受当前距离窗口限制，不会绕过已到期的丢线/故障停车；已进入转弯后使用动作时限与转角保护，0.70 rad 前不使用当前线位置捕获，满 1 s 连续 3 帧有效单线或超时在线时优先进入离口；其余仍按正常转角与有界出口条件确认。`g_diagnostics.route_turn_forced` 标记本项是否由骤变触发，保持到下一路段或 START。进入歧义或丢线时保存当前编码器航向。歧义（全目标线、超宽线、多区域）及连续恢复确认期间沿用正常基础速度，不施加干扰保持上限；完全无目标线时才将基础速度限制到 `HOLD_SPEED_CM_S=40 cm/s`。路径接近、候选及已确认动作的速度规划仍独立生效。编码器模式通过左右轮目标速度差纠正航向偏移；冻结位置 PID，不按图形位置拐弯，也不进入旧的 SEARCH 寻线。恢复需连续 3 帧单一窄白线，并重建 PID 历史。异常时限从最后稳定白线起算，先检查截止时限再接受恢复，孤立有效帧和异常种类切换不能续时。
++未满足上述强制条件时，宽线、全目标线和多个分离区域仍通过距离窗口、目标分支、连续帧与运动距离联合确认。LEFT/RIGHT 另支持 L 弯：同帧中心与目标侧分支覆盖至少 3 路，或先连续 3 帧中心窄线、随后出现至少 2 路的单一目标侧边缘分支；后者中心历史须在 250 ms 内且前进不超过 1.5 cm。两者仍需连续至少 3 帧分支、前进 0.1 cm 并在 100 ms 内确认。普通候选中，没有中心历史的两路侧边线、单个边缘噪点、反方向分支不能确认；STOP 及其非最终轮直行闭合仍要求同帧中心+侧边分支至少 4 路，显式 STRAIGHT 表项按上述里程通过。未提交动作的其余异常按丢线/干扰处理。强制入口仍受当前距离窗口限制，不会绕过已到期的丢线/故障停车；圆弧出口采用下述 90° 和连续中心线条件，其他动作仍使用各自出口门禁。`g_diagnostics.route_turn_forced` 标记本项是否由骤变触发，保持到下一路段或 START。进入歧义或丢线时保存当前编码器航向。歧义（全目标线、超宽线、多区域）及连续恢复确认期间沿用正常基础速度，不施加干扰保持上限；完全无目标线时才将基础速度限制到 `HOLD_SPEED_CM_S=40 cm/s`。路径接近、候选及已确认动作的速度规划仍独立生效。编码器模式通过左右轮目标速度差纠正航向偏移；冻结位置 PID，不按图形位置拐弯，也不进入旧的 SEARCH 寻线。恢复需连续 3 帧单一窄白线，并重建 PID 历史。异常时限从最后稳定白线起算，先检查截止时限再接受恢复，孤立有效帧和异常种类切换不能续时。
+ 
+ 转弯执行阶段（`ROUTE_EXECUTING`）的最新规则：**没有可靠出口线就继续本项指定方向转向**。完全无线、全目标宽线、普通多区域歧义都不算可靠出口；保留原有有界中心加分支识别。LEFT向左、RIGHT向右、CUSTOM_TURN按角度符号续转，估计达到目标角不再自动改成直行/航向回正。圆弧按原轨迹到目标角，之后无线时继续正向曲率；圆弧接STRAIGHT也必须实际检测到连续中心出口线，不能只凭航向对齐离口。在原有合理捕获角度门禁后看到可靠线，非圆弧立即取消大差速扫转，使用半差上限12 cm/s的位置PID，不再叠加目标航向、强制补角或高速倍增。已见线后30 ms内短暂失线先保持左右等速，证据中断会重建连续确认；超过宽限后，若已有真实中心线点，则反馈传感器相对规划出口轴的横向偏移来回线，若尚无中心线点才恢复指定方向扫转。非圆弧已确认出口的CLEARING继续位置PID沿线离口，无有效线时才冻结PID。动作时限、最大转角、反向、编码器及控制任务保护保留，触发时停车，不作无限转圈。[实现与验证](docs/evidence/2026-10-29-continue-turn-without-line.md)。
+ 
+@@ -503,7 +501,7 @@ flowchart TD
+ 
+ 普通非圆弧直角（LEFT/RIGHT，以及循环 STOP 映射的左右转）以实际出口线优先：保留入口干扰的捕获角度门禁（当前0.70 rad，约40°）；达到估计目标角后仍需中心线连续3帧，未到估计90°但已连续单一区域窄线50 ms且净前进0.25 cm、最终中心线连续3帧，也可确认出口。见线立即取消扫转，不必等待这段确认才恢复内轮。孤立线、无线/宽线/多区域中断不能直接成功。确认后继续位置PID走完离口去重，交接还须连续中心线50 ms并前进至少2 cm，不再用偶尔三帧居中结束离口。已见中心线后失线采用出口轴横向反馈；捕获/离口超出20 cm仍未稳定回线，以新故障8停车且不自动恢复。若下一窗口已经越过，直接停车，禁止把超窗进度交接给下一项。`g_diagnostics.turn_exit[0/1]` 新增首个有效捕线帧的角度/灰度/左右目标，仍保存离口与交接记录，便于区分软件仍给扫转指令和真实轮速尚未跟上。此规则取代本日早期的强制90°与离口冻结位置PID策略；圆弧、自定义角度及有界附带分支仍保留各自出口门禁。详见[见线取消扫转与PID恢复](docs/evidence/2026-10-29-line-capture-pid.md)。高速短段与实车效果仍待验证。
+ 
+-在标称路口位置前 `JUNCTION_APPROACH_DISTANCE_CM=5 cm` 开始按剩余距离降低基础目标，到标称位置降至不超过 20 cm/s，候选及转弯期间保持低速。90° 左右转以轴中点半径 10 cm 规划相切圆弧：入口先前进 6 cm，再按曲率 1/10 和编码器航向误差控制轮速；圆弧期间冻结位置 PID、允许探头离开目标线。到达 90° 后仍未检测到可靠线时，继续同方向圆弧转向，两轮保持非负且内轮前进；普通非圆弧左右转和自定义角度也在无线时继续指定方向，非圆弧外轮表速不变。有可靠线后再进入捕获与出口确认。圆弧紧接显式 STRAIGHT 时采用上述专用航向对齐与离口规则；其他动作仍按原出口判定，全部保留路口角度/时间保护。正常几何退出要求至少转过 1.35 rad，或至少 1.30 rad 且单一区域窄线连续 50 ms、前进 0.25 cm，再经中心窄目标线连续 3 帧后进入离口；另允许转弯满 1000 ms 后连续 3 帧有效单线进入离口；普通非圆弧直角采用上段实际出口证据优先规则，其他转弯保留原在线规则。转弯预算为 3000 ms（自定义大角度按比例扩展），到期当前帧为有效单线可进入离口，但普通非圆弧直角仍需中心窄线确认，无线/歧义仍停车；超过最大转角、反向限制或离口独立 1500 ms 超时仍停车。非最终轮 STOP 的直行闭合仍需越过至少 3 cm 再确认中心线；显式 STRAIGHT 按上述标称里程通过。转弯经几何确认或新的在线退出规则进入离口时，立即按下一路径项的目标速度与 `TARGET_RISE_CM_S2=160 cm/s²` 提速，例如从 6 升至 120 cm/s 的理想目标斜坡约需 0.713 s（还受启动及接近包络约束）。离口预看下一段速度，下一段本身较短时仍受该段起点的减速包络约束，下一段低速目标也不会被抬高。普通非圆弧须连续中心线50 ms、该连续期间前进2 cm，并满足离口距离后才推进表项；其余原规则保留。紧邻下一路口且未越窗时，已确认转弯可用 0.5 cm + 连续 3 帧窄线提前交接，重建下一段里程基准，防止同一路口重复消费；切段延续当前速度与 START 包络。圆弧轮速比例是规划目标，实际转弯半径、惯性、速度跟随和打滑仍需实车验证。
++圆弧项仍使用标称路口前 5 cm 的接近速度规划；动作入口保持距离窗口与原有路口识别规则。确认路口后 R=L=16 cm，立即按圆弧规划两轮正向目标，轴中点目标上限 40 cm/s，航向修正限幅。实际轮速可能因响应或饱和暂时达不到目标；该几何不保证传感器全程在线。达到估计 90° 后仍须原始观测为居中单一区域窄线连续至少 50 ms、前进 0.25 cm 且至少 3 帧，才转入 CLEARING；接 STRAIGHT 还须满足航向对齐。无线、偏离或歧义会清空出口候选；动作超时、反向和过转保护保留。离口后仍按下一段目标规划，实际回线和跟踪需实车验证。非圆弧与自定义角度仍采用各自的原有规则。
+ 
+ 八路一维传感器不能识别元器件的语义。若图形恰好在窗口内产生相同分支和连续观测，仍可能误判；若是持续的单一窄图形，也可能看起来像白线。编码器航向会受轮胎打滑影响。所有尺寸、速度、确认距离与超时均需真实赛道标定。
+ 
+@@ -534,6 +532,7 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
+ | `raw_mask` / `line_mask` / `valid_line_samples` | 当前原始输入 / 滤波白线 / 连续有效单线样本数（PWM 最多 7 路，编码器最多 6 路；启动需至少 3 帧） |
+ | `state` / `stop_reason` / `left_command` / `right_command` | 当前是否运行、是否已发生停车、软件下发的 PWM 指令；不代表已测到引脚波形 |
+ | `route_state` / `route_index` / `route_failure` | 当前路径阶段、0 起始索引及具体路径失败原因（8为回线超距），失败原因保持至人工 START 或自动恢复，恢复前另存快照 |
++
+ | `route_repeat_count` / `route_completed_laps` | 配置总轮数（0 无限）与本次 START 后末项标记确认次数；无限计数饱和不回绕 |
+ | `stop_snapshot.actual_turn_rad` | 实际动作起始航向以来的转角，反向保护使用此基准；相对规划轴的进度仍为 `turn_rad` |
+ | `route_candidate_samples` / `route_turn_capturing` / `route_turn_rad` | 候选连续帧数、是否在捕获窄出口线、相对规划入口轴的有符号角度进度（rad，左负右正；短段可能有初始偏移） |
+@@ -542,6 +541,8 @@ IWDG 分频 64、reload=399，以名义 LSI 40 kHz 估算约 640 ms；LSI 误差
+ | `route_recovery_window_active` / `route_recovery_window_progress_cm` / `route_recovery_window_limit_cm` | 是否使用恢复检测区间、恢复后前进量和区间上限（cm） |
+ | `stop_snapshot` | 当前停车前锁存记录；接受 START 或自动恢复后清空，自动恢复前另存 auto_resume_snapshot |
+ 
++转弯过程另存于 `follow.turn_trace`：EXECUTING / CLEARING 阶段每 20 ms 记录一次里程、转角、灰度类型/位置、左右目标及实测速度，循环保留最近 48 帧；`next` 指向下一写入位置，`count` 为有效帧数。停车后可通过 ST-Link 读取，接受人工 START 清空；复位或断电丢失。采样用于诊断，不能代替实车测量，也不改变回线及停车保护。
++
+ 针对“转弯后沿出口低速直走一段再停”，先正常运行，停车后保持供电、不要按复位或再按 START，然后展开 `g_diagnostics.stop_snapshot`；若已自动恢复则读 `auto_resume_snapshot` 和恢复次数。调试连接须保留当前 RAM，使用不复位/不重新下载的连接方式；若调试器重新复位/烧录，记录会丢失。快照由主循环复制，停车后应等待至少一个正常控制周期再读取；运行时跨字段读取不是原子快照。`Error_Handler` 的硬故障/初始化失败与看门狗复位不保证有此快照。
+ 
+ | 快照字段 | 怎么读 |
+diff --git a/include/line_follow.h b/include/line_follow.h
+index 99c0989..62f4977 100644
+--- a/include/line_follow.h
++++ b/include/line_follow.h
+@@ -65,6 +65,19 @@ typedef struct {
+     float clearing_turn_rad, minimum_turn_rad, handoff_turn_rad;
+     uint8_t clearing_mask, handoff_mask;
+ } TurnExitDiagnostics;
++/* 最近的转弯采样，停车后保留；20 ms 间隔，循环覆盖。 */
++#define TURN_TRACE_CAPACITY 48U
++typedef struct {
++    uint32_t ms;
++    float distance_cm, turn_rad, position;
++    float left_target, right_target, left_speed, right_speed;
++    uint8_t mask, kind, route_state, capturing;
++} TurnTraceSample;
++typedef struct {
++    TurnTraceSample samples[TURN_TRACE_CAPACITY];
++    uint32_t last_ms;
++    uint8_t next, count;
++} TurnTrace;
+ typedef struct {
+     LineState state;
+     LineStopReason stop_reason;
+@@ -93,6 +106,7 @@ typedef struct {
+     uint32_t auto_resume_count, auto_resume_last_ms;
+     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
+     TurnExitDiagnostics turn_exit[2]; /* 前两个弯的离口角度记录，START清零。 */
++    TurnTrace turn_trace; /* 接受人工 START 清零；停止后读取 follow.turn_trace。 */
+ } LineFollow;
+ void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
+                        const RouteStep *steps, size_t count,
+diff --git a/include/motion_config.h b/include/motion_config.h
+index 465a4e0..05e68cc 100644
+--- a/include/motion_config.h
++++ b/include/motion_config.h
+@@ -136,11 +136,12 @@
+ #define RIGHT_COUNTS_PER_WHEEL_REV 1560.0f /* 右输出轮完整一圈的最终四倍频计数。 */
+ #define WHEEL_TRACK_CM              14.5f /* 用户于 2026-10-23 实测左右轮中心间距，单位 cm。 */
+ /* 2026-10-25 实测输入：灰度排中心在轮轴中点前方 16 cm。
+- * 90° 切角以轴中点 R=10 cm 规划；须 R>track/2，保证内轮前进。
+- * 灰度触发点近似路口中心：先直行 L-R=6 cm 至圆弧切点。
++ * 90° 圆弧 R=L=16 cm，路口识别后从当前位置开始规划；须 R>track/2。
++ * 触发点与实际路口中心的偏差以及轮胎打滑需实车验证。
+  */
+ #define GRAY_FORWARD_OFFSET_CM       16.0f
+-#define CORNER_RADIUS_CM             10.0f
++#define CORNER_RADIUS_CM             16.0f
++#define CORNER_MAX_HALF_RATIO         0.8f /* 圆弧航向修正有界，保证两轮目标均为正。 */
+ #define CORNER_HEADING_KP            8.0f /* 编码器轨迹航向误差到轮速半差。 */
+ #define ENCODER_LEFT_SIGN            -1    /* 启动后原始计数 65527 指向负向回绕，取反；实车待复测。 */
+ #define ENCODER_RIGHT_SIGN            1    /* 右轮计数方向修正，只允许 +1 或 -1，前进应为正。 */
+@@ -241,7 +242,7 @@
+ #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
+ #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
+ #define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
+-#define JUNCTION_TURN_SPEED_CM_S      60.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
++#define JUNCTION_TURN_SPEED_CM_S      40.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
+ #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
+ #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
+ #define JUNCTION_CAPTURE_MAX_HALF_DIFF_CM_S 12.0f /* 非圆弧见线后位置半差上限，不再叠加高速放大。 */
+diff --git a/src/line_follow.c b/src/line_follow.c
+index b22ed4f..b5299bb 100644
+--- a/src/line_follow.c
++++ b/src/line_follow.c
+@@ -388,6 +388,7 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
+             f->auto_resume_snapshot = (LineStopSnapshot){0};
+             f->straight_entry_aligned = f->straight_entry_handoff = (StraightEntrySnapshot){0};
+             memset(f->turn_exit,0,sizeof(f->turn_exit));
++            memset(&f->turn_trace,0,sizeof(f->turn_trace));
+             f->exit_anchor_valid=f->exit_recovery_active=false;
+             f->exit_lateral_error_cm=0;
+             f->start_result = LINE_START_ACCEPTED;
+@@ -531,7 +532,7 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
+                 (!f->route.corner_arc_complete ||
+                  (route_prepares_straight(&f->route) && have_turn_line));
+             if (arc_planning) {
+-                /* 探头触发后先到轴中点切点，再按 s/R 规划航向。
++                /* 从触发点按 s/R 规划航向（当前 R=L，切点前距离为零）。
+                  * 不把转弯中途的灰度位置送入 PID；出口判定仍完全由 route_update 决定。 */
+                 pid_reset(&f->pid);
+                 float track = f->odometry.calibration.track_cm;
+@@ -643,7 +644,14 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
+                 correction *= (float)step.speed/(2.0f*JUNCTION_TURN_SLOW_CM_S);
+             outer_targets(f, (float)step.speed, correction, dt);
+         }
+-        else targets(f, turn_base, correction, dt);
++        else {
++            if (route_uses_corner_arc(&f->route)) {
++                float planned_base=next_base(f,turn_base,TARGET_RISE_CM_S2,dt);
++                float limit=CORNER_MAX_HALF_RATIO*planned_base;
++                correction=fmaxf(-limit,fminf(limit,correction));
++            }
++            targets(f, turn_base, correction, dt);
++        }
+     } else if (f->route.state == ROUTE_CLEARING && !route_uses_corner_arc(&f->route) &&
+                step.action != CUSTOM_TURN && route_current_action(&f->route) != STRAIGHT) {
+         /* 出口确认后继续位置PID沿线离口，不能只保持航向而漏掉线反馈。
+@@ -755,6 +763,22 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
+                 HEADING_KP_CM_S_PER_RAD * (f->hold_heading_rad - f->odometry.heading_rad), dt);
+     }
+ #if PRESET_ROUTE_ENABLED
++    if ((f->route.state == ROUTE_EXECUTING || f->route.state == ROUTE_CLEARING) &&
++        (f->turn_trace.count == 0 || (uint32_t)(now_ms-f->turn_trace.last_ms) >= 20U)) {
++        TurnTrace *trace = &f->turn_trace;
++        trace->samples[trace->next] = (TurnTraceSample){
++            .ms=now_ms, .distance_cm=f->odometry.distance_cm,
++            .turn_rad=f->odometry.heading_rad-f->route.entry_heading,
++            .position=obs.position, .left_target=f->left_target_cm_s,
++            .right_target=f->right_target_cm_s, .left_speed=f->odometry.left_speed_cm_s,
++            .right_speed=f->odometry.right_speed_cm_s, .mask=obs.line_mask,
++            .kind=(uint8_t)obs.kind, .route_state=(uint8_t)f->route.state,
++            .capturing=f->route.turn_capturing
++        };
++        trace->next=(uint8_t)((trace->next+1U)%TURN_TRACE_CAPACITY);
++        if (trace->count<TURN_TRACE_CAPACITY) ++trace->count;
++        trace->last_ms=now_ms;
++    }
+     if(f->route.state==ROUTE_EXECUTING && f->route.index<2 &&
+        f->route.turn_capturing && !f->route.turn_exit_branch && narrow) {
+         TurnExitDiagnostics *record=&f->turn_exit[f->route.index];
+diff --git a/src/route.c b/src/route.c
+index 2885eff..ef4ce64 100644
+--- a/src/route.c
++++ b/src/route.c
+@@ -475,6 +475,39 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
+             fail(p, actual_turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
+             return;
+         }
++        if (route_uses_corner_arc(p)) {
++            if (turn >= fabsf(route_turn_target_rad(p))) p->corner_arc_complete=true;
++            bool center=p->corner_arc_complete && route_is_narrow_line(obs) &&
++                        fabsf(obs.position)<=JUNCTION_CENTER_LIMIT &&
++                        (!route_prepares_straight(p) ||
++                         fabsf(heading_rad-exit_heading)<=STRAIGHT_ENTRY_ALIGN_RAD);
++            if (!center || (uint32_t)(now_ms-p->online_ms)>CONTROL_MAX_INTERVAL_MS) {
++                p->exit_candidate_pending=false;
++                p->exit_count=0;
++            }
++            if (center && !p->exit_candidate_pending) {
++                p->exit_candidate_pending=true;
++                p->exit_candidate_ms=now_ms;
++                p->exit_candidate_cm=distance_cm;
++            }
++            if (center && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
++            p->online_ms=now_ms;
++            if (center && p->exit_count>=LINE_CONFIRM_SAMPLES &&
++                (uint32_t)(now_ms-p->exit_candidate_ms)>=JUNCTION_EXIT_CONFIRM_MS &&
++                distance_cm-p->exit_candidate_cm>=JUNCTION_EXIT_CONFIRM_CM) {
++                p->state=ROUTE_CLEARING;
++                p->phase_ms=now_ms;
++                p->clear_cm=distance_cm;
++                p->exit_count=0;
++                p->exit_candidate_pending=false;
++                p->turn_capturing=p->turn_exit_branch=false;
++                p->turn_ended_on_line=!route_prepares_straight(p);
++                return;
++            }
++            if (timed_out) { fail(p,ROUTE_FAILURE_ACTION_TIMEOUT); return; }
++            p->turn_capturing=p->corner_arc_complete && route_is_narrow_line(obs);
++            return;
++        }
+         if (route_prepares_straight(p)) {
+             /* 接直行也必须实际检测到出口中心线，不能只凭航向对齐离口。 */
+             if (timed_out) { fail(p, ROUTE_FAILURE_ACTION_TIMEOUT); return; }
+diff --git a/src/route_table.c b/src/route_table.c
+index 0e146f1..66b5ad9 100644
+--- a/src/route_table.c
++++ b/src/route_table.c
+@@ -4,7 +4,7 @@
+  * 首段从启动位置起算；后续为用户测量的路口中心间距离，单位 cm。
+  * 以入口灰度触发点近似路口中心；转弯/离口累计灰度中心出口方向净位移。
+  * 已计入前置 16 cm 的旋转位移，不以轮程/探头弧长代替中心间距离；打滑仍须实测。
+- * R=10 的完整直角结束时探头已在出口约 26 cm；下面 20 cm 短段可能在回线前越过，
++ * R=16 的理想直角结束时探头已在出口约 32 cm；下面 20 cm 短段可能在回线前越过，
+  * 保留用户路径表和真实进度，不能保证此短段路口可捕获。
+  * STOP 同样需要在距离窗口内确认路口；ROUTE_REPEAT_COUNT 控制总轮数，
+  * 非最终轮的 STOP 标记按 ROUTE_REPEAT_ACTION（当前 LEFT）转向/离口后回到首项。表内 60 cm/s 保留用户设置，须不超过 WHEEL_TARGET_MAX_CM_S。 */
+@@ -24,13 +24,13 @@ const RouteStep route[] = {
+     {20.0f, 10.0f, LEFT, 80, 0.0f, true},
+     {70.0f, 16.0f, STOP, 80, 0.0f, true},
+     */
+-    /* 赛道 2
+-    {75.0f, 10.0f, LEFT, 120, 0.0f, true},
++    /* 赛道 2 */
++    {65.0f, 5.0f, LEFT, 120, 0.0f, true},
+     {219.0f, 16.0f, LEFT, 120, 0.0f, true},
+     {75.0f, 10.0f, LEFT, 120, 0.0f, true},
+     {219.0f, 16.0f, STOP, 120, 0.0f, true},
+-    */
+-    /* 赛道 3 */
++
++    /* 赛道 3
+     {200.0f, 15.0f, RIGHT, 120, 0.0f, false},
+     {82.0f, 8.0f, RIGHT, 120, 0.0f, false},
+     {52.0f, 8.0f, CUSTOM_TURN, 120, 60.0f, false},
+@@ -38,5 +38,6 @@ const RouteStep route[] = {
+     {20.0f, 5.0f, LEFT, 80, 0.0f, false},
+     {120.0f, 10.0f, STOP, 120, 0.0f, false},
+     //{80.0f, 8.0f, LEFT, 80, 0.0f, true},
++    */
+ };
+ const size_t route_count = sizeof(route) / sizeof(route[0]);
+diff --git a/test/test_navigation.c b/test/test_navigation.c
+index 6571593..e5f53a9 100644
+--- a/test/test_navigation.c
++++ b/test/test_navigation.c
+@@ -104,7 +104,9 @@ static void test_corner_mode_switch(void)
+         tick(&f,&c,&now,0,0,0,false);
+         CHECK(route_uses_corner_arc(&f.route)==(enabled!=0));
+         if (enabled) {
+-            NEAR(f.left_target_cm_s,8); NEAR(f.right_target_cm_s,8);
++            CHECK(f.left_target_cm_s>0 && f.right_target_cm_s>0);
++            CHECK(mirror ? f.left_target_cm_s>f.right_target_cm_s :
++                           f.left_target_cm_s<f.right_target_cm_s);
+         } else {
+             NEAR(f.left_target_cm_s,mirror?8:0);
+             NEAR(f.right_target_cm_s,mirror?0:8);
+@@ -128,7 +130,30 @@ static void test_corner_mode_switch(void)
+     CHECK(p.valid && !route_uses_corner_arc(&p)); /* 省略新增字段时默认为 false。 */
+ }
+ 
+-/* 已标定几何下，切点前两轮前进；圆弧中窄线不改变 R=10 的规划轮速。 */
++static void test_arc_exit_requires_center(void)
++{
++    for (unsigned side=0;side<2;++side) {
++        RouteStep steps[]={{100,10,side?RIGHT:LEFT,40,0,true},{200,10,STOP,40,0,true}};
++        RoutePlanner p; init_route_once(&p,steps,2,NULL,NULL); route_start(&p,0,0);
++        p.state=ROUTE_EXECUTING; p.entry_cm=0; p.phase_ms=0;
++        float heading=(side?1.0f:-1.0f)*JUNCTION_TURN_TARGET_RAD;
++        for (unsigned t=5;t<=100;t+=5) route_update(&p,mask(0),t*.01f,heading,t);
++        CHECK(p.state==ROUTE_EXECUTING && p.corner_arc_complete);
++        for (unsigned t=105;t<=200;t+=5) route_update(&p,mask(0x60),t*.01f,heading,t);
++        CHECK(p.state==ROUTE_EXECUTING);
++        for (unsigned t=205;t<=245;t+=5) route_update(&p,mask(0x18),t*.01f,heading,t);
++        route_update(&p,mask(0),2.50f,heading,250);
++        CHECK(p.state==ROUTE_EXECUTING && !p.exit_candidate_pending);
++        for (unsigned t=255;t<=305;t+=5) route_update(&p,mask(0x18),t*.01f,heading,t);
++        CHECK(p.state==ROUTE_CLEARING && p.turn_ended_on_line);
++        init_route_once(&p,steps,2,NULL,NULL); route_start(&p,0,0);
++        p.state=ROUTE_EXECUTING; p.entry_cm=0; p.phase_ms=0;
++        route_update(&p,mask(0),1,heading,JUNCTION_ACTION_TIMEOUT_MS);
++        CHECK(p.state==ROUTE_FAILED && p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
++    }
++}
++
++/* 左右镜像：确认后立即沿 R=16 圆弧，两轮目标均向前。 */
+ static void test_corner_kinematics(void)
+ {
+     for (unsigned mirror=0;mirror<2;++mirror) {
+@@ -137,11 +162,11 @@ static void test_corner_kinematics(void)
+             LineFollow f; EncoderCounts c; uint32_t now=0;
+             start(&f,&c,&now,steps,2);
+             f.odometry.calibration.track_cm=WHEEL_TRACK_CM;
+-            float angle=phase==0?0:.3f*(float)phase;
++            float angle=.3f*(float)phase;
+             f.route.state=ROUTE_EXECUTING;
+             f.route.phase_ms=now;
+             f.route.entry_cm=0;
+-            f.odometry.distance_cm=phase==0?5.9f:6+10*angle;
++            f.odometry.distance_cm=CORNER_RADIUS_CM*angle;
+             f.odometry.heading_rad=(mirror?1:-1)*angle;
+             f.route.projection_previous_cm=f.odometry.distance_cm;
+             f.route.projection_previous_heading=f.odometry.heading_rad;
+@@ -149,14 +174,12 @@ static void test_corner_kinematics(void)
+             f.base=JUNCTION_TURN_SPEED_CM_S;
+             tick(&f,&c,&now,0,0,phase%2?0x04:0,false);
+             CHECK(f.route.state==ROUTE_EXECUTING && !f.pid.primed);
+-            if (phase==0) {
+-                NEAR(f.left_target_cm_s,JUNCTION_TURN_SPEED_CM_S);
+-                NEAR(f.right_target_cm_s,JUNCTION_TURN_SPEED_CM_S);
+-            } else {
++            {
+                 float half_diff=JUNCTION_TURN_SPEED_CM_S*WHEEL_TRACK_CM/(2*CORNER_RADIUS_CM);
+                 NEAR(f.left_target_cm_s,JUNCTION_TURN_SPEED_CM_S+(mirror?half_diff:-half_diff));
+                 NEAR(f.right_target_cm_s,JUNCTION_TURN_SPEED_CM_S+(mirror?-half_diff:half_diff));
+-                NEAR(WHEEL_TRACK_CM*f.base/fabsf(f.left_target_cm_s-f.right_target_cm_s),10);
++                NEAR(WHEEL_TRACK_CM*f.base/fabsf(f.left_target_cm_s-f.right_target_cm_s),CORNER_RADIUS_CM);
++                CHECK(f.left_target_cm_s>0 && f.right_target_cm_s>0);
+             }
+             if (phase==3) {
+                 f.odometry.heading_rad=(mirror?1:-1)*(JUNCTION_TURN_TARGET_RAD+.01f);
+@@ -1153,7 +1176,10 @@ static void test_turn_without_line_keeps_direction(void)
+         }
+         /* 看到中心出口线后走原确认流程；角度到位本身不能代替此观测。 */
+         f.odometry.heading_rad=.2f+sign*target;
+-        for(unsigned i=0;i<3;++i) tick(&f,&c,&now,0,0,0x18,false);
++        for(unsigned i=0;i<(arc?11U:3U);++i) {
++            if (arc) f.odometry.distance_cm+=0.05f;
++            tick(&f,&c,&now,0,0,0x18,false);
++        }
+         CHECK(f.route.state==ROUTE_CLEARING);
+     }
+ }
+@@ -2465,7 +2491,11 @@ static void test_corner_into_straight_entry(void)
+         f.odometry.distance_cm=76+6+10*(JUNCTION_TURN_TARGET_RAD-.02f);
+         for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) tick(&f,&c,&now,0,0,0,false);
+         CHECK(f.route.state==ROUTE_EXECUTING);
+-        for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) tick(&f,&c,&now,0,0,0x18,false);
++        f.odometry.heading_rad=direction*JUNCTION_TURN_TARGET_RAD;
++        for(unsigned i=0;i<11;++i) {
++            f.odometry.distance_cm+=0.05f;
++            tick(&f,&c,&now,0,0,0x18,false);
++        }
+         CHECK(f.route.state==ROUTE_CLEARING && !f.pid.primed);
+         CHECK(!f.route.turn_ended_on_line);
+         CHECK(f.straight_entry_aligned.valid && !f.straight_entry_aligned.pid_active);
+@@ -2477,7 +2507,7 @@ static void test_corner_into_straight_entry(void)
+             LineFollow copy=f; EncoderCounts sample=c; uint32_t time=now;
+             tick(&copy,&sample,&time,0,0,shapes[i],false);
+             CHECK(copy.route.state==ROUTE_CLEARING && !copy.pid.primed && !copy.abnormal);
+-            CHECK(direction*(copy.left_target_cm_s-copy.right_target_cm_s)>0);
++            CHECK(direction*(copy.left_target_cm_s-copy.right_target_cm_s)>=-0.001f);
+             if(i==0) {expected_left=copy.left_target_cm_s; expected_right=copy.right_target_cm_s;}
+             NEAR(copy.left_target_cm_s,expected_left); NEAR(copy.right_target_cm_s,expected_right);
+         }
+@@ -2537,7 +2567,7 @@ static void test_ambiguity_keeps_speed(void)
+ int main(void)
+ {
+     test_steering_with_saturated_outer_feedback(); test_exit_requires_stable_center_and_distance_bounds(); test_spatial_exit_recapture(); test_encoder_tracking_pid_at_maximum_speed(); test_line_detection_cancels_sweep(); test_turn_without_line_keeps_direction(); test_nonarc_clearing_uses_line_pid(); test_nonarc_exit_needs_reliable_line(); test_nonarc_keeps_outer_speed(); test_ambiguity_keeps_speed();
+-    test_corner_into_straight_entry(); test_after_straight_turn_gate(); test_straight_resistor(); test_route_auto_resume(); test_route_resume_phases(); test_short_segment_heading_reference(); test_spatial_short_s(); test_offset_odometry(); test_corner_mode_switch(); test_corner_kinematics(); test_turn_online_exit();
++    test_corner_into_straight_entry(); test_after_straight_turn_gate(); test_straight_resistor(); test_route_auto_resume(); test_route_resume_phases(); test_short_segment_heading_reference(); test_spatial_short_s(); test_offset_odometry(); test_corner_mode_switch(); test_corner_kinematics(); test_arc_exit_requires_center(); test_turn_online_exit();
+     test_plain_turn_overshoot_recovery(); test_custom_turn_heading_limit(); test_custom_exit_angle_hysteresis(); test_custom_capture_recentering(); test_branch_exit_capture(); test_short_segment_handoff(); test_custom_turns(); test_odometry(); test_measured_distance_scale(); test_speed(); test_left_encoder_direction(); test_routes(); test_controller(); test_full_route_pipeline(); test_post_turn_stop_snapshot(); test_raw_pipeline();
+     test_startup_ramp(); test_junction_approach_speed(); test_early_exit_acceleration(); test_long_straight_without_timeout(); test_reference_path(); test_route_repeats(); test_loop_end_corner(); test_corner_distance_projection(); test_capture_cancellation(); test_near_angle_exit(); test_exit_evidence_boundaries(); test_relaxed_exit_acceleration(); test_late_turn_clear_budget(); test_turn_capture(); test_l_corner_confirmation(); test_route_abrupt_priority(); test_spatial_corner();
+     printf("PASS: odometry, nested loops, junction FSM, interference and route STOP; %u checks\n",checks);

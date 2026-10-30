@@ -65,6 +65,19 @@ typedef struct {
     float clearing_turn_rad, minimum_turn_rad, handoff_turn_rad;
     uint8_t clearing_mask, handoff_mask;
 } TurnExitDiagnostics;
+/* 最近的转弯采样，停车后保留；20 ms 间隔，循环覆盖。 */
+#define TURN_TRACE_CAPACITY 48U
+typedef struct {
+    uint32_t ms;
+    float distance_cm, turn_rad, position;
+    float left_target, right_target, left_speed, right_speed;
+    uint8_t mask, kind, route_state, capturing;
+} TurnTraceSample;
+typedef struct {
+    TurnTraceSample samples[TURN_TRACE_CAPACITY];
+    uint32_t last_ms;
+    uint8_t next, count;
+} TurnTrace;
 typedef struct {
     LineState state;
     LineStopReason stop_reason;
@@ -81,6 +94,7 @@ typedef struct {
     float held_pwm_correction; /* Open-loop interference hold, not measured heading. */
     bool exit_anchor_valid, exit_recovery_active;
     float exit_anchor_x_cm, exit_anchor_y_cm, exit_axis_rad, exit_lateral_error_cm;
+    bool exit_accelerating; /* 出口确认后跨切段保持快速加速，达到规划目标后清除。 */
     float startup_elapsed_s; /* 每次明确 START 重新计时，两种模式均使用 1 s 启动包络。 */
     uint32_t last_reliable_ms;
     uint32_t sample_ms;
@@ -93,11 +107,15 @@ typedef struct {
     uint32_t auto_resume_count, auto_resume_last_ms;
     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
     TurnExitDiagnostics turn_exit[2]; /* 前两个弯的离口角度记录，START清零。 */
+    TurnTrace turn_trace; /* 接受人工 START 清零；停止后读取 follow.turn_trace。 */
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,
                        RouteStopCallback callback, void *context);
 void line_follow_stop(LineFollow *follow, LineStopReason reason);
+/* Caller has a fresh level IMU sample and an explicit START; preserves snapshot
+ * until START is actually accepted. Other fault stops cannot be cleared here. */
+void line_follow_acknowledge_tilt(LineFollow *follow);
 void line_follow_update(LineFollow *follow, GrayObservation observation, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request);
 /* IMU 已启用时主循环每个控制周期必须给出有效实测航向；丢样锁定停车。 */

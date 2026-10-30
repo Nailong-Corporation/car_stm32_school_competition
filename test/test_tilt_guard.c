@@ -36,17 +36,24 @@ int main(void)
             }
             for (int i = 0; i < 30; ++i) pitch_frame(&g, direction * 55.0f, inverted);
             assert(g.tripped);
+            assert(!tilt_guard_acknowledge(&g)); /* Still lifted cannot START. */
             for (int i = 0; i < 100; ++i) pitch_frame(&g, 0, inverted);
-            assert(g.tripped); /* Explicit reset required. */
+            assert(g.tripped && g.can_restart && g.pitch_deg < 1);
+            assert(tilt_guard_acknowledge(&g) && !g.tripped);
+            for (int i = 0; i < 100; ++i) pitch_frame(&g, 55, inverted);
+            assert(g.tripped); /* Repeated pickup still stops. */
+            assert(tilt_guard_update(&g, 1.5f, 0, 0, .005f));
+            assert(!tilt_guard_acknowledge(&g)); /* Invalid gravity cannot release. */
         }
     }
     TiltGuard invalid = {0};
     assert(!tilt_guard_update(&invalid, NAN, 0, 1, .005f));
+    assert(!tilt_guard_acknowledge(&invalid));
     assert(!tilt_guard_update(&invalid, 0, 0, 1, 0.0f));
     assert(!tilt_guard_update(&invalid, 0, 0, 1, .020f));
     assert(tilt_guard_update(&invalid, 0, 0, -1, .005f));
     assert(tilt_guard_update(&invalid, 1.5f, 0, 0, .005f));
     assert(invalid.above_threshold_s == 0.0f && !invalid.tripped);
-    puts("PASS: inverted/normal pitch 40deg, spike filtering, time confirmation, tilt latch");
+    puts("PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup");
     return 0;
 }

@@ -1,0 +1,9 @@
+PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup
+PASS: MPU yaw/IMU fault lock; tilt remains stopped until level + explicit START; IDLE pickup/0x30 restart
+GRAY_INVERT_ENABLED=1
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+Assertion failed: (f.route.index==2 && f.route.state==ROUTE_FOLLOW), function test_spatial_short_s, file test_navigation.c, line 2182.
+/tmp/car-extra-tests.sh: line 25: 70049 Abort trap: 6           "$test_binary"

@@ -45,10 +45,14 @@
 
 /* AD0 接 GND 时 7-bit 地址 0x68；若 AD0 接 3.3 V 则改为 0x69。 */
 #define MPU6050_ADDRESS_7BIT           0x68U
+#define MPU6050_POWER_SETTLE_MS         100U /* 模块电源启动后再探测，电机保持待机。 */
+#define MPU6050_PROBE_ATTEMPTS            5U
+#define MPU6050_PROBE_RETRY_MS           20U
 /* 实际 MPU6050 倒置安装（芯片面朝下、芯片 Z 正轴朝地面），车体右转时
  * 在传感器坐标下读得正 Z 角速度：+1 对应全系统右转正航向。
  * 仅使用水平面偏航角，不融合俯仰/横滚；必须近似水平固定并手持右转核实。 */
 #define MPU6050_YAW_SIGN               1
+#define MPU6050_GYRO_SETTLE_MS         500U /* 唤醒/配置后固定等待；不以波动或零偏大小拒绝启动。 */
 #define MPU6050_GYRO_BIAS_SAMPLES      128U
 #define MPU6050_GYRO_CALIBRATION_MS    5U
 #define MPU6050_I2C_TIMEOUT_MS         2U
@@ -121,7 +125,7 @@
  * 同步采用测试工程的公共距离系数，统一修正里程、反馈轮速和编码器估计航向。
  * 保留下面的轮径/每圈计数原值，不重复补偿；直线测距通过不代表转角/路径已实测。
  */
-#define ODOMETRY_DISTANCE_SCALE       1.53f
+#define ODOMETRY_DISTANCE_SCALE       2.15f
 /* 2026-10-29：本轮编码器估计97.59°，用户目测约75°，暂取75/97.59≈0.77。
  * 只修正轮差到航向的比例，不改直线距离/轮速；目测初值，非精确转角标定。
  * 主机理想几何回归可显式置1，生产固件仅使用本头文件默认值。 */
@@ -136,14 +140,15 @@
 #define RIGHT_COUNTS_PER_WHEEL_REV 1560.0f /* 右输出轮完整一圈的最终四倍频计数。 */
 #define WHEEL_TRACK_CM              14.5f /* 用户于 2026-10-23 实测左右轮中心间距，单位 cm。 */
 /* 2026-10-25 实测输入：灰度排中心在轮轴中点前方 16 cm。
- * 90° 切角以轴中点 R=10 cm 规划；须 R>track/2，保证内轮前进。
- * 灰度触发点近似路口中心：先直行 L-R=6 cm 至圆弧切点。
+ * 90° 圆弧 R=L=16 cm，路口识别后从当前位置开始规划；须 R>track/2。
+ * 触发点与实际路口中心的偏差以及轮胎打滑需实车验证。
  */
 #define GRAY_FORWARD_OFFSET_CM       16.0f
-#define CORNER_RADIUS_CM             10.0f
+#define CORNER_RADIUS_CM             16.0f
+#define CORNER_MAX_HALF_RATIO         0.8f /* 圆弧航向修正有界，保证两轮目标均为正。 */
 #define CORNER_HEADING_KP            8.0f /* 编码器轨迹航向误差到轮速半差。 */
-#define ENCODER_LEFT_SIGN            -1    /* 启动后原始计数 65527 指向负向回绕，取反；实车待复测。 */
-#define ENCODER_RIGHT_SIGN            1    /* 右轮计数方向修正，只允许 +1 或 -1，前进应为正。 */
+#define ENCODER_LEFT_SIGN             1    /* 2026-10-29 电机极性反转后启动快照左原始计数 +1，旧 -1 触发反向停车；轮向待复测。 */
+#define ENCODER_RIGHT_SIGN           -1    /* 2026-10-29 与测距工程一致：右原始计数 0→65535，乘 -1 后为正反馈；实车轮向仍待核对。 */
 
 /* ==================== 四、编码器采样与轮速量程 ====================
  * 输入滤波作用于定时器硬件，轮速低通作用于软件换算后的 cm/s 测量值。
@@ -152,7 +157,7 @@
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
 #define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        120.0f  /* 每个车轮目标速度上限，单位 cm/s。 */
+#define WHEEL_TARGET_MAX_CM_S        200.0f  /* 与当前路径表 200 cm/s 一致；目标值，非实测能力。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
@@ -180,6 +185,26 @@
 #define POSITION_KI_CM_S              0.0f   /* 白线位置积分系数初值。 */
 #define POSITION_KD_CM_S              0.025f /* 白线位置微分系数。 */
 #define POSITION_CURVE_SLOWDOWN       0.35f  /* 最大位置偏差时，相对路段基础速度的降速比例。 */
+/* 转弯速度功能独立开关：修改头文件后 pio run，不增加构建环境。 */
+#ifndef TURN_APPROACH_SLOWDOWN_ENABLED
+#define TURN_APPROACH_SLOWDOWN_ENABLED 1
+#endif
+#ifndef TURN_EXIT_ACCEL_ENABLED
+#define TURN_EXIT_ACCEL_ENABLED        1
+#endif
+#ifndef MOTOR_REVERSE_BRAKE_ENABLED
+#define MOTOR_REVERSE_BRAKE_ENABLED    1
+#endif
+#if (TURN_APPROACH_SLOWDOWN_ENABLED != 0 && TURN_APPROACH_SLOWDOWN_ENABLED != 1) || \
+    (TURN_EXIT_ACCEL_ENABLED != 0 && TURN_EXIT_ACCEL_ENABLED != 1) || \
+    (MOTOR_REVERSE_BRAKE_ENABLED != 0 && MOTOR_REVERSE_BRAKE_ENABLED != 1)
+#error "Turn speed switches must be 0 or 1"
+#endif
+#define TURN_EXIT_ACCEL_CM_S2        400.0f /* 出口确认后跨切段快速提速；原普通斜率160。 */
+#define REVERSE_BRAKE_MARGIN_CM_S      3.0f /* 实测高于目标此值才施加反向力矩。 */
+#define REVERSE_BRAKE_KP              4.0f /* 超速差映射到反向PWM，非倒车目标。 */
+#define REVERSE_BRAKE_MAX_PWM        60.0f /* 255标尺下的反向指令上限。 */
+
 #define TARGET_RISE_CM_S2           160.0f  /* 恢复/切段加速斜率，单位 cm/s²；6→40 目标约 0.213 s，START 仍受 1 s 包络。 */
 #define LINE_FOLLOW_SPEED_CM_S        12.0f /* 编码器仅巡线时的基础速度；路径模式改用表中 speed。 */
 
@@ -241,7 +266,7 @@
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
 #define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
-#define JUNCTION_TURN_SPEED_CM_S      60.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
+#define JUNCTION_TURN_SPEED_CM_S      40.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
 #define JUNCTION_CAPTURE_MAX_HALF_DIFF_CM_S 12.0f /* 非圆弧见线后位置半差上限，不再叠加高速放大。 */

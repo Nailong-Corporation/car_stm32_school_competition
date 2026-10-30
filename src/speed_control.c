@@ -27,7 +27,7 @@ void speed_control_init(SpeedControl *s)
 }
 
 /**
- * @brief 根据单轮目标/实测速度（cm/s）与 dt（秒）生成限幅 PWM。
+ * @brief 根据单轮目标/实测速度（cm/s）与 dt（秒）生成限幅 PWM；开启反转制动时可输出受限负 PWM。
  * 目标为零时复位并输出零；反向反馈、低速持续超限或非法值返回对应故障码。
  * stall 保存低速累计秒数，pwm 接收含前馈及抗饱和 PID 的输出。
  */
@@ -44,6 +44,15 @@ static SpeedFault wheel(Pid *pid, float target, float measured, float dt, float 
         *stall + dt : 0.0f;
     if (measured < -SPEED_STALL_MEASURED_CM_S) return SPEED_FAULT_REVERSE;
     if (*stall >= SPEED_STALL_TIMEOUT_S) return SPEED_FAULT_STALL;
+#if MOTOR_REVERSE_BRAKE_ENABLED
+    /* 只对确认的正向超速施加反向力矩；不请求负轮速，不累积制动积分。 */
+    if (measured > target + REVERSE_BRAKE_MARGIN_CM_S) {
+        pid_reset(pid);
+        *pwm = -fminf(REVERSE_BRAKE_MAX_PWM,
+                     REVERSE_BRAKE_KP * (measured - target - REVERSE_BRAKE_MARGIN_CM_S));
+        return SPEED_FAULT_NONE;
+    }
+#endif
     return pid_update_bounded(pid, target - measured, dt, 0.0f, MOTOR_PWM_LIMIT,
                               target * SPEED_FEEDFORWARD, pwm) ? SPEED_FAULT_NONE : SPEED_FAULT_PID;
 }

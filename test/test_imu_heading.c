@@ -1,6 +1,7 @@
 #include "gray_sensor.h"
 #include "line_follow.h"
 #include "motion_config.h"
+#include "tilt_guard.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -82,6 +83,44 @@ int main(void)
     line_follow_update_heading(&tilted,center,count,now,.005f,true,true,0.0f);
     assert(tilted.state==LINE_STOPPED && tilted.start_result==LINE_START_REJECTED_FAULT);
 
-    puts("PASS: MPU yaw controls pose, junction angle, IMU/tilt fault locked stops");
+    TiltGuard guard = {0};
+    for (unsigned i=0;i<100;++i) assert(tilt_guard_update(&guard,.9f,0,-.6f,.005f));
+    assert(guard.tripped && !tilt_guard_acknowledge(&guard));
+    for (unsigned i=0;i<100;++i) assert(tilt_guard_update(&guard,0,0,-1,.005f));
+    assert(guard.tripped && guard.can_restart); /* No automatic restart after level. */
+    for (unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) {
+        now+=5;
+        line_follow_update_heading(&tilted,center,count,now,.005f,false,true,0);
+    }
+    assert(tilted.state==LINE_STOPPED && !tilted.command.enabled);
+    assert(tilt_guard_acknowledge(&guard)); /* Same explicit START path as main. */
+    line_follow_acknowledge_tilt(&tilted);
+    now+=5;
+    line_follow_update_heading(&tilted,center,count,now,.005f,true,true,0);
+    assert(tilted.state==LINE_TRACKING && tilted.start_result==LINE_START_ACCEPTED);
+    assert(tilted.command.enabled && !tilted.stop_snapshot.valid);
+    line_follow_stop(&tilted,LINE_STOP_IMU);
+    line_follow_acknowledge_tilt(&tilted);
+    assert(tilted.stop_reason==LINE_STOP_IMU && !tilted.command.enabled);
+
+    /* Captured board sequence: pickup before first START, then 0x30 on line. */
+    LineFollow idle_tilt;
+    line_follow_init(&idle_tilt,geometry,steps,2,NULL,NULL);
+    line_follow_stop(&idle_tilt,LINE_STOP_TILT);
+    assert(idle_tilt.stop_snapshot.state_before_stop==LINE_IDLE);
+    GrayObservation offset_center=gray_classify(0x30,true,0);
+    for (unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) {
+        now+=5;
+        line_follow_update_heading(&idle_tilt,offset_center,count,now,.005f,
+                                   i==LINE_CONFIRM_SAMPLES-1U,true,0);
+    }
+    assert(idle_tilt.state==LINE_STOPPED && !idle_tilt.command.enabled);
+    line_follow_acknowledge_tilt(&idle_tilt); /* Fresh level check is in main. */
+    now+=5;
+    line_follow_update_heading(&idle_tilt,offset_center,count,now,.005f,true,true,0);
+    assert(idle_tilt.start_result==LINE_START_ACCEPTED && idle_tilt.state==LINE_TRACKING);
+    assert(idle_tilt.command.enabled);
+
+    puts("PASS: MPU yaw/IMU fault lock; tilt remains stopped until level + explicit START; IDLE pickup/0x30 restart");
     return 0;
 }

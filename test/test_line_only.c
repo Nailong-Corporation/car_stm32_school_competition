@@ -33,8 +33,8 @@ static void tick(LineFollow *f, EncoderCounts *c, uint32_t *now,
     CHECK(f->route.state == ROUTE_DISABLED && !f->route.stop_pending);
     CHECK(f->route.steps == NULL && f->route.count == 0 && f->route.stop_callback == NULL);
     CHECK(f->state != LINE_JUNCTION && callbacks == 0);
-    CHECK(f->command.left >= 0 && f->command.left <= MOTOR_PWM_LIMIT);
-    CHECK(f->command.right >= 0 && f->command.right <= MOTOR_PWM_LIMIT);
+    CHECK(f->command.left >= (MOTOR_REVERSE_BRAKE_ENABLED ? -REVERSE_BRAKE_MAX_PWM : 0) && f->command.left <= MOTOR_PWM_LIMIT);
+    CHECK(f->command.right >= (MOTOR_REVERSE_BRAKE_ENABLED ? -REVERSE_BRAKE_MAX_PWM : 0) && f->command.right <= MOTOR_PWM_LIMIT);
     CHECK(f->left_target_cm_s >= 0 && f->left_target_cm_s <= WHEEL_TARGET_MAX_CM_S);
     CHECK(f->right_target_cm_s >= 0 && f->right_target_cm_s <= WHEEL_TARGET_MAX_CM_S);
     if (f->state == LINE_IDLE || f->state == LINE_STOPPED)

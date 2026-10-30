@@ -120,6 +120,9 @@ int main(void)
     if (!mpu6050_init(&imu)) {
         g_diagnostics.imu_init_failure_stage = imu.init_failure_stage;
         g_diagnostics.imu_address_7bit = imu.address_7bit;
+        g_diagnostics.imu_gyro_z_bias_lsb = imu.gyro_z_bias_lsb;
+        g_diagnostics.imu_gyro_z_raw = imu.gyro_z_raw;
+        g_diagnostics.imu_gyro_z_calibration_span_lsb = imu.gyro_z_calibration_span_lsb;
         Error_Handler();
     }
 #endif
@@ -147,6 +150,7 @@ int main(void)
 #if MPU6050_ENABLED
     g_diagnostics.imu_ready = imu.ready;
     g_diagnostics.imu_gyro_z_bias_lsb = imu.gyro_z_bias_lsb;
+    g_diagnostics.imu_gyro_z_calibration_span_lsb = imu.gyro_z_calibration_span_lsb;
     g_diagnostics.imu_address_7bit = imu.address_7bit;
 #endif
     if (!watchdog_init()) Error_Handler();
@@ -187,6 +191,13 @@ int main(void)
             g_diagnostics.pitch_over_threshold_ms = imu.pitch_guard.above_threshold_s * 1000.0f;
             g_diagnostics.pitch_stop_latched = imu.pitch_guard.tripped;
 #endif
+#endif
+#if MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED
+            if (start_pending && imu_valid && follow.state == LINE_STOPPED &&
+                follow.stop_reason == LINE_STOP_TILT && tilt_guard_acknowledge(&imu.pitch_guard)) {
+                line_follow_acknowledge_tilt(&follow);
+                g_diagnostics.pitch_stop_latched = imu.pitch_guard.tripped;
+            }
 #endif
             if (start_pending) {
                 ++g_diagnostics.start_request_count;

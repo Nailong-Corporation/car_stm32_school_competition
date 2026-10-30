@@ -8,6 +8,28 @@ typedef struct { uint32_t compare[2], counter; } TIM_TypeDef;
 typedef enum { HAL_OK, HAL_ERROR } HAL_StatusTypeDef;
 typedef enum { GPIO_PIN_RESET, GPIO_PIN_SET } GPIO_PinState;
 typedef struct { uint32_t Pin, Mode, Pull, Speed; } GPIO_InitTypeDef;
+typedef struct {
+    uint32_t ClockSpeed, DutyCycle, OwnAddress1, AddressingMode, DualAddressMode;
+    uint32_t OwnAddress2, GeneralCallMode, NoStretchMode;
+} I2C_InitTypeDef;
+typedef struct { void *Instance; I2C_InitTypeDef Init; } I2C_HandleTypeDef;
+#define I2C1 ((void *)1)
+#define I2C_MEMADD_SIZE_8BIT 1U
+#define I2C_DUTYCYCLE_2 0U
+#define I2C_ADDRESSINGMODE_7BIT 0U
+#define I2C_DUALADDRESS_DISABLE 0U
+#define I2C_GENERALCALL_DISABLE 0U
+#define I2C_NOSTRETCH_DISABLE 0U
+#define GPIO_MODE_AF_OD 3U
+#define __HAL_RCC_AFIO_CLK_ENABLE() ((void)0)
+#define __HAL_RCC_I2C1_CLK_ENABLE() ((void)0)
+#define __HAL_AFIO_REMAP_I2C1_ENABLE() ((void)0)
+HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *i2c);
+HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *i2c, uint16_t address, uint16_t reg,
+                                uint16_t size, uint8_t *data, uint16_t count, uint32_t timeout);
+HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *i2c, uint16_t address, uint16_t reg,
+                                 uint16_t size, uint8_t *data, uint16_t count, uint32_t timeout);
+void HAL_Delay(uint32_t ms);
 typedef struct { uint32_t Prescaler, CounterMode, Period, ClockDivision; } TIM_Base_InitTypeDef;
 typedef struct { TIM_TypeDef *Instance; TIM_Base_InitTypeDef Init; } TIM_HandleTypeDef;
 typedef struct { uint32_t OCMode, Pulse, OCPolarity, OCFastMode; } TIM_OC_InitTypeDef;

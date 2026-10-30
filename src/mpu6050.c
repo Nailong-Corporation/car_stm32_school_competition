@@ -58,7 +58,8 @@ bool mpu6050_init(Mpu6050 *imu)
 #else
     if ((MPU6050_YAW_SIGN != 1 && MPU6050_YAW_SIGN != -1) ||
         (MPU6050_ADDRESS_7BIT != 0x68U && MPU6050_ADDRESS_7BIT != 0x69U) ||
-        MPU6050_GYRO_BIAS_SAMPLES == 0U) return false;
+        MPU6050_PROBE_ATTEMPTS == 0U ||
+        MPU6050_GYRO_BIAS_SAMPLES < 2U || MPU6050_GYRO_CALIBRATION_MS == 0U) return false;
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_AFIO_CLK_ENABLE();
@@ -83,15 +84,23 @@ bool mpu6050_init(Mpu6050 *imu)
     imu->init_failure_stage = 1;
     if (HAL_I2C_Init(&imu->i2c) != HAL_OK) return false;
 
-    uint8_t who = 0;
+    HAL_Delay(MPU6050_POWER_SETTLE_MS);
     imu->init_failure_stage = 2;
-    imu->address_7bit = MPU6050_ADDRESS_7BIT;
     /* WHO_AM_I stays 0x68 regardless of AD0. Try both possible bus addresses. */
-    if (!read_reg(imu, MPU_REG_WHO_AM_I, &who, 1) || who != 0x68U) {
-        imu->address_7bit = MPU6050_ADDRESS_7BIT == 0x68U ? 0x69U : 0x68U;
-        if (!read_reg(imu, MPU_REG_WHO_AM_I, &who, 1) || who != 0x68U)
-            return false;
+    bool found = false;
+    for (uint32_t attempt = 0; attempt < MPU6050_PROBE_ATTEMPTS && !found; ++attempt) {
+        for (unsigned alternate = 0; alternate < 2; ++alternate) {
+            imu->address_7bit = alternate ? (MPU6050_ADDRESS_7BIT ^ 1U) : MPU6050_ADDRESS_7BIT;
+            uint8_t who = 0;
+            if (read_reg(imu, MPU_REG_WHO_AM_I, &who, 1) && who == 0x68U) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && attempt + 1U < MPU6050_PROBE_ATTEMPTS)
+            HAL_Delay(MPU6050_PROBE_RETRY_MS);
     }
+    if (!found) return false;
     imu->init_failure_stage = 3;
     if (!write_reg(imu, MPU_REG_PWR_MGMT_1, 0x01U) ||
         !write_reg(imu, MPU_REG_CONFIG, 0x03U) ||
@@ -103,16 +112,36 @@ bool mpu6050_init(Mpu6050 *imu)
 
     /* Only during startup, with motors already disabled. User must keep the car still.
      * HAL_Delay never runs inside the time-critical 5 ms control task. */
-    HAL_Delay(100U);
+    HAL_Delay(MPU6050_GYRO_SETTLE_MS);
+    /* Never integrate with an assumed scale after a configuration mismatch. */
+    imu->init_failure_stage = 6;
+    uint8_t config;
+    if (!read_reg(imu, MPU_REG_GYRO_CONFIG, &config, 1) || config != 0x18U)
+        return false;
+    /* Discard the already-latched sample; each calibration read below must be fresh. */
     imu->init_failure_stage = 4;
-    int64_t total = 0;
+    uint8_t status;
+    if (!read_reg(imu, MPU_REG_INT_STATUS, &status, 1)) return false;
+    /* One fixed window. Calibration magnitude/spread are diagnostics, never a
+     * start veto. Median rejects isolated startup spikes without repeated windows. */
+    int16_t samples[MPU6050_GYRO_BIAS_SAMPLES];
     for (uint32_t i = 0; i < MPU6050_GYRO_BIAS_SAMPLES; ++i) {
-        int16_t sample;
-        if (!read_gyro_z(imu, &sample)) return false;
-        total += sample;
         HAL_Delay(MPU6050_GYRO_CALIBRATION_MS);
+        int16_t sample;
+        if (!read_reg(imu, MPU_REG_INT_STATUS, &status, 1) || !(status & 0x01U) ||
+            !read_gyro_z(imu, &sample)) return false;
+        imu->gyro_z_raw = sample;
+        uint32_t j = i;
+        while (j > 0 && samples[j-1U] > sample) {
+            samples[j] = samples[j-1U];
+            --j;
+        }
+        samples[j] = sample;
     }
-    imu->gyro_z_bias_lsb = (float)total / (float)MPU6050_GYRO_BIAS_SAMPLES;
+    uint32_t middle = MPU6050_GYRO_BIAS_SAMPLES / 2U;
+    imu->gyro_z_bias_lsb = MPU6050_GYRO_BIAS_SAMPLES % 2U ? (float)samples[middle] :
+        0.5f * ((float)samples[middle-1U] + (float)samples[middle]);
+    imu->gyro_z_calibration_span_lsb = (float)((int32_t)samples[MPU6050_GYRO_BIAS_SAMPLES-1U] - samples[0]);
     imu->ready = true;
     imu->init_failure_stage = 0;
     return true;

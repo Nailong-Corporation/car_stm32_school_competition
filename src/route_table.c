@@ -4,7 +4,7 @@
  * 首段从启动位置起算；后续为用户测量的路口中心间距离，单位 cm。
  * 以入口灰度触发点近似路口中心；转弯/离口累计灰度中心出口方向净位移。
  * 已计入前置 16 cm 的旋转位移，不以轮程/探头弧长代替中心间距离；打滑仍须实测。
- * R=10 的完整直角结束时探头已在出口约 26 cm；下面 20 cm 短段可能在回线前越过，
+ * R=16 的理想直角结束时探头已在出口约 32 cm；下面 20 cm 短段可能在回线前越过，
  * 保留用户路径表和真实进度，不能保证此短段路口可捕获。
  * STOP 同样需要在距离窗口内确认路口；ROUTE_REPEAT_COUNT 控制总轮数，
  * 非最终轮的 STOP 标记按 ROUTE_REPEAT_ACTION（当前 LEFT）转向/离口后回到首项。表内 60 cm/s 保留用户设置，须不超过 WHEEL_TARGET_MAX_CM_S。 */
@@ -24,13 +24,13 @@ const RouteStep route[] = {
     {20.0f, 10.0f, LEFT, 80, 0.0f, true},
     {70.0f, 16.0f, STOP, 80, 0.0f, true},
     */
-    /* 赛道 2
-    {75.0f, 10.0f, LEFT, 120, 0.0f, true},
-    {219.0f, 16.0f, LEFT, 120, 0.0f, true},
-    {75.0f, 10.0f, LEFT, 120, 0.0f, true},
-    {219.0f, 16.0f, STOP, 120, 0.0f, true},
-    */
-    /* 赛道 3 */
+    /* 赛道 2 */
+    {65.0f, 5.0f, LEFT, 200, 0.0f, true},
+    {219.0f, 16.0f, LEFT, 200, 0.0f, true},
+    {75.0f, 10.0f, LEFT, 200, 0.0f, true},
+    {219.0f, 16.0f, STOP, 200, 0.0f, true},
+
+    /* 赛道 3
     {200.0f, 15.0f, RIGHT, 120, 0.0f, false},
     {82.0f, 8.0f, RIGHT, 120, 0.0f, false},
     {52.0f, 8.0f, CUSTOM_TURN, 120, 60.0f, false},
@@ -38,5 +38,6 @@ const RouteStep route[] = {
     {20.0f, 5.0f, LEFT, 80, 0.0f, false},
     {120.0f, 10.0f, STOP, 120, 0.0f, false},
     //{80.0f, 8.0f, LEFT, 80, 0.0f, true},
+    */
 };
 const size_t route_count = sizeof(route) / sizeof(route[0]);

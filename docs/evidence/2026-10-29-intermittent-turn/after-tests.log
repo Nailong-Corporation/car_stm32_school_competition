@@ -1,0 +1,11 @@
+PASS: MPU driver rejects bad/moving/stale calibration and scale mismatch; stationary/90deg integration
+PASS: production heading scale, distance/speed, pose and mirrored 90-degree control gates
+PASS: inverted/normal pitch 40deg, spike filtering, time confirmation, tilt latch
+PASS: MPU yaw controls pose, junction angle, IMU/tilt fault locked stops
+GRAY_INVERT_ENABLED=1
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production route/raw grayscale START accepted; excessive speed rejected
+Assertion failed: (f.route.index==2 && f.route.state==ROUTE_FOLLOW), function test_spatial_short_s, file test_navigation.c, line 2182.
+test/run_host_tests.sh: line 40: 96985 Abort trap: 6           "$test_binary"

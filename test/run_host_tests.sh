@@ -3,6 +3,50 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 test_binary=$(mktemp "${TMPDIR:-/tmp}/car_stm32_test.XXXXXX")
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
+# Independent approach / exit / reverse brake switches, all eight combinations.
+for approach in 0 1; do
+    for exit_accel in 0 1; do
+        for reverse_brake in 0 1; do
+            "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+                -fsanitize=address,undefined -fno-omit-frame-pointer \
+                -I"$project_dir/include" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f \
+                -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
+                -DTURN_APPROACH_SLOWDOWN_ENABLED="$approach" \
+                -DTURN_EXIT_ACCEL_ENABLED="$exit_accel" -DMOTOR_REVERSE_BRAKE_ENABLED="$reverse_brake" \
+                "$project_dir/test/test_turn_speed_switches.c" "$project_dir/src/gray_sensor.c" \
+                "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/route.c" \
+                "$project_dir/src/route_table.c" "$project_dir/src/speed_control.c" \
+                "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+            "$test_binary"
+            "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic \
+                -I"$project_dir/test/fakes" -I"$project_dir/include" \
+                -DMOTOR_REVERSE_BRAKE_ENABLED="$reverse_brake" \
+                "$project_dir/test/test_motor_hal.c" "$project_dir/src/motor.c" \
+                "$project_dir/src/motor_command.c" -lm -o "$test_binary"
+            "$test_binary"
+        done
+    done
+done
+# Actual production switches and route table must accept a stationary centered-line START.
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" \
+    "$project_dir/test/test_configured_start.c" "$project_dir/src/gray_sensor.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
+    "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+    "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
+    -lm -o "$test_binary"
+"$test_binary"
+# Exercise the actual I2C driver with captured bad calibration and bus/register failures.
+"${CC:-cc}" -DMPU6050_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/test/fakes" -I"$project_dir/include" \
+    "$project_dir/test/test_mpu6050.c" "$project_dir/src/mpu6050.c" \
+    "$project_dir/src/tilt_guard.c" "$project_dir/src/line_follow.c" \
+    "$project_dir/src/odometry.c" "$project_dir/src/gray_sensor.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/route.c" \
+    "$project_dir/src/speed_control.c" -lm -o "$test_binary"
+"$test_binary"
 # 生产转角比例与理想几何分开验证；不覆盖PlatformIO固件配置。
 "${CC:-cc}" -DMPU6050_ENABLED=0 -std=c11 -Wall -Wextra -Werror -pedantic -g \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
@@ -25,6 +69,7 @@ trap 'rm -f "$test_binary"' EXIT HUP INT TERM
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -I"$project_dir/include" \
     "$project_dir/test/test_imu_heading.c" "$project_dir/src/odometry.c" \
+    "$project_dir/src/tilt_guard.c" \
     "$project_dir/src/gray_sensor.c" "$project_dir/src/line_follow.c" \
     "$project_dir/src/pid.c" "$project_dir/src/route.c" \
     "$project_dir/src/speed_control.c" -lm -o "$test_binary"
@@ -62,10 +107,12 @@ for invert in 1 0; do
         "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
         -lm -o "$test_binary"
     "$test_binary"
+    # Historical navigation models keep their original no-slowdown speed assumptions.
     "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/include" \
         -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
+        -DTURN_APPROACH_SLOWDOWN_ENABLED=0 -DTURN_EXIT_ACCEL_ENABLED=0 -DMOTOR_REVERSE_BRAKE_ENABLED=0 \
         "$project_dir/test/test_navigation.c" "$project_dir/src/gray_sensor.c" \
         "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
         "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
@@ -81,7 +128,7 @@ for invert in 1 0; do
         "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
         "$project_dir/src/line_follow.c" -lm -o "$test_binary"
     "$test_binary"
-    "${CC:-cc}" -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -I"$project_dir/include" -DENCODER_CONTROL_ENABLED=0 -DPRESET_ROUTE_ENABLED=0 \
         "$project_dir/test/test_open_loop.c" "$project_dir/src/gray_sensor.c" \

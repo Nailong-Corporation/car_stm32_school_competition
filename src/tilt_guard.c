@@ -4,9 +4,10 @@
 
 bool tilt_guard_update(TiltGuard *g, float ax, float ay, float az, float dt)
 {
-    if (!g || !isfinite(ax) || !isfinite(ay) || !isfinite(az) ||
+    if (!g) return false;
+    g->can_restart = false;
+    if (!isfinite(ax) || !isfinite(ay) || !isfinite(az) ||
         !isfinite(dt) || dt <= 0.0f || dt > 0.015f) return false;
-    if (g->tripped) return true;
     float magnitude = sqrtf(ax * ax + ay * ay + az * az);
     if (!isfinite(magnitude)) return false;
     /* Dynamic acceleration is not a reliable measure of gravity. Require a
@@ -30,6 +31,9 @@ bool tilt_guard_update(TiltGuard *g, float ax, float ay, float az, float dt)
      * unchanged. X must be aligned with the vehicle's forward axis. */
     g->pitch_deg = atan2f(fabsf(g->x_g), hypotf(g->y_g, g->z_g)) * 57.2957795131f;
     if (!isfinite(g->pitch_deg)) return false;
+    float current_pitch = atan2f(fabsf(ax), hypotf(ay, az)) * 57.2957795131f;
+    g->can_restart = current_pitch <= MPU6050_PITCH_STOP_DEG &&
+                     g->pitch_deg <= MPU6050_PITCH_STOP_DEG;
     if (g->pitch_deg > MPU6050_PITCH_STOP_DEG) {
         g->above_threshold_s += dt;
         if (g->above_threshold_s >= MPU6050_PITCH_CONFIRM_MS / 1000.0f)
@@ -37,5 +41,13 @@ bool tilt_guard_update(TiltGuard *g, float ax, float ay, float az, float dt)
     } else {
         g->above_threshold_s = 0.0f;
     }
+    return true;
+}
+
+bool tilt_guard_acknowledge(TiltGuard *g)
+{
+    if (!g || !g->primed || !g->can_restart) return false;
+    g->tripped = false;
+    g->above_threshold_s = 0;
     return true;
 }

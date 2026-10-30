@@ -475,6 +475,39 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
             fail(p, actual_turn < -JUNCTION_WRONG_WAY_RAD ? ROUTE_FAILURE_WRONG_WAY : ROUTE_FAILURE_TURN_LIMIT);
             return;
         }
+        if (route_uses_corner_arc(p)) {
+            if (turn >= fabsf(route_turn_target_rad(p))) p->corner_arc_complete=true;
+            bool center=p->corner_arc_complete && route_is_narrow_line(obs) &&
+                        fabsf(obs.position)<=JUNCTION_CENTER_LIMIT &&
+                        (!route_prepares_straight(p) ||
+                         fabsf(heading_rad-exit_heading)<=STRAIGHT_ENTRY_ALIGN_RAD);
+            if (!center || (uint32_t)(now_ms-p->online_ms)>CONTROL_MAX_INTERVAL_MS) {
+                p->exit_candidate_pending=false;
+                p->exit_count=0;
+            }
+            if (center && !p->exit_candidate_pending) {
+                p->exit_candidate_pending=true;
+                p->exit_candidate_ms=now_ms;
+                p->exit_candidate_cm=distance_cm;
+            }
+            if (center && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
+            p->online_ms=now_ms;
+            if (center && p->exit_count>=LINE_CONFIRM_SAMPLES &&
+                (uint32_t)(now_ms-p->exit_candidate_ms)>=JUNCTION_EXIT_CONFIRM_MS &&
+                distance_cm-p->exit_candidate_cm>=JUNCTION_EXIT_CONFIRM_CM) {
+                p->state=ROUTE_CLEARING;
+                p->phase_ms=now_ms;
+                p->clear_cm=distance_cm;
+                p->exit_count=0;
+                p->exit_candidate_pending=false;
+                p->turn_capturing=p->turn_exit_branch=false;
+                p->turn_ended_on_line=!route_prepares_straight(p);
+                return;
+            }
+            if (timed_out) { fail(p,ROUTE_FAILURE_ACTION_TIMEOUT); return; }
+            p->turn_capturing=p->corner_arc_complete && route_is_narrow_line(obs);
+            return;
+        }
         if (route_prepares_straight(p)) {
             /* 接直行也必须实际检测到出口中心线，不能只凭航向对齐离口。 */
             if (timed_out) { fail(p, ROUTE_FAILURE_ACTION_TIMEOUT); return; }

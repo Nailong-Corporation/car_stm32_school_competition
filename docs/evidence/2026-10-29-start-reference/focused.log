@@ -1,0 +1,15 @@
+old_right_sign=True, invert=0, imu=1
+Assertion failed: (f.odometry.right_speed_cm_s > 0.0f), function main, file test_configured_start.c, line 43.
+exit=-6; expected outcome
+old_right_sign=False, invert=0, imu=0
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+exit=0; expected outcome
+old_right_sign=False, invert=0, imu=1
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+exit=0; expected outcome
+old_right_sign=False, invert=1, imu=0
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+exit=0; expected outcome
+old_right_sign=False, invert=1, imu=1
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+exit=0; expected outcome

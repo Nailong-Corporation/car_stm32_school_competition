@@ -1,0 +1,4 @@
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+PASS: MPU fixed median calibration; centered-line button START accepted; spike rejection; probe/bus faults; stationary/90deg integration
+Assertion failed: (fabsf(o.distance_cm-wheel*.5f)<.001f), function main, file test_heading_scale.c, line 26.
+test/run_host_tests.sh: line 34: 59915 Abort trap: 6           "$test_binary"
