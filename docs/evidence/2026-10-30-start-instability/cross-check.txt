@@ -1,0 +1,1 @@
+Candidate diagnostic snapshot @0x20000d44 equals controller snapshot @0x20000328, 128 bytes: True

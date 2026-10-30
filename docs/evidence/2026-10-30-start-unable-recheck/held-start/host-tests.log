@@ -1,0 +1,59 @@
+PASS: approach=0 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: mirrored angle settling, yaw damping, low-speed clearance, custom angles and no-exit timeout
+PASS: mirrored angle settling, yaw damping, low-speed clearance, custom angles and no-exit timeout
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: single-count START, transient inhibit, mirrored reverse time/distance/severe gates and lock
+PASS: MPU stationary median calibration and movement rejection; centered-line button START accepted; spike rejection; probe/bus faults; stationary/90deg integration
+PASS: production heading scale, distance/speed, pose and mirrored 90-degree control gates
+PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup
+PASS: MPU yaw, startup/runtime encoder fallback, continuous mirrored turns, sticky source and encoder fault lock; tilt restart gates
+GRAY_INVERT_ENABLED=1
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (7773 checks)
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+GRAY_INVERT_ENABLED=0
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (7773 checks)
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: seam filter=1 polarity=1 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=1 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=1; 782 checks
+PASS: seam filter=1 polarity=0 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=0 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=1; 782 checks
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (7786 checks)

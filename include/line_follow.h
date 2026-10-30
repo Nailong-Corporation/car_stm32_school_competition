@@ -1,10 +1,14 @@
 #ifndef LINE_FOLLOW_H
 #define LINE_FOLLOW_H
 #include "odometry.h"
+#include "braking_planner.h"
 #include "route.h"
 #include "speed_control.h"
 
 typedef enum { LINE_IDLE, LINE_TRACKING, LINE_GAP_HOLD, LINE_JUNCTION, LINE_STOPPED } LineState;
+typedef enum { HEADING_ENCODER, HEADING_IMU } HeadingSource;
+typedef enum { HEADING_FALLBACK_NONE, HEADING_FALLBACK_STARTUP,
+               HEADING_FALLBACK_DATA } HeadingFallbackReason;
 typedef enum {
     LINE_STOP_NONE, LINE_STOP_REQUEST, LINE_STOP_LOST, LINE_STOP_FAULT,
     LINE_STOP_ENCODER, LINE_STOP_CALIBRATION, LINE_STOP_ROUTE, LINE_STOP_ROUTE_COMPLETE,
@@ -39,6 +43,9 @@ typedef struct {
     EncoderCounts counts;
     uint32_t sample_ms, reliable_age_ms, route_phase_age_ms;
     uint32_t route_index;
+    uint16_t junctions_seen;
+    bool final_segment_active;
+    float final_segment_progress_cm;
     float dt_s, base; /* base 在编码器模式为 cm/s，普通 PWM 模式为 PWM 指令。 */
     float left_target_cm_s, right_target_cm_s;
     float left_speed_cm_s, right_speed_cm_s;
@@ -54,10 +61,14 @@ typedef struct {
     uint8_t exit_line_mask;
     bool exit_recovery_active;
     float exit_lateral_error_cm;
+    HeadingSource heading_source;
+    HeadingFallbackReason heading_fallback_reason;
+    uint32_t heading_fallback_ms;
 } LineStopSnapshot;
 typedef struct {
     bool valid, handed_off;
     bool capture_seen;
+    bool line_confirmed_exit;
     uint32_t capture_ms;
     float capture_turn_rad, capture_left_target_cm_s, capture_right_target_cm_s;
     uint8_t capture_mask;
@@ -85,6 +96,9 @@ typedef struct {
     Odometry odometry;
     RoutePlanner route;
     SpeedControl speed;
+    BrakingSlew braking_slew;
+    bool braking_active;
+    float braking_origin_cm;
     Pid pid; /* White-line position: PWM difference when open, cm/s when closed. */
     MotorCommand command; /* Final PWM output in either mode. */
     bool have_reliable, abnormal;
@@ -92,9 +106,10 @@ typedef struct {
     float reliable_position, base, correction, left_target_cm_s, right_target_cm_s;
     float hold_heading_rad, abnormal_origin_cm;
     float held_pwm_correction; /* Open-loop interference hold, not measured heading. */
+    float turn_yaw_rate_rad_s; /* 当前航向来源实际增量 / dt 的低通值，右转正。 */
     bool exit_anchor_valid, exit_recovery_active;
     float exit_anchor_x_cm, exit_anchor_y_cm, exit_axis_rad, exit_lateral_error_cm;
-    bool exit_accelerating; /* 出口确认后跨切段保持快速加速，达到规划目标后清除。 */
+    bool exit_accelerating; /* 低速离口完成后快速加速，达到规划目标后清除。 */
     float startup_elapsed_s; /* 每次明确 START 重新计时，两种模式均使用 1 s 启动包络。 */
     uint32_t last_reliable_ms;
     uint32_t sample_ms;
@@ -108,6 +123,9 @@ typedef struct {
     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
     TurnExitDiagnostics turn_exit[2]; /* 前两个弯的离口角度记录，START清零。 */
     TurnTrace turn_trace; /* 接受人工 START 清零；停止后读取 follow.turn_trace。 */
+    HeadingSource heading_source;
+    HeadingFallbackReason heading_fallback_reason;
+    uint32_t heading_fallback_ms; /* Sticky until line_follow_init / MCU reset. */
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,
@@ -118,7 +136,7 @@ void line_follow_stop(LineFollow *follow, LineStopReason reason);
 void line_follow_acknowledge_tilt(LineFollow *follow);
 void line_follow_update(LineFollow *follow, GrayObservation observation, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request);
-/* IMU 已启用时主循环每个控制周期必须给出有效实测航向；丢样锁定停车。 */
+/* IMU 首个无效航向锁定降级编码器，从当前航向继续积分；不自动切回 IMU。 */
 void line_follow_update_heading(LineFollow *follow, GrayObservation observation,
                         EncoderCounts counts, uint32_t now_ms, float dt, bool start_request,
                         bool imu_valid, float imu_heading_rad);

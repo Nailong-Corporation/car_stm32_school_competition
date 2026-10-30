@@ -10,7 +10,7 @@ int main(void)
 {
     const float pi=3.14159265359f;
     OdometryCalibration c={4.8f,4.8f,1560,1560,14.5f,-1,1,true};
-    float cm_per_count=pi*4.8f/1560*1.53f;
+    float cm_per_count=pi*4.8f/1560*ODOMETRY_DISTANCE_SCALE;
     assert(fabsf(ODOMETRY_HEADING_SCALE-.77f)<.00001f);
     for(unsigned mirror=0;mirror<2;++mirror) {
         Odometry o; odometry_init(&o,c); assert(o.ready);
@@ -48,8 +48,8 @@ int main(void)
     /* 实际生产比例的控制链：旧公式已经报90°时，修正后还约69.3°，不能离口。
      * 无线时不得仅凭角度成功；出现真实中心线后才进入捕获。 */
     for(unsigned mirror=0;mirror<2;++mirror) {
-        RouteStep steps[]={{220,15,mirror?LEFT:RIGHT,120,0,false},
-                           {100,10,STOP,40,0,false}};
+        RouteStep steps[]={{1, 6.0f, mirror?LEFT:RIGHT, 120, 0, false, 0.0f},
+                           {1, 6.0f, STOP, 40, 0, false, 0.0f}};
         LineFollow f; line_follow_init(&f,c,steps,2,NULL,NULL);
         f.route.repeat_count=1;
         counts=(EncoderCounts){30000,30000};
@@ -61,7 +61,7 @@ int main(void)
         }
         assert(f.state==LINE_TRACKING);
         f.route.state=ROUTE_EXECUTING; f.route.phase_ms=now;
-        f.route.entry_cm=f.route.projection_previous_cm=f.odometry.distance_cm;
+        f.route.entry_cm=f.odometry.distance_cm;
         f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
         f.base=f.left_target_cm_s=f.right_target_cm_s=120;
         bool crossed_old_target=false;
@@ -80,7 +80,7 @@ int main(void)
             }
             assert(f.state!=LINE_STOPPED);
             if(f.route.state==ROUTE_EXECUTING)
-                assert(fabsf(fmaxf(f.left_target_cm_s,f.right_target_cm_s)-120)<.001f);
+                assert(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=6.001f);
         }
         assert(crossed_old_target && f.route.state==ROUTE_CLEARING);
         assert(fabsf(f.odometry.heading_rad)>=pi*.5f);

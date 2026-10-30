@@ -25,7 +25,8 @@ typedef struct {
 void odometry_init(Odometry *odom, OdometryCalibration calibration);
 bool odometry_update(Odometry *odom, EncoderCounts counts, float dt);
 /* IMU 模式：heading_rad 为右转正、连续不折返的实测相对航向（rad）。
- * 轮程/轮速仍只来自编码器，积分轮轴与探头位姿使用此航向增量。 */
+ * 轮程/轮速仍只来自编码器，积分轮轴与探头位姿使用此航向增量。
+ * use_imu 从 true 切为 false 时从当前航向累加本帧轮差，不重新设零。 */
 bool odometry_update_with_heading(Odometry *odom, EncoderCounts counts, float dt,
                                   bool use_imu, float heading_rad);
 #endif

@@ -16,6 +16,12 @@ typedef struct {
     uint8_t init_failure_stage;
     TiltGuard pitch_guard;
     bool ready;
+    float gyro_z_calibration_central_span_lsb;
+    uint32_t calibration_attempts;
+    uint32_t init_attempts;
+    uint32_t bus_recovery_count, last_i2c_status, last_i2c_error;
+    uint8_t last_who_am_i;
+    uint8_t bus_line_mask; /* bit0=SCL high, bit1=SDA high after recovery release. */
 } Mpu6050;
 
 /* Must be called once with motors stopped; calibrates the stationary gyro bias. */

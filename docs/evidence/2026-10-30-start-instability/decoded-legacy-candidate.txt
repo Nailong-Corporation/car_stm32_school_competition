@@ -1,0 +1,1435 @@
+
+warning: exec file is newer than core file.
+
+warning: Couldn't find general-purpose registers in core file.
+
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = {
+  control_count = 278747,
+  last_sample_ms = 1394530,
+  task_duration_ms = 0,
+  interval_ms = 5,
+  raw_mask = 0 '\000',
+  line_mask = 0 '\000',
+  selected_mask = 0 '\000',
+  prefilter_mask = 0 '\000',
+  seam_mask = 0 '\000',
+  observation = GRAY_NONE,
+  state = LINE_STOPPED,
+  stop_reason = LINE_STOP_ROUTE,
+  button_press_count = 1,
+  start_request_count = 1,
+  start_result = LINE_START_ACCEPTED,
+  valid_line_samples = 0 '\000',
+  start_raw_mask = 8 '\b',
+  start_line_mask = 8 '\b',
+  position = 0,
+  left_command = 0,
+  right_command = 0,
+  left_encoder = 2985,
+  right_encoder = 61116,
+  encoder_control_enabled = true,
+  preset_route_enabled = true,
+  odometry_ready = true,
+  imu_enabled = true,
+  imu_ready = false,
+  imu_gyro_z_raw = -5,
+  imu_gyro_z_bias_lsb = -1,
+  imu_init_failure_stage = 0 '\000',
+  imu_address_7bit = 104 'h',
+  pitch_stop_enabled = true,
+  pitch_stop_latched = false,
+  pitch_deg = 4.58524752,
+  pitch_over_threshold_ms = 0,
+  distance_cm = 76.9480591,
+  heading_rad = -1.79497039,
+  left_speed_cm_s = 4.20389539e-45,
+  right_speed_cm_s = 4.20389539e-45,
+  left_target_cm_s = 0,
+  right_target_cm_s = 0,
+  route_state = ROUTE_FAILED,
+  route_failure = ROUTE_FAILURE_TURN_LIMIT,
+  route_progress_cm = 76.9480591,
+  route_elapsed_ms = 1393580,
+  route_repeat_count = 0,
+  route_completed_laps = 0,
+  route_turn_capturing = false,
+  route_turn_forced = false,
+  route_candidate_samples = 0 '\000',
+  route_turn_rad = -1.7114979,
+  route_index = 0,
+  route_stop_events = 0,
+  route_stopped_step = 0,
+  stop_snapshot = {
+    valid = true,
+    reason = LINE_STOP_ROUTE,
+    state_before_stop = LINE_JUNCTION,
+    route_state = ROUTE_FAILED,
+    route_state_before_update = ROUTE_EXECUTING,
+    route_failure = ROUTE_FAILURE_TURN_LIMIT,
+    speed_fault = SPEED_FAULT_NONE,
+    speed_fault_wheel = 0 '\000',
+    observation = {
+      kind = GRAY_NONE,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    counts = {
+      left = 2869,
+      right = 61416
+    },
+    sample_ms = 6310,
+    reliable_age_ms = 1000,
+    route_phase_age_ms = 980,
+    route_index = 0,
+    junctions_seen = 1,
+    final_segment_active = true,
+    final_segment_progress_cm = 72.6253052,
+    dt_s = 0.00499999989,
+    base = 25,
+    left_target_cm_s = 0,
+    right_target_cm_s = 50,
+    left_speed_cm_s = 4.47961044,
+    right_speed_cm_s = 42.0388794,
+    distance_cm = 72.6253052,
+    route_progress_cm = 72.6253052,
+    clear_progress_cm = 72.6253052,
+    turn_rad = -2.10366535,
+    actual_turn_rad = -2.10366535,
+    exit_candidate_age_ms = 0,
+    exit_candidate_progress_cm = 0,
+    exit_candidate_pending = false,
+    exit_confirm_samples = 0 '\000',
+    handoff_early = false,
+    segment_start_progress_cm = 0,
+    turn_exit_branch = false,
+    exit_line_mask = 0 '\000',
+    exit_recovery_active = false,
+    exit_lateral_error_cm = 0,
+    heading_source = HEADING_IMU,
+    heading_fallback_reason = HEADING_FALLBACK_NONE,
+    heading_fallback_ms = 0
+  },
+  auto_resume_snapshot = {
+    valid = false,
+    reason = LINE_STOP_NONE,
+    state_before_stop = LINE_IDLE,
+    route_state = ROUTE_FOLLOW,
+    route_state_before_update = ROUTE_FOLLOW,
+    route_failure = ROUTE_FAILURE_NONE,
+    speed_fault = SPEED_FAULT_NONE,
+    speed_fault_wheel = 0 '\000',
+    observation = {
+      kind = GRAY_VALID,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    counts = {
+      left = 0,
+      right = 0
+    },
+    sample_ms = 0,
+    reliable_age_ms = 0,
+    route_phase_age_ms = 0,
+    route_index = 0,
+    junctions_seen = 0,
+    final_segment_active = false,
+    final_segment_progress_cm = 0,
+    dt_s = 0,
+    base = 0,
+    left_target_cm_s = 0,
+    right_target_cm_s = 0,
+    left_speed_cm_s = 0,
+    right_speed_cm_s = 0,
+    distance_cm = 0,
+    route_progress_cm = 0,
+    clear_progress_cm = 0,
+    turn_rad = 0,
+    actual_turn_rad = 0,
+    exit_candidate_age_ms = 0,
+    exit_candidate_progress_cm = 0,
+    exit_candidate_pending = false,
+    exit_confirm_samples = 0 '\000',
+    handoff_early = false,
+    segment_start_progress_cm = 0,
+    turn_exit_branch = false,
+    exit_line_mask = 0 '\000',
+    exit_recovery_active = false,
+    exit_lateral_error_cm = 0,
+    heading_source = HEADING_ENCODER,
+    heading_fallback_reason = HEADING_FALLBACK_NONE,
+    heading_fallback_ms = 0
+  },
+  auto_resume_count = 0,
+  auto_resume_last_ms = 0,
+  route_junctions_seen = 1,
+  route_final_segment_active = true,
+  route_final_segment_progress_cm = 76.9480591,
+  route_recovery_window_active = false,
+  route_recovery_window_progress_cm = 0,
+  route_recovery_window_limit_cm = 0,
+  straight_entry_aligned = {
+    valid = false,
+    pid_active = false,
+    sample_ms = 0,
+    route_index = 0,
+    route_state = ROUTE_FOLLOW,
+    observation = {
+      kind = GRAY_VALID,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    heading_rad = 0,
+    target_heading_rad = 0,
+    outgoing_cm = 0,
+    left_target_cm_s = 0,
+    right_target_cm_s = 0
+  },
+  straight_entry_handoff = {
+    valid = false,
+    pid_active = false,
+    sample_ms = 0,
+    route_index = 0,
+    route_state = ROUTE_FOLLOW,
+    observation = {
+      kind = GRAY_VALID,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    heading_rad = 0,
+    target_heading_rad = 0,
+    outgoing_cm = 0,
+    left_target_cm_s = 0,
+    right_target_cm_s = 0
+  },
+  turn_exit = {{
+      valid = false,
+      handed_off = false,
+      capture_seen = true,
+      capture_ms = 5835,
+      capture_turn_rad = 1.01388764,
+      capture_left_target_cm_s = 15.8894634,
+      capture_right_target_cm_s = 50,
+      capture_mask = 1 '\001',
+      clearing_ms = 0,
+      handoff_ms = 0,
+      clearing_turn_rad = 0,
+      minimum_turn_rad = 0,
+      handoff_turn_rad = 0,
+      clearing_mask = 0 '\000',
+      handoff_mask = 0 '\000'
+    }, {
+      valid = false,
+      handed_off = false,
+      capture_seen = false,
+      capture_ms = 0,
+      capture_turn_rad = 0,
+      capture_left_target_cm_s = 0,
+      capture_right_target_cm_s = 0,
+      capture_mask = 0 '\000',
+      clearing_ms = 0,
+      handoff_ms = 0,
+      clearing_turn_rad = 0,
+      minimum_turn_rad = 0,
+      handoff_turn_rad = 0,
+      clearing_mask = 0 '\000',
+      handoff_mask = 0 '\000'
+    }},
+  exit_anchor_valid = true,
+  exit_recovery_active = false,
+  exit_lateral_error_cm = 0,
+  imu_gyro_z_calibration_span_lsb = 20,
+  imu_gyro_z_calibration_central_span_lsb = 15,
+  imu_calibration_attempts = 1,
+  imu_init_attempts = 1,
+  heading_source = HEADING_ENCODER,
+  heading_fallback_reason = HEADING_FALLBACK_DATA,
+  heading_fallback_ms = 21480,
+  pitch_monitor_available = false
+}
+$2 = {
+  state = LINE_STOPPED,
+  stop_reason = LINE_STOP_ROUTE,
+  start_result = LINE_START_ACCEPTED,
+  odometry = {
+    calibration = {
+      left_diameter_cm = 4.80000019,
+      right_diameter_cm = 4.80000019,
+      left_counts_per_rev = 1560,
+      right_counts_per_rev = 1560,
+      track_cm = 14.5,
+      left_sign = 1,
+      right_sign = -1,
+      confirmed = true
+    },
+    previous = {
+      left = 2985,
+      right = 61116
+    },
+    ready = true,
+    primed = true,
+    left_cm_per_count = 0.020782847,
+    right_cm_per_count = 0.020782847,
+    distance_cm = 76.9480591,
+    heading_rad = -1.79497039,
+    left_speed_cm_s = 4.20389539e-45,
+    right_speed_cm_s = 4.20389539e-45,
+    left_distance_cm = 62.0365829,
+    right_distance_cm = 91.8596802,
+    x_cm = 54.3243332,
+    y_cm = -21.3916206,
+    sensor_x_cm = 50.7675133,
+    sensor_y_cm = -36.9912682,
+    sensor_distance_cm = 144.539429,
+    left_delta = 0,
+    right_delta = 0
+  },
+  route = {
+    junctions_seen = 1,
+    passing_junction = false,
+    final_segment_active = true,
+    search_pending = false,
+    final_segment_origin_cm = 0,
+    search_origin_cm = 0,
+    search_ms = 0,
+    last_sample_ms = 6310,
+    measured_left_cm_s = 4.47961044,
+    measured_right_cm_s = 42.0388794,
+    steps = 0x8008130,
+    count = 4,
+    index = 0,
+    state = ROUTE_FAILED,
+    failure = ROUTE_FAILURE_TURN_LIMIT,
+    origin_cm = 0,
+    entry_cm = 52.0921364,
+    entry_heading = -0.0834725201,
+    clear_cm = 0,
+    approach_center_cm = 51.5725594,
+    action_start_heading = -0.0834725201,
+    segment_ms = 950,
+    phase_ms = 5330,
+    approach_center_ms = 5310,
+    exit_candidate_ms = 0,
+    exit_candidate_cm = 0,
+    exit_candidate_pending = false,
+    repeat_action = LEFT,
+    repeat_count = 0,
+    completed_laps = 0,
+    candidate_count = 0 '\000',
+    exit_count = 0 '\000',
+    approach_center_count = 0 '\000',
+    have_approach_center = false,
+    valid = true,
+    stop_pending = false,
+    callback_dispatched = false,
+    corner_arc_complete = true,
+    turn_capturing = false,
+    lap_boundary = false,
+    capture_line_seen = true,
+    line_exit_confirmed = false,
+    capture_line_ms = 6075,
+    line_exit_heading_rad = 0,
+    stop_callback = 0x8003f99,
+    callback_context = 0x0,
+    turn_ended_on_line = false
+  },
+  speed = {
+    left = {
+      config = {
+        kp = 2,
+        ki = 8,
+        kd = 0,
+        integral_limit = 10,
+        derivative_tau = 0.0199999996
+      },
+      integral = 0,
+      previous_error = 0,
+      derivative = 0,
+      primed = false
+    },
+    right = {
+      config = {
+        kp = 2,
+        ki = 8,
+        kd = 0,
+        integral_limit = 10,
+        derivative_tau = 0.0199999996
+      },
+      integral = 0,
+      previous_error = 0,
+      derivative = 0,
+      primed = false
+    },
+    left_stall_s = 0,
+    right_stall_s = 0,
+    left_reverse_s = 0,
+    right_reverse_s = 0,
+    left_reverse_cm = 0,
+    right_reverse_cm = 0,
+    reverse_pending = false,
+    fault = SPEED_FAULT_NONE,
+    fault_wheel = 0 '\000'
+  },
+  braking_slew = {
+    speed = 30.6857452,
+    acceleration = 160
+  },
+  braking_active = false,
+  braking_origin_cm = 0,
+  pid = {
+    config = {
+      kp = 1.79999995,
+      ki = 0,
+      kd = 0.0250000004,
+      integral_limit = 20,
+      derivative_tau = 0.0199999996
+    },
+    integral = 0,
+    previous_error = 0,
+    derivative = 0,
+    primed = false
+  },
+  command = {
+    left = 0,
+    right = 0,
+    enabled = false
+  },
+  have_reliable = false,
+  abnormal = false,
+  valid_count = 0 '\000',
+  reliable_position = 0,
+  base = 0,
+  correction = 0,
+  left_target_cm_s = 0,
+  right_target_cm_s = 0,
+  hold_heading_rad = -0.0839727074,
+  abnormal_origin_cm = 51.7076492,
+  held_pwm_correction = 0,
+  exit_anchor_valid = true,
+  exit_recovery_active = false,
+  exit_anchor_x_cm = 63.3774376,
+  exit_anchor_y_cm = -23.8859501,
+  exit_axis_rad = -1.65426886,
+  exit_lateral_error_cm = 0,
+  exit_accelerating = false,
+  startup_elapsed_s = 1,
+  last_reliable_ms = 5310,
+  sample_ms = 1394530,
+  sample_dt_s = 0.00499999989,
+  observation = {
+    kind = GRAY_NONE,
+    raw_mask = 0 '\000',
+    line_mask = 0 '\000',
+    selected_mask = 0 '\000',
+    white_count = 0 '\000',
+    region_count = 0 '\000',
+    position = 0,
+    prefilter_mask = 0 '\000',
+    seam_mask = 0 '\000'
+  },
+  sample_counts = {
+    left = 2985,
+    right = 61116
+  },
+  route_state_before_update = ROUTE_FAILED,
+  stop_snapshot = {
+    valid = true,
+    reason = LINE_STOP_ROUTE,
+    state_before_stop = LINE_JUNCTION,
+    route_state = ROUTE_FAILED,
+    route_state_before_update = ROUTE_EXECUTING,
+    route_failure = ROUTE_FAILURE_TURN_LIMIT,
+    speed_fault = SPEED_FAULT_NONE,
+    speed_fault_wheel = 0 '\000',
+    observation = {
+      kind = GRAY_NONE,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    counts = {
+      left = 2869,
+      right = 61416
+    },
+    sample_ms = 6310,
+    reliable_age_ms = 1000,
+    route_phase_age_ms = 980,
+    route_index = 0,
+    junctions_seen = 1,
+    final_segment_active = true,
+    final_segment_progress_cm = 72.6253052,
+    dt_s = 0.00499999989,
+    base = 25,
+    left_target_cm_s = 0,
+    right_target_cm_s = 50,
+    left_speed_cm_s = 4.47961044,
+    right_speed_cm_s = 42.0388794,
+    distance_cm = 72.6253052,
+    route_progress_cm = 72.6253052,
+    clear_progress_cm = 72.6253052,
+    turn_rad = -2.10366535,
+    actual_turn_rad = -2.10366535,
+    exit_candidate_age_ms = 0,
+    exit_candidate_progress_cm = 0,
+    exit_candidate_pending = false,
+    exit_confirm_samples = 0 '\000',
+    handoff_early = false,
+    segment_start_progress_cm = 0,
+    turn_exit_branch = false,
+    exit_line_mask = 0 '\000',
+    exit_recovery_active = false,
+    exit_lateral_error_cm = 0,
+    heading_source = HEADING_IMU,
+    heading_fallback_reason = HEADING_FALLBACK_NONE,
+    heading_fallback_ms = 0
+  },
+  auto_resume_snapshot = {
+    valid = false,
+    reason = LINE_STOP_NONE,
+    state_before_stop = LINE_IDLE,
+    route_state = ROUTE_FOLLOW,
+    route_state_before_update = ROUTE_FOLLOW,
+    route_failure = ROUTE_FAILURE_NONE,
+    speed_fault = SPEED_FAULT_NONE,
+    speed_fault_wheel = 0 '\000',
+    observation = {
+      kind = GRAY_VALID,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    counts = {
+      left = 0,
+      right = 0
+    },
+    sample_ms = 0,
+    reliable_age_ms = 0,
+    route_phase_age_ms = 0,
+    route_index = 0,
+    junctions_seen = 0,
+    final_segment_active = false,
+    final_segment_progress_cm = 0,
+    dt_s = 0,
+    base = 0,
+    left_target_cm_s = 0,
+    right_target_cm_s = 0,
+    left_speed_cm_s = 0,
+    right_speed_cm_s = 0,
+    distance_cm = 0,
+    route_progress_cm = 0,
+    clear_progress_cm = 0,
+    turn_rad = 0,
+    actual_turn_rad = 0,
+    exit_candidate_age_ms = 0,
+    exit_candidate_progress_cm = 0,
+    exit_candidate_pending = false,
+    exit_confirm_samples = 0 '\000',
+    handoff_early = false,
+    segment_start_progress_cm = 0,
+    turn_exit_branch = false,
+    exit_line_mask = 0 '\000',
+    exit_recovery_active = false,
+    exit_lateral_error_cm = 0,
+    heading_source = HEADING_ENCODER,
+    heading_fallback_reason = HEADING_FALLBACK_NONE,
+    heading_fallback_ms = 0
+  },
+  auto_resume_count = 0,
+  auto_resume_last_ms = 0,
+  straight_entry_aligned = {
+    valid = false,
+    pid_active = false,
+    sample_ms = 0,
+    route_index = 0,
+    route_state = ROUTE_FOLLOW,
+    observation = {
+      kind = GRAY_VALID,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    heading_rad = 0,
+    target_heading_rad = 0,
+    outgoing_cm = 0,
+    left_target_cm_s = 0,
+    right_target_cm_s = 0
+  },
+  straight_entry_handoff = {
+    valid = false,
+    pid_active = false,
+    sample_ms = 0,
+    route_index = 0,
+    route_state = ROUTE_FOLLOW,
+    observation = {
+      kind = GRAY_VALID,
+      raw_mask = 0 '\000',
+      line_mask = 0 '\000',
+      selected_mask = 0 '\000',
+      white_count = 0 '\000',
+      region_count = 0 '\000',
+      position = 0,
+      prefilter_mask = 0 '\000',
+      seam_mask = 0 '\000'
+    },
+    heading_rad = 0,
+    target_heading_rad = 0,
+    outgoing_cm = 0,
+    left_target_cm_s = 0,
+    right_target_cm_s = 0
+  },
+  turn_exit = {{
+      valid = false,
+      handed_off = false,
+      capture_seen = true,
+      capture_ms = 5835,
+      capture_turn_rad = 1.01388764,
+      capture_left_target_cm_s = 15.8894634,
+      capture_right_target_cm_s = 50,
+      capture_mask = 1 '\001',
+      clearing_ms = 0,
+      handoff_ms = 0,
+      clearing_turn_rad = 0,
+      minimum_turn_rad = 0,
+      handoff_turn_rad = 0,
+      clearing_mask = 0 '\000',
+      handoff_mask = 0 '\000'
+    }, {
+      valid = false,
+      handed_off = false,
+      capture_seen = false,
+      capture_ms = 0,
+      capture_turn_rad = 0,
+      capture_left_target_cm_s = 0,
+      capture_right_target_cm_s = 0,
+      capture_mask = 0 '\000',
+      clearing_ms = 0,
+      handoff_ms = 0,
+      clearing_turn_rad = 0,
+      minimum_turn_rad = 0,
+      handoff_turn_rad = 0,
+      clearing_mask = 0 '\000',
+      handoff_mask = 0 '\000'
+    }},
+  turn_trace = {
+    samples = {{
+        ms = 6290,
+        distance_cm = 72.1680908,
+        turn_rad = -2.04122186,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 4.75504255,
+        right_speed = 42.4423294,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5350,
+        distance_cm = 52.5285759,
+        turn_rad = 0.0018144995,
+        position = 0,
+        left_target = 0,
+        right_target = 34.6911697,
+        left_speed = 23.3571014,
+        right_speed = 24.0219536,
+        mask = 27 '\033',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5370,
+        distance_cm = 52.8610954,
+        turn_rad = 0.00263927132,
+        position = 0,
+        left_target = 0,
+        right_target = 37.8911667,
+        left_speed = 17.3163967,
+        right_speed = 23.4989662,
+        mask = 24 '\030',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5390,
+        distance_cm = 53.1832237,
+        turn_rad = 0.0056829527,
+        position = -1,
+        left_target = 0,
+        right_target = 41.0911636,
+        left_speed = 13.7666683,
+        right_speed = 23.1318436,
+        mask = 8 '\b',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5410,
+        distance_cm = 53.5261345,
+        turn_rad = 0.00289468467,
+        position = 0,
+        left_target = 0,
+        right_target = 44.2911606,
+        left_speed = 11.6930761,
+        right_speed = 23.9637337,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5430,
+        distance_cm = 53.858654,
+        turn_rad = -0.0071143508,
+        position = 0,
+        left_target = 0,
+        right_target = 47.4911575,
+        left_speed = 10.646512,
+        right_speed = 23.8189697,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5450,
+        distance_cm = 54.1807823,
+        turn_rad = -0.024184525,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 9.57263565,
+        right_speed = 23.8879833,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5470,
+        distance_cm = 54.5029106,
+        turn_rad = -0.0470653623,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 8.5567255,
+        right_speed = 24.3718796,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5490,
+        distance_cm = 54.8250389,
+        turn_rad = -0.0741019994,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 7.56171799,
+        right_speed = 25.1541615,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5510,
+        distance_cm = 55.136776,
+        turn_rad = -0.105980858,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 6.58837938,
+        right_speed = 25.4915886,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5530,
+        distance_cm = 55.4277306,
+        turn_rad = -0.141446158,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 5.46919966,
+        right_speed = 25.2374649,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5550,
+        distance_cm = 55.7394676,
+        turn_rad = -0.179731667,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 4.86509466,
+        right_speed = 25.9104881,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5570,
+        distance_cm = 56.0408134,
+        turn_rad = -0.221076816,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 4.03004599,
+        right_speed = 26.408802,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5590,
+        distance_cm = 56.3421593,
+        turn_rad = -0.265146375,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 2.98551202,
+        right_speed = 27.0517159,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5610,
+        distance_cm = 56.6538963,
+        turn_rad = -0.312174499,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 2.49440813,
+        right_speed = 28.1500759,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5630,
+        distance_cm = 56.9448509,
+        turn_rad = -0.363305211,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 1.7203548,
+        right_speed = 28.1491489,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5650,
+        distance_cm = 57.2461967,
+        turn_rad = -0.415957779,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 1.30254006,
+        right_speed = 28.8047695,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5670,
+        distance_cm = 57.5371513,
+        turn_rad = -0.472468168,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.703078747,
+        right_speed = 28.938797,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5690,
+        distance_cm = 57.8384972,
+        turn_rad = -0.530750513,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.379504442,
+        right_speed = 29.6672573,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5710,
+        distance_cm = 58.139843,
+        turn_rad = -0.590538621,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.204847053,
+        right_speed = 29.9981403,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5730,
+        distance_cm = 58.4619713,
+        turn_rad = -0.652976751,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.110571347,
+        right_speed = 31.1219692,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5750,
+        distance_cm = 58.7944908,
+        turn_rad = -0.717787981,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.0596836582,
+        right_speed = 32.1025162,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5770,
+        distance_cm = 59.1374016,
+        turn_rad = -0.784844875,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.0322157554,
+        right_speed = 33.1407585,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5790,
+        distance_cm = 59.4803123,
+        turn_rad = -0.853098989,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.017389264,
+        right_speed = 33.7860069,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5810,
+        distance_cm = 59.8336143,
+        turn_rad = -0.923125029,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.00938629266,
+        right_speed = 34.4234009,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5830,
+        distance_cm = 60.2180901,
+        turn_rad = -0.995465875,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 0.00506648747,
+        right_speed = 36.2337608,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 5850,
+        distance_cm = 60.6025658,
+        turn_rad = -1.06952536,
+        position = -7,
+        left_target = 16.7796631,
+        right_target = 50,
+        left_speed = 0.596530378,
+        right_speed = 36.9097252,
+        mask = 1 '\001',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5870,
+        distance_cm = 61.0390053,
+        turn_rad = -1.1418767,
+        position = -5,
+        left_target = 27.7612839,
+        right_target = 50,
+        left_speed = 3.20268011,
+        right_speed = 37.1395607,
+        mask = 2 '\002',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5890,
+        distance_cm = 61.4650536,
+        turn_rad = -1.21107793,
+        position = -3,
+        left_target = 38.1192932,
+        right_target = 50,
+        left_speed = 4.15065145,
+        right_speed = 37.0437622,
+        mask = 4 '\004',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5910,
+        distance_cm = 61.9118881,
+        turn_rad = -1.27613401,
+        position = -1,
+        left_target = 46.8801956,
+        right_target = 50,
+        left_speed = 5.69239616,
+        right_speed = 37.2119102,
+        mask = 8 '\b',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5930,
+        distance_cm = 62.4002914,
+        turn_rad = -1.33432043,
+        position = 0,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 8.37522602,
+        right_speed = 37.3026733,
+        mask = 24 '\030',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5950,
+        distance_cm = 62.9302597,
+        turn_rad = -1.38736141,
+        position = 2,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 11.7363071,
+        right_speed = 37.1941299,
+        mask = 48 '0',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5970,
+        distance_cm = 63.5017929,
+        turn_rad = -1.43455446,
+        position = 3,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 14.8696957,
+        right_speed = 37.6670113,
+        mask = 32 ' ',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 5990,
+        distance_cm = 64.0421448,
+        turn_rad = -1.47463322,
+        position = 3,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 17.1548176,
+        right_speed = 36.3970871,
+        mask = 32 ' ',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 6010,
+        distance_cm = 64.6344452,
+        turn_rad = -1.51020491,
+        position = 5,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 19.3334942,
+        right_speed = 36.9476814,
+        mask = 64 '@',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 6030,
+        distance_cm = 65.2579193,
+        turn_rad = -1.54126978,
+        position = 7,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 21.5395432,
+        right_speed = 37.6690178,
+        mask = 128 '\200',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 6050,
+        distance_cm = 65.9125671,
+        turn_rad = -1.57008898,
+        position = 7,
+        left_target = 48.4000015,
+        right_target = 50,
+        left_speed = 24.2070141,
+        right_speed = 38.0583763,
+        mask = 128 '\200',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 6070,
+        distance_cm = 66.5879974,
+        turn_rad = -1.59528458,
+        position = 7,
+        left_target = 50,
+        right_target = 23.5905914,
+        left_speed = 27.0508366,
+        right_speed = 37.539711,
+        mask = 128 '\200',
+        kind = 0 '\000',
+        route_state = 2 '\002',
+        capturing = 1 '\001'
+      }, {
+        ms = 6090,
+        distance_cm = 67.2218628,
+        turn_rad = -1.61469603,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 27.3982697,
+        right_speed = 36.5343857,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6110,
+        distance_cm = 67.8141632,
+        turn_rad = -1.63088286,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 22.6571293,
+        right_speed = 39.0697784,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6130,
+        distance_cm = 68.3233337,
+        turn_rad = -1.65699899,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 17.968626,
+        right_speed = 38.8992996,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6150,
+        distance_cm = 68.8428955,
+        turn_rad = -1.69023478,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 14.9289207,
+        right_speed = 39.6901779,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6170,
+        distance_cm = 69.3416748,
+        turn_rad = -1.72789788,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 11.8841734,
+        right_speed = 40.5533371,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6190,
+        distance_cm = 69.8196716,
+        turn_rad = -1.77027535,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 9.27296257,
+        right_speed = 41.239109,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6210,
+        distance_cm = 70.2976685,
+        turn_rad = -1.81720769,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 7.88600254,
+        right_speed = 41.3894119,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6230,
+        distance_cm = 70.765274,
+        turn_rad = -1.8687588,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 6.67859268,
+        right_speed = 41.4705391,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6250,
+        distance_cm = 71.2224884,
+        turn_rad = -1.92363548,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 5.51789427,
+        right_speed = 41.514328,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }, {
+        ms = 6270,
+        distance_cm = 71.7004852,
+        turn_rad = -1.98130608,
+        position = 0,
+        left_target = 0,
+        right_target = 50,
+        left_speed = 5.26531458,
+        right_speed = 41.9742279,
+        mask = 0 '\000',
+        kind = 1 '\001',
+        route_state = 2 '\002',
+        capturing = 0 '\000'
+      }},
+    last_ms = 6290,
+    next = 1 '\001',
+    count = 48 '0'
+  },
+  heading_source = HEADING_ENCODER,
+  heading_fallback_reason = HEADING_FALLBACK_DATA,
+  heading_fallback_ms = 21480
+}
+type = struct {
+/*      0      |       1 */    LineState state;
+/*      1      |       1 */    LineStopReason stop_reason;
+/*      2      |       1 */    LineStartResult start_result;
+/* XXX  1-byte hole      */
+/*      4      |     100 */    Odometry odometry;
+/*    104      |     136 */    RoutePlanner route;
+/*    240      |     100 */    SpeedControl speed;
+/*    340      |       8 */    BrakingSlew braking_slew;
+/*    348      |       1 */    _Bool braking_active;
+/* XXX  3-byte hole      */
+/*    352      |       4 */    float braking_origin_cm;
+/*    356      |      36 */    Pid pid;
+/*    392      |      12 */    MotorCommand command;
+/*    404      |       1 */    _Bool have_reliable;
+/*    405      |       1 */    _Bool abnormal;
+/*    406      |       1 */    uint8_t valid_count;
+/* XXX  1-byte hole      */
+/*    408      |       4 */    float reliable_position;
+/*    412      |       4 */    float base;
+/*    416      |       4 */    float correction;
+/*    420      |       4 */    float left_target_cm_s;
+/*    424      |       4 */    float right_target_cm_s;
+/*    428      |       4 */    float hold_heading_rad;
+/*    432      |       4 */    float abnormal_origin_cm;
+/*    436      |       4 */    float held_pwm_correction;
+/*    440      |       1 */    _Bool exit_anchor_valid;
+/*    441      |       1 */    _Bool exit_recovery_active;
+/* XXX  2-byte hole      */
+/*    444      |       4 */    float exit_anchor_x_cm;
+/*    448      |       4 */    float exit_anchor_y_cm;
+/*    452      |       4 */    float exit_axis_rad;
+/*    456      |       4 */    float exit_lateral_error_cm;
+/*    460      |       1 */    _Bool exit_accelerating;
+/* XXX  3-byte hole      */
+/*    464      |       4 */    float startup_elapsed_s;
+/*    468      |       4 */    uint32_t last_reliable_ms;
+/*    472      |       4 */    uint32_t sample_ms;
+/*    476      |       4 */    float sample_dt_s;
+/*    480      |      16 */    GrayObservation observation;
+/*    496      |       4 */    EncoderCounts sample_counts;
+/*    500      |       1 */    RouteState route_state_before_update;
+/* XXX  3-byte hole      */
+/*    504      |     128 */    LineStopSnapshot stop_snapshot;
+/*    632      |     128 */    LineStopSnapshot auto_resume_snapshot;
+/*    760      |       4 */    uint32_t auto_resume_count;
+/*    764      |       4 */    uint32_t auto_resume_last_ms;
+/*    768      |      52 */    StraightEntrySnapshot straight_entry_aligned;
+/*    820      |      52 */    StraightEntrySnapshot straight_entry_handoff;
+/*    872      |      96 */    TurnExitDiagnostics turn_exit[2];
+/*    968      |    1736 */    TurnTrace turn_trace;
+/*   2704      |       1 */    HeadingSource heading_source;
+/*   2705      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*   2708      |       4 */    uint32_t heading_fallback_ms;
+
+                               /* total size (bytes): 2712 */
+                             }
+type = struct {
+/*      0      |       4 */    uint32_t control_count;
+/*      4      |       4 */    uint32_t last_sample_ms;
+/*      8      |       4 */    uint32_t task_duration_ms;
+/*     12      |       4 */    uint32_t interval_ms;
+/*     16      |       1 */    uint8_t raw_mask;
+/*     17      |       1 */    uint8_t line_mask;
+/*     18      |       1 */    uint8_t selected_mask;
+/*     19      |       1 */    uint8_t prefilter_mask;
+/*     20      |       1 */    uint8_t seam_mask;
+/*     21      |       1 */    GrayKind observation;
+/*     22      |       1 */    LineState state;
+/*     23      |       1 */    LineStopReason stop_reason;
+/*     24      |       4 */    uint32_t button_press_count;
+/*     28      |       4 */    uint32_t start_request_count;
+/*     32      |       1 */    LineStartResult start_result;
+/*     33      |       1 */    uint8_t valid_line_samples;
+/*     34      |       1 */    uint8_t start_raw_mask;
+/*     35      |       1 */    uint8_t start_line_mask;
+/*     36      |       4 */    float position;
+/*     40      |       4 */    float left_command;
+/*     44      |       4 */    float right_command;
+/*     48      |       2 */    uint16_t left_encoder;
+/*     50      |       2 */    uint16_t right_encoder;
+/*     52      |       1 */    _Bool encoder_control_enabled;
+/*     53      |       1 */    _Bool preset_route_enabled;
+/*     54      |       1 */    _Bool odometry_ready;
+/*     55      |       1 */    _Bool imu_enabled;
+/*     56      |       1 */    _Bool imu_ready;
+/* XXX  1-byte hole      */
+/*     58      |       2 */    int16_t imu_gyro_z_raw;
+/*     60      |       4 */    float imu_gyro_z_bias_lsb;
+/*     64      |       1 */    uint8_t imu_init_failure_stage;
+/*     65      |       1 */    uint8_t imu_address_7bit;
+/*     66      |       1 */    _Bool pitch_stop_enabled;
+/*     67      |       1 */    _Bool pitch_stop_latched;
+/*     68      |       4 */    float pitch_deg;
+/*     72      |       4 */    float pitch_over_threshold_ms;
+/*     76      |       4 */    float distance_cm;
+/*     80      |       4 */    float heading_rad;
+/*     84      |       4 */    float left_speed_cm_s;
+/*     88      |       4 */    float right_speed_cm_s;
+/*     92      |       4 */    float left_target_cm_s;
+/*     96      |       4 */    float right_target_cm_s;
+/*    100      |       1 */    RouteState route_state;
+/*    101      |       1 */    RouteFailure route_failure;
+/* XXX  2-byte hole      */
+/*    104      |       4 */    float route_progress_cm;
+/*    108      |       4 */    uint32_t route_elapsed_ms;
+/*    112      |       4 */    uint32_t route_repeat_count;
+/*    116      |       4 */    uint32_t route_completed_laps;
+/*    120      |       1 */    _Bool route_turn_capturing;
+/*    121      |       1 */    _Bool route_turn_forced;
+/*    122      |       1 */    uint8_t route_candidate_samples;
+/* XXX  1-byte hole      */
+/*    124      |       4 */    float route_turn_rad;
+/*    128      |       4 */    uint32_t route_index;
+/*    132      |       4 */    uint32_t route_stop_events;
+/*    136      |       4 */    uint32_t route_stopped_step;
+/*    140      |     128 */    LineStopSnapshot stop_snapshot;
+/*    268      |     128 */    LineStopSnapshot auto_resume_snapshot;
+/*    396      |       4 */    uint32_t auto_resume_count;
+/*    400      |       4 */    uint32_t auto_resume_last_ms;
+/*    404      |       2 */    uint16_t route_junctions_seen;
+/*    406      |       1 */    _Bool route_final_segment_active;
+/* XXX  1-byte hole      */
+/*    408      |       4 */    float route_final_segment_progress_cm;
+/*    412      |       1 */    _Bool route_recovery_window_active;
+/* XXX  3-byte hole      */
+/*    416      |       4 */    float route_recovery_window_progress_cm;
+/*    420      |       4 */    float route_recovery_window_limit_cm;
+/*    424      |      52 */    StraightEntrySnapshot straight_entry_aligned;
+/*    476      |      52 */    StraightEntrySnapshot straight_entry_handoff;
+/*    528      |      96 */    TurnExitDiagnostics turn_exit[2];
+/*    624      |       1 */    _Bool exit_anchor_valid;
+/*    625      |       1 */    _Bool exit_recovery_active;
+/* XXX  2-byte hole      */
+/*    628      |       4 */    float exit_lateral_error_cm;
+/*    632      |       4 */    float imu_gyro_z_calibration_span_lsb;
+/*    636      |       4 */    float imu_gyro_z_calibration_central_span_lsb;
+/*    640      |       4 */    uint32_t imu_calibration_attempts;
+/*    644      |       4 */    uint32_t imu_init_attempts;
+/*    648      |       1 */    HeadingSource heading_source;
+/*    649      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*    652      |       4 */    uint32_t heading_fallback_ms;
+/*    656      |       1 */    _Bool pitch_monitor_available;
+/* XXX  3-byte padding   */
+
+                               /* total size (bytes):  660 */
+                             }

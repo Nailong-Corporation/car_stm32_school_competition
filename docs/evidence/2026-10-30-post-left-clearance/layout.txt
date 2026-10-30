@@ -1,0 +1,152 @@
+Symbol "follow" is static storage at address 0x20000130.
+$1 = 660
+$2 = 2696
+type = struct {
+/*      0      |       4 */    uint32_t control_count;
+/*      4      |       4 */    uint32_t last_sample_ms;
+/*      8      |       4 */    uint32_t task_duration_ms;
+/*     12      |       4 */    uint32_t interval_ms;
+/*     16      |       1 */    uint8_t raw_mask;
+/*     17      |       1 */    uint8_t line_mask;
+/*     18      |       1 */    uint8_t selected_mask;
+/*     19      |       1 */    uint8_t prefilter_mask;
+/*     20      |       1 */    uint8_t seam_mask;
+/*     21      |       1 */    GrayKind observation;
+/*     22      |       1 */    LineState state;
+/*     23      |       1 */    LineStopReason stop_reason;
+/*     24      |       4 */    uint32_t button_press_count;
+/*     28      |       4 */    uint32_t start_request_count;
+/*     32      |       1 */    LineStartResult start_result;
+/*     33      |       1 */    uint8_t valid_line_samples;
+/*     34      |       1 */    uint8_t start_raw_mask;
+/*     35      |       1 */    uint8_t start_line_mask;
+/*     36      |       4 */    float position;
+/*     40      |       4 */    float left_command;
+/*     44      |       4 */    float right_command;
+/*     48      |       2 */    uint16_t left_encoder;
+/*     50      |       2 */    uint16_t right_encoder;
+/*     52      |       1 */    _Bool encoder_control_enabled;
+/*     53      |       1 */    _Bool preset_route_enabled;
+/*     54      |       1 */    _Bool odometry_ready;
+/*     55      |       1 */    _Bool imu_enabled;
+/*     56      |       1 */    _Bool imu_ready;
+/* XXX  1-byte hole      */
+/*     58      |       2 */    int16_t imu_gyro_z_raw;
+/*     60      |       4 */    float imu_gyro_z_bias_lsb;
+/*     64      |       1 */    uint8_t imu_init_failure_stage;
+/*     65      |       1 */    uint8_t imu_address_7bit;
+/*     66      |       1 */    _Bool pitch_stop_enabled;
+/*     67      |       1 */    _Bool pitch_stop_latched;
+/*     68      |       4 */    float pitch_deg;
+/*     72      |       4 */    float pitch_over_threshold_ms;
+/*     76      |       4 */    float distance_cm;
+/*     80      |       4 */    float heading_rad;
+/*     84      |       4 */    float left_speed_cm_s;
+/*     88      |       4 */    float right_speed_cm_s;
+/*     92      |       4 */    float left_target_cm_s;
+/*     96      |       4 */    float right_target_cm_s;
+/*    100      |       1 */    RouteState route_state;
+/*    101      |       1 */    RouteFailure route_failure;
+/* XXX  2-byte hole      */
+/*    104      |       4 */    float route_progress_cm;
+/*    108      |       4 */    uint32_t route_elapsed_ms;
+/*    112      |       4 */    uint32_t route_repeat_count;
+/*    116      |       4 */    uint32_t route_completed_laps;
+/*    120      |       1 */    _Bool route_turn_capturing;
+/*    121      |       1 */    _Bool route_turn_forced;
+/*    122      |       1 */    uint8_t route_candidate_samples;
+/* XXX  1-byte hole      */
+/*    124      |       4 */    float route_turn_rad;
+/*    128      |       4 */    uint32_t route_index;
+/*    132      |       4 */    uint32_t route_stop_events;
+/*    136      |       4 */    uint32_t route_stopped_step;
+/*    140      |     128 */    LineStopSnapshot stop_snapshot;
+/*    268      |     128 */    LineStopSnapshot auto_resume_snapshot;
+/*    396      |       4 */    uint32_t auto_resume_count;
+/*    400      |       4 */    uint32_t auto_resume_last_ms;
+/*    404      |       2 */    uint16_t route_junctions_seen;
+/*    406      |       1 */    _Bool route_final_segment_active;
+/* XXX  1-byte hole      */
+/*    408      |       4 */    float route_final_segment_progress_cm;
+/*    412      |       1 */    _Bool route_recovery_window_active;
+/* XXX  3-byte hole      */
+/*    416      |       4 */    float route_recovery_window_progress_cm;
+/*    420      |       4 */    float route_recovery_window_limit_cm;
+/*    424      |      52 */    StraightEntrySnapshot straight_entry_aligned;
+/*    476      |      52 */    StraightEntrySnapshot straight_entry_handoff;
+/*    528      |      96 */    TurnExitDiagnostics turn_exit[2];
+/*    624      |       1 */    _Bool exit_anchor_valid;
+/*    625      |       1 */    _Bool exit_recovery_active;
+/* XXX  2-byte hole      */
+/*    628      |       4 */    float exit_lateral_error_cm;
+/*    632      |       4 */    float imu_gyro_z_calibration_span_lsb;
+/*    636      |       4 */    float imu_gyro_z_calibration_central_span_lsb;
+/*    640      |       4 */    uint32_t imu_calibration_attempts;
+/*    644      |       4 */    uint32_t imu_init_attempts;
+/*    648      |       1 */    HeadingSource heading_source;
+/*    649      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*    652      |       4 */    uint32_t heading_fallback_ms;
+/*    656      |       1 */    _Bool pitch_monitor_available;
+/* XXX  3-byte padding   */
+
+                               /* total size (bytes):  660 */
+                             }
+type = struct {
+/*      0      |       1 */    LineState state;
+/*      1      |       1 */    LineStopReason stop_reason;
+/*      2      |       1 */    LineStartResult start_result;
+/* XXX  1-byte hole      */
+/*      4      |     100 */    Odometry odometry;
+/*    104      |     136 */    RoutePlanner route;
+/*    240      |      84 */    SpeedControl speed;
+/*    324      |       8 */    BrakingSlew braking_slew;
+/*    332      |       1 */    _Bool braking_active;
+/* XXX  3-byte hole      */
+/*    336      |       4 */    float braking_origin_cm;
+/*    340      |      36 */    Pid pid;
+/*    376      |      12 */    MotorCommand command;
+/*    388      |       1 */    _Bool have_reliable;
+/*    389      |       1 */    _Bool abnormal;
+/*    390      |       1 */    uint8_t valid_count;
+/* XXX  1-byte hole      */
+/*    392      |       4 */    float reliable_position;
+/*    396      |       4 */    float base;
+/*    400      |       4 */    float correction;
+/*    404      |       4 */    float left_target_cm_s;
+/*    408      |       4 */    float right_target_cm_s;
+/*    412      |       4 */    float hold_heading_rad;
+/*    416      |       4 */    float abnormal_origin_cm;
+/*    420      |       4 */    float held_pwm_correction;
+/*    424      |       1 */    _Bool exit_anchor_valid;
+/*    425      |       1 */    _Bool exit_recovery_active;
+/* XXX  2-byte hole      */
+/*    428      |       4 */    float exit_anchor_x_cm;
+/*    432      |       4 */    float exit_anchor_y_cm;
+/*    436      |       4 */    float exit_axis_rad;
+/*    440      |       4 */    float exit_lateral_error_cm;
+/*    444      |       1 */    _Bool exit_accelerating;
+/* XXX  3-byte hole      */
+/*    448      |       4 */    float startup_elapsed_s;
+/*    452      |       4 */    uint32_t last_reliable_ms;
+/*    456      |       4 */    uint32_t sample_ms;
+/*    460      |       4 */    float sample_dt_s;
+/*    464      |      16 */    GrayObservation observation;
+/*    480      |       4 */    EncoderCounts sample_counts;
+/*    484      |       1 */    RouteState route_state_before_update;
+/* XXX  3-byte hole      */
+/*    488      |     128 */    LineStopSnapshot stop_snapshot;
+/*    616      |     128 */    LineStopSnapshot auto_resume_snapshot;
+/*    744      |       4 */    uint32_t auto_resume_count;
+/*    748      |       4 */    uint32_t auto_resume_last_ms;
+/*    752      |      52 */    StraightEntrySnapshot straight_entry_aligned;
+/*    804      |      52 */    StraightEntrySnapshot straight_entry_handoff;
+/*    856      |      96 */    TurnExitDiagnostics turn_exit[2];
+/*    952      |    1736 */    TurnTrace turn_trace;
+/*   2688      |       1 */    HeadingSource heading_source;
+/*   2689      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*   2692      |       4 */    uint32_t heading_fallback_ms;
+
+                               /* total size (bytes): 2696 */
+                             }

@@ -1,0 +1,4 @@
+TEST reproduce
+PASS: captured right reverse feedback trips protection; explicit START cannot clear encoder lock
+TEST configured-start
+PASS: production START / IMU startup fallback; no-line and invalid-route gates retained

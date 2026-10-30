@@ -1,0 +1,3 @@
+Local ELF interpretation only; no Flash read or firmware comparison.
+128-byte stop snapshots identical: True
+Trace samples: 48

@@ -107,6 +107,12 @@ int main(void)
     motor_apply((MotorCommand){NAN, 50.0f, true});
     stopped();
     assert(stop_writes > 0 && enable_writes == (3 + (MOTOR_REVERSE_BRAKE_ENABLED && ENCODER_CONTROL_ENABLED)));
+    motor_short_brake();
+    assert(fake_gpio_b.output & MOTOR_STBY_PIN);
+    assert((fake_gpio_b.output & (MOTOR_LEFT_IN1|MOTOR_LEFT_IN2|MOTOR_RIGHT_IN1|MOTOR_RIGHT_IN2)) ==
+           (MOTOR_LEFT_IN1|MOTOR_LEFT_IN2|MOTOR_RIGHT_IN1|MOTOR_RIGHT_IN2));
+    assert(fake_tim3.compare[0]==0 && fake_tim3.compare[1]==0);
+    motor_stop();assert(!(fake_gpio_b.output & MOTOR_STBY_PIN));
     puts("PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop");
     return 0;
 }

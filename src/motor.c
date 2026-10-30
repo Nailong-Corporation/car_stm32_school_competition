@@ -43,6 +43,18 @@ void motor_stop(void)
                      GPIO_PIN_RESET);
 }
 
+/* Separate from standby: this interface is not automatically selected by navigation.
+ * Hardware braking force/current/temperature still require bench measurement. */
+void motor_short_brake(void)
+{
+    if(!pwm_ready) {motor_stop();return;}
+    __HAL_TIM_SET_COMPARE(&pwm_timer,MOTOR_LEFT_CHANNEL,0);
+    __HAL_TIM_SET_COMPARE(&pwm_timer,MOTOR_RIGHT_CHANNEL,0);
+    HAL_GPIO_WritePin(MOTOR_DIRECTION_PORT,
+        MOTOR_LEFT_IN1|MOTOR_LEFT_IN2|MOTOR_RIGHT_IN1|MOTOR_RIGHT_IN2,GPIO_PIN_SET);
+    HAL_GPIO_WritePin(MOTOR_STBY_PORT,MOTOR_STBY_PIN,GPIO_PIN_SET);
+}
+
 /**
  * @brief 初始化 TIM3 双通道 PWM，检查各步返回值，并保持电机停止。
  * 全部配置和启动成功返回 true，失败返回 false，由调用者进入异常停车。

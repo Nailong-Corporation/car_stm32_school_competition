@@ -83,29 +83,25 @@ static void test_start_and_tracking(void)
 }
 static void test_junction_guard(void)
 {
-    const RouteStep steps[]={{10,5,LEFT,20,0, true},{100,5,STOP,20,0, true}};
+    const RouteStep steps[]={{1, 6.0f, LEFT, 20, 0, true, 0.0f},{1, 6.0f, STOP, 20, 0, true, 0.0f}};
     RoutePlanner p; route_init(&p,steps,2,NULL,NULL); p.repeat_count=1;
     route_start(&p,0,0);
     GraySensor sensor; gray_sensor_init(&sensor);
     for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x18),9,0,5+5*i);
-    for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0x99),9+.02f*(float)i,0,30+5*i);
-#if FLOOR_SEAM_FILTER_ENABLED
-    CHECK(p.state==ROUTE_FOLLOW && !p.turn_forced);
-#else
-    CHECK(p.state==ROUTE_EXECUTING && p.turn_forced); /* 展示相同细缝如何触发旧骤变规则。 */
-#endif
+    for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0x99),9+.06f*(float)i,0,30+5*i);
+    CHECK(p.junctions_seen==0 && p.junctions_seen<=1); /* Isolated edge bits never trigger. */
     route_start(&p,0,0); gray_sensor_init(&sensor);
     for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x18),9,0,5+5*i);
     for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0x80),9,0,30+5*i);
-    CHECK(p.state==ROUTE_FOLLOW && !p.turn_forced); /* 过滤后为零也不能伪装成真实丢线骤变。 */
+    CHECK(p.state==ROUTE_FOLLOW && p.junctions_seen<=1); /* 过滤后为零也不能伪装成真实丢线骤变。 */
     route_start(&p,0,0); gray_sensor_init(&sensor);
     for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x18),9,0,5+5*i);
     for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0),9,0,30+5*i);
-    CHECK(p.state==ROUTE_EXECUTING && p.turn_forced); /* 真实无线原行为保留。 */
+    CHECK(p.state==ROUTE_FOLLOW && p.junctions_seen==0); /* Loss is not a junction. */
     route_start(&p,0,0); gray_sensor_init(&sensor);
     for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x18),9,0,5+5*i);
-    for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0x1f),9,0,30+5*i);
-    CHECK(p.state==ROUTE_EXECUTING && p.turn_forced); /* 真实连续分支仍可转弯。 */
+    for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x1f),9+.06f*(float)i,0,30+5*i);
+    CHECK(p.state==ROUTE_EXECUTING && p.junctions_seen==1 && p.junctions_seen<=1);
 }
 int main(void)
 {

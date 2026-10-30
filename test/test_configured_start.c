@@ -46,19 +46,53 @@ int main(void)
     line_follow_init(&f, calibration, route, route_count, NULL, NULL);
     request_start(&f, 0);
     assert(f.start_result == LINE_START_REJECTED_LINE && !f.command.enabled);
+    /* 2026-10-30 按住START现场：请求帧0x23为S0/S1与S5两个区域，
+     * 后来0x01稳定也不能消费旧请求；须明确新请求，不放宽歧义门禁。 */
+    line_follow_init(&f, calibration, route, route_count, NULL, NULL);
+    request_start(&f, 0x23);
+    assert(f.observation.region_count == 2);
+    assert(f.start_result == LINE_START_REJECTED_LINE);
+    assert(f.state == LINE_IDLE && !f.command.enabled && !f.stop_snapshot.valid);
+    GraySensor recovery;
+    gray_sensor_init(&recovery);
+    for (unsigned i = 11; i <= 20; ++i) {
+        GrayObservation obs = gray_sensor_update(&recovery, raw_for_line(0x01), false, 0);
+        line_follow_update_heading(&f, obs, (EncoderCounts){0}, i * CONTROL_PERIOD_MS,
+                                   .005f, false, false, 0);
+        assert(f.state == LINE_IDLE && !f.command.enabled);
+        assert(f.start_result == LINE_START_REJECTED_LINE);
+    }
+    assert(f.valid_count == LINE_CONFIRM_SAMPLES && f.observation.position == -7);
+    /* 先对准中心线，稳定后另一次明确请求才接受；整段不使用真实硬件。 */
+    for (unsigned i = 21; i <= 30; ++i) {
+        GrayObservation obs = gray_sensor_update(&recovery, raw_for_line(0x18), false, 0);
+        line_follow_update_heading(&f, obs, (EncoderCounts){0}, i * CONTROL_PERIOD_MS,
+                                   .005f, i == 30, false, 0);
+        if (i < 30) assert(f.state == LINE_IDLE && !f.command.enabled);
+    }
+    assert(f.start_result == LINE_START_ACCEPTED && f.state == LINE_TRACKING);
+    assert(f.command.enabled && f.route.index == 0 && f.route.junctions_seen == 0);
 #if MPU6050_ENABLED
     line_follow_init(&f, calibration, route, route_count, NULL, NULL);
-    line_follow_update_heading(&f, gray_classify(0x18, true, 0), (EncoderCounts){0},
-                               CONTROL_PERIOD_MS, .005f, true, false, 0.0f);
-    assert(f.start_result == LINE_START_REJECTED_FAULT);
-    assert(f.stop_reason == LINE_STOP_IMU && !f.command.enabled);
+    for (unsigned i = 1; i <= LINE_CONFIRM_SAMPLES; ++i)
+        line_follow_update_heading(&f, gray_classify(0x18, true, 0), (EncoderCounts){0},
+                                   i * CONTROL_PERIOD_MS, .005f,
+                                   i == LINE_CONFIRM_SAMPLES, false, 0.0f);
+    assert(f.start_result == LINE_START_ACCEPTED && f.command.enabled);
+    assert(f.heading_source == HEADING_ENCODER && f.heading_fallback_reason == HEADING_FALLBACK_STARTUP);
+    line_follow_init(&f, calibration, route, route_count, NULL, NULL);
+    for (unsigned i = 1; i <= LINE_CONFIRM_SAMPLES; ++i)
+        line_follow_update_heading(&f, gray_classify(0, true, 0), (EncoderCounts){0},
+                                   i * CONTROL_PERIOD_MS, .005f,
+                                   i == LINE_CONFIRM_SAMPLES, false, 0.0f);
+    assert(f.start_result == LINE_START_REJECTED_LINE && !f.command.enabled);
 #endif
-    RouteStep invalid[] = {{75, 10, STOP, (int)WHEEL_TARGET_MAX_CM_S + 1, 0.0f, true}};
+    RouteStep invalid[] = {{1, 6.0f, STOP, (int)WHEEL_TARGET_MAX_CM_S + 1, 0.0f, true, 0.0f}};
     line_follow_init(&f, calibration, invalid, 1, NULL, NULL);
     assert(!f.route.valid && f.route.failure == ROUTE_FAILURE_INVALID);
     request_start(&f, 0x18);
     assert(f.start_result == LINE_START_REJECTED_ROUTE);
     assert(f.state == LINE_STOPPED && !f.command.enabled);
-    puts("PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained");
+    puts("PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates");
     return 0;
 }

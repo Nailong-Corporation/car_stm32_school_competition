@@ -1,0 +1,1 @@
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.

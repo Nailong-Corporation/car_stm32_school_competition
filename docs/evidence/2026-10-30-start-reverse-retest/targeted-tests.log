@@ -1,0 +1,4 @@
+MOTOR_REVERSE_BRAKE_ENABLED=0
+PASS: single-count START, transient inhibit, mirrored reverse time/distance/severe gates and lock
+MOTOR_REVERSE_BRAKE_ENABLED=1
+PASS: single-count START, transient inhibit, mirrored reverse time/distance/severe gates and lock

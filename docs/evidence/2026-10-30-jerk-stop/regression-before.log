@@ -1,0 +1,2 @@
+Assertion failed: (fmaxf(f.left_target_cm_s,f.right_target_cm_s)>50), function test_final_leg_ramp, file test_navigation.c, line 333.
+old-source exit=134

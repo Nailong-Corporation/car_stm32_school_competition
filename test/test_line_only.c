@@ -75,7 +75,7 @@ int main(void)
     CHECK(f.left_target_cm_s < f.right_target_cm_s && f.command.left < f.command.right);
 
     /* A supplied LEFT/STOP table must neither steer, set speed nor stop this mode. */
-    const RouteStep table[] = {{1,.3f,LEFT,4, 0.0f, true},{1,.3f,STOP,4, 0.0f, true}};
+    const RouteStep table[] = {{1, 6.0f, LEFT, 4, 0.0f, true, 0.0f},{1, 6.0f, STOP, 4, 0.0f, true, 0.0f}};
     start(&f,&c,&now,table,2);
     uint32_t began = now;
     while ((uint32_t)(now-began) <= 30000U)

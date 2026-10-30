@@ -14,7 +14,7 @@ for approach in 0 1; do
                 -DTURN_APPROACH_SLOWDOWN_ENABLED="$approach" \
                 -DTURN_EXIT_ACCEL_ENABLED="$exit_accel" -DMOTOR_REVERSE_BRAKE_ENABLED="$reverse_brake" \
                 "$project_dir/test/test_turn_speed_switches.c" "$project_dir/src/gray_sensor.c" \
-                "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/route.c" \
+                "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" \
                 "$project_dir/src/route_table.c" "$project_dir/src/speed_control.c" \
                 "$project_dir/src/line_follow.c" -lm -o "$test_binary"
             "$test_binary"
@@ -27,13 +27,34 @@ for approach in 0 1; do
         done
     done
 done
+# Near-angle/no-line convergence and low-speed clearance; real IMU yaw and fallback.
+for imu in 0 1; do
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+        -fsanitize=address,undefined -fno-omit-frame-pointer \
+        -I"$project_dir/include" -DMPU6050_ENABLED="$imu" -DODOMETRY_HEADING_SCALE=1.0f \
+        "$project_dir/test/test_turn_settling.c" "$project_dir/src/gray_sensor.c" \
+        "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
+        "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" \
+        "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+    "$test_binary"
+done
 # Actual production switches and route table must accept a stationary centered-line START.
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -I"$project_dir/include" \
     "$project_dir/test/test_configured_start.c" "$project_dir/src/gray_sensor.c" \
     "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
-    "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+    "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+    "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
+    -lm -o "$test_binary"
+"$test_binary"
+# Captured one-count reverse START: inhibit transient output, retain bounded fault lock.
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" \
+    "$project_dir/test/test_reverse_feedback.c" "$project_dir/src/gray_sensor.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
+    "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
     "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
     -lm -o "$test_binary"
 "$test_binary"
@@ -44,7 +65,7 @@ done
     "$project_dir/test/test_mpu6050.c" "$project_dir/src/mpu6050.c" \
     "$project_dir/src/tilt_guard.c" "$project_dir/src/line_follow.c" \
     "$project_dir/src/odometry.c" "$project_dir/src/gray_sensor.c" \
-    "$project_dir/src/pid.c" "$project_dir/src/route.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" \
     "$project_dir/src/speed_control.c" -lm -o "$test_binary"
 "$test_binary"
 # 生产转角比例与理想几何分开验证；不覆盖PlatformIO固件配置。
@@ -53,7 +74,7 @@ done
     -I"$project_dir/include" "$project_dir/test/test_heading_scale.c" \
     "$project_dir/src/odometry.c" "$project_dir/src/gray_sensor.c" \
     "$project_dir/src/line_follow.c" "$project_dir/src/pid.c" \
-    "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+    "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
     "$project_dir/src/speed_control.c" -lm -o "$test_binary"
 "$test_binary"
 # 含倒置正反号、40°门槛、瞬态滤波、持续确认和锁定逻辑。
@@ -62,7 +83,7 @@ done
     -I"$project_dir/include" "$project_dir/test/test_tilt_guard.c" \
     "$project_dir/src/tilt_guard.c" -lm -o "$test_binary"
 "$test_binary"
-# 启用 IMU 的独立航向输入：车轮差不能代替真实车身角度；IMU 掉样锁定停车。
+# 健康 IMU 优先；初始化/运行失败锁定编码器降级，验证航向连续和非 IMU 故障保护。
 "${CC:-cc}" -DMPU6050_ENABLED=1 -DODOMETRY_HEADING_SCALE=1.0f \
     -DGRAY_INVERT_ENABLED=1 -DFLOOR_SEAM_FILTER_ENABLED=0 \
     -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
@@ -71,7 +92,7 @@ done
     "$project_dir/test/test_imu_heading.c" "$project_dir/src/odometry.c" \
     "$project_dir/src/tilt_guard.c" \
     "$project_dir/src/gray_sensor.c" "$project_dir/src/line_follow.c" \
-    "$project_dir/src/pid.c" "$project_dir/src/route.c" \
+    "$project_dir/src/pid.c" "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" \
     "$project_dir/src/speed_control.c" -lm -o "$test_binary"
 "$test_binary"
 # 以下合成导航用例按无打滑理想几何生成计数，显式使用单位转角比例。
@@ -103,7 +124,7 @@ for invert in 1 0; do
         -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
         "$project_dir/test/test_configured_start.c" "$project_dir/src/gray_sensor.c" \
         "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
-        "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+        "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
         "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
         -lm -o "$test_binary"
     "$test_binary"
@@ -115,7 +136,7 @@ for invert in 1 0; do
         -DTURN_APPROACH_SLOWDOWN_ENABLED=0 -DTURN_EXIT_ACCEL_ENABLED=0 -DMOTOR_REVERSE_BRAKE_ENABLED=0 \
         "$project_dir/test/test_navigation.c" "$project_dir/src/gray_sensor.c" \
         "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
-        "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+        "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
         "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
         -lm -o "$test_binary"
     "$test_binary"
@@ -125,7 +146,7 @@ for invert in 1 0; do
         -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=0 \
         "$project_dir/test/test_line_only.c" "$project_dir/src/gray_sensor.c" \
         "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
-        "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+        "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
         "$project_dir/src/line_follow.c" -lm -o "$test_binary"
     "$test_binary"
     "${CC:-cc}" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f -DGRAY_INVERT_ENABLED="$invert" -DFLOOR_SEAM_FILTER_ENABLED=0 -DLOST_LINE_STOP_ENABLED=1 -std=c11 -Wall -Wextra -Werror -pedantic -g \
@@ -133,7 +154,7 @@ for invert in 1 0; do
         -I"$project_dir/include" -DENCODER_CONTROL_ENABLED=0 -DPRESET_ROUTE_ENABLED=0 \
         "$project_dir/test/test_open_loop.c" "$project_dir/src/gray_sensor.c" \
         "$project_dir/src/pid.c" "$project_dir/src/motor_command.c" \
-        "$project_dir/src/route.c" "$project_dir/src/line_follow.c" \
+        "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/line_follow.c" \
         -lm -o "$test_binary"
     "$test_binary"
 done
@@ -148,7 +169,7 @@ for loss_stop in 1 0; do
             -DENCODER_CONTROL_ENABLED="$1" -DPRESET_ROUTE_ENABLED="$2" \
             "$project_dir/test/test_loss_stop.c" "$project_dir/src/gray_sensor.c" \
             "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
-            "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+            "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
             "$project_dir/src/line_follow.c" "$project_dir/src/motor_command.c" \
             -lm -o "$test_binary"
         "$test_binary"
@@ -167,10 +188,22 @@ for invert in 1 0; do
                 -DENCODER_CONTROL_ENABLED="$1" -DPRESET_ROUTE_ENABLED="$2" \
                 "$project_dir/test/test_floor_seam.c" "$project_dir/src/gray_sensor.c" \
                 "$project_dir/src/pid.c" "$project_dir/src/odometry.c" \
-                "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
+                "$project_dir/src/braking_planner.c" "$project_dir/src/route.c" "$project_dir/src/route_table.c" \
                 "$project_dir/src/speed_control.c" "$project_dir/src/line_follow.c" \
                 "$project_dir/src/motor_command.c" -lm -o "$test_binary"
             "$test_binary"
         done
     done
 done
+
+# Synthetic calibration verifies final-leg arming/search; does not certify hardware deceleration.
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -I"$project_dir/include" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f \
+    -DENCODER_CONTROL_ENABLED=1 -DPRESET_ROUTE_ENABLED=1 \
+    -DBRAKING_CALIBRATION_CONFIRMED=1 -DBRAKING_SAFE_DECEL_CM_S2=30.0f \
+    "$project_dir/test/test_navigation.c" "$project_dir/src/braking_planner.c" \
+    "$project_dir/src/route.c" "$project_dir/src/gray_sensor.c" "$project_dir/src/line_follow.c" \
+    "$project_dir/src/speed_control.c" "$project_dir/src/odometry.c" "$project_dir/src/pid.c" \
+    -lm -o "$test_binary"
+"$test_binary"

@@ -1,43 +1,17 @@
 #include "route.h"
-
-/* 示例路径：实际使用前按赛道及编码器标定结果修改距离和速度。
- * 首段从启动位置起算；后续为用户测量的路口中心间距离，单位 cm。
- * 以入口灰度触发点近似路口中心；转弯/离口累计灰度中心出口方向净位移。
- * 已计入前置 16 cm 的旋转位移，不以轮程/探头弧长代替中心间距离；打滑仍须实测。
- * R=16 的理想直角结束时探头已在出口约 32 cm；下面 20 cm 短段可能在回线前越过，
- * 保留用户路径表和真实进度，不能保证此短段路口可捕获。
- * STOP 同样需要在距离窗口内确认路口；ROUTE_REPEAT_COUNT 控制总轮数，
- * 非最终轮的 STOP 标记按 ROUTE_REPEAT_ACTION（当前 LEFT）转向/离口后回到首项。表内 60 cm/s 保留用户设置，须不超过 WHEEL_TARGET_MAX_CM_S。 */
-/* 第六列 corner_arc_enabled：true 启用本项 90° 圆弧；false 使用原转弯。
- * STOP 非最终轮映射为左右转时也使用本项开关，最终轮仍正常停车。
- * STRAIGHT / 非 ±90° CUSTOM_TURN 不走圆弧，无论开关值。
- * 第五列 angle_deg 仅 CUSTOM_TURN 使用；例如：
- * {75.0f, 10.0f, CUSTOM_TURN, 60, 45.0f, false},  顺时针 45°
- * {75.0f, 10.0f, CUSTOM_TURN, 60, -135.0f, false}, 逆时针 135°
- * 有效范围 [-360, 0) 或 (0, 360]；直行用 STRAIGHT。 */
+/* 字段顺序：路口数、转弯速度、动作、巡航速度、角度、圆弧开关、最后一段长度。
+ * 路口数：上次动作离口后确认的第几个路口，实际数量需实车确认。
+ * 转弯速度：入口实测轮速上限及转弯轮目标上限，单位 cm/s。
+ * 动作：LEFT 左转、RIGHT 右转、STRAIGHT 直行、STOP 终点、CUSTOM_TURN 自定义转角。
+ * 巡航速度：路段目标速度，单位 cm/s，不是 PWM。
+ * 角度：仅 CUSTOM_TURN 使用，顺时针为正、逆时针为负，单位度。
+ * 圆弧开关：true 为 ±90° 启用圆弧，false 使用普通转弯。
+ * 最后一段长度：上一口离口确认点到目标口触发点的实测距离，单位 cm；0 禁用距离规划。
+ * 旧路口中心间距离不能直接用于最后一段；启用距离规划前须确认制动标定。 */
 const RouteStep route[] = {
-    /*** 周博洋的赛道 
-    {104.0f, 16.0f, LEFT, 80, 0.0f, true},
-    {131.0f, 16.0f, LEFT, 80, 0.0f, true},
-    {62.0f, 10.0f, LEFT, 60, 0.0f, true},
-    {60.0f, 12.0f, CUSTOM_TURN, 50, 90.0f, false},
-    {20.0f, 10.0f, LEFT, 80, 0.0f, true},
-    {70.0f, 16.0f, STOP, 80, 0.0f, true},
-    */
-    /* 赛道 2 */
-    {65.0f, 5.0f, LEFT, 200, 0.0f, true},
-    {219.0f, 16.0f, LEFT, 200, 0.0f, true},
-    {75.0f, 10.0f, LEFT, 200, 0.0f, true},
-    {219.0f, 16.0f, STOP, 200, 0.0f, true},
-
-    /* 赛道 3
-    {200.0f, 15.0f, RIGHT, 120, 0.0f, false},
-    {82.0f, 8.0f, RIGHT, 120, 0.0f, false},
-    {52.0f, 8.0f, CUSTOM_TURN, 120, 60.0f, false},
-    {70.0f, 10.0f, CUSTOM_TURN, 120, -60.0f, false},
-    {20.0f, 5.0f, LEFT, 80, 0.0f, false},
-    {120.0f, 10.0f, STOP, 120, 0.0f, false},
-    //{80.0f, 8.0f, LEFT, 80, 0.0f, true},
-    */
+    {1, 50.0f, LEFT, 50, 0.0f, false, 65.0f},
+    {4, 50.0f, LEFT, 200, 0.0f, false, 70.0f},
+    {2, 50.0f, LEFT, 200, 0.0f, false, 50.0f},
+    {3, 50.0f, STOP, 200, 0.0f, false, 70.0f},
 };
-const size_t route_count = sizeof(route) / sizeof(route[0]);
+const size_t route_count = sizeof(route)/sizeof(route[0]);

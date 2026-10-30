@@ -1,0 +1,1 @@
+Assertion failed: (speed_control_update(&s, lt, rt, side == 0 ? -.593797f : 0, side == 1 ? -.593797f : 0, .005f, &out)), function test_reverse_confirmation, file test_reverse_feedback.c, line 23.

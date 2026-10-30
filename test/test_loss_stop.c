@@ -11,7 +11,7 @@ static void tick(LineFollow *f, EncoderCounts *c, uint32_t *now, uint8_t line, b
 }
 int main(void)
 {
-    const RouteStep route_steps[]={{1000,10,STOP,12, 0.0f, true}};
+    const RouteStep route_steps[]={{1, 6.0f, STOP, 12, 0.0f, true, 0.0f}};
     OdometryCalibration cal={1.0f/(3.14159265359f*ODOMETRY_DISTANCE_SCALE),
         1.0f/(3.14159265359f*ODOMETRY_DISTANCE_SCALE),100,100,10,1,1,true};
     LineFollow f; EncoderCounts c={0}; uint32_t now=0;
@@ -27,7 +27,7 @@ int main(void)
 #endif
     for (unsigned i=0;i<360 && f.state!=LINE_STOPPED;++i)
         tick(&f,&c,&now,i%2 ? 0 : 0xff,false);
-#if LOST_LINE_STOP_ENABLED
+#if LOST_LINE_STOP_ENABLED || PRESET_ROUTE_ENABLED
     assert(f.state==LINE_STOPPED && f.stop_reason==LINE_STOP_LOST);
     assert(f.stop_snapshot.valid);
 #else

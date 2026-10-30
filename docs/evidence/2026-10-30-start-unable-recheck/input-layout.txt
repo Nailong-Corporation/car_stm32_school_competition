@@ -1,0 +1,21 @@
+
+warning: Couldn't find general-purpose registers in core file.
+
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+All variables matching regular expression "button_":
+
+Non-debugging symbols:
+0x20000124  button_candidate
+0x20000128  button_changed_ms
+0x2000012c  button_initialized
+0x2000012d  button_stable
+$1 = {
+  history = "\000\000",
+  next = 1 '\001',
+  count = 3 '\003'
+}
+$2 = 0
+$3 = 1
+$4 = false
+$5 = true

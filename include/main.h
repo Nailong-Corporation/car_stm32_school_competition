@@ -37,6 +37,9 @@ typedef struct {
     LineStopSnapshot stop_snapshot; /* 当前停车快照；接受 START/自动恢复时清空。 */
     LineStopSnapshot auto_resume_snapshot; /* 最近一次自动恢复前的快照。 */
     uint32_t auto_resume_count, auto_resume_last_ms;
+    uint16_t route_junctions_seen;
+    bool route_final_segment_active;
+    float route_final_segment_progress_cm;
     bool route_recovery_window_active;
     float route_recovery_window_progress_cm, route_recovery_window_limit_cm;
     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
@@ -44,6 +47,16 @@ typedef struct {
     bool exit_anchor_valid, exit_recovery_active;
     float exit_lateral_error_cm;
     float imu_gyro_z_calibration_span_lsb;
+    float imu_gyro_z_calibration_central_span_lsb;
+    uint32_t imu_calibration_attempts;
+    uint32_t imu_init_attempts;
+    HeadingSource heading_source;
+    HeadingFallbackReason heading_fallback_reason;
+    uint32_t heading_fallback_ms;
+    bool pitch_monitor_available;
+    uint32_t imu_bus_recovery_count, imu_last_i2c_status, imu_last_i2c_error;
+    uint8_t imu_last_who_am_i;
+    uint8_t imu_bus_line_mask;
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */

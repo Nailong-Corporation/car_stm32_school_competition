@@ -1,0 +1,1 @@
+Assertion failed: (fabsf((f.left_target_cm_s)-(f.right_target_cm_s))<.001f), function test_settling, file test_turn_settling.c, line 28.

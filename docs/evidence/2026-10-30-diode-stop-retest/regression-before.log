@@ -1,0 +1,1 @@
+Assertion failed: (f.route.index==1 && f.route.junctions_seen==1 && f.route.passing_junction), function test_turn_into_adjacent_diode, file test_turn_speed_switches.c, line 20.

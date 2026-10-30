@@ -1,0 +1,179 @@
+warning: Couldn't find general-purpose registers in core file.
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = {
+  calibration = {
+    left_diameter_cm = 4.80000019,
+    right_diameter_cm = 4.80000019,
+    left_counts_per_rev = 1560,
+    right_counts_per_rev = 1560,
+    track_cm = 14.5,
+    left_sign = 1,
+    right_sign = -1,
+    confirmed = true
+  },
+  previous = {
+    left = 31,
+    right = 81
+  },
+  ready = true,
+  primed = true,
+  left_cm_per_count = 0.020782847,
+  right_cm_per_count = 0.020782847,
+  distance_cm = -0.519571126,
+  heading_rad = 0.123607695,
+  left_speed_cm_s = 4.20389539e-45,
+  right_speed_cm_s = 4.20389539e-45,
+  left_distance_cm = 0.644268215,
+  right_distance_cm = -1.68340969,
+  x_cm = -0.518683493,
+  y_cm = -0.0267792307,
+  sensor_x_cm = 15.3592415,
+  sensor_y_cm = 1.94591153,
+  sensor_distance_cm = 2.66426158,
+  left_delta = 0,
+  right_delta = 0
+}
+$2 = 0.819999397
+$3 = 54522
+$4 = LINE_STOP_ENCODER
+type = struct {
+/*      0      |       4 */    uint32_t control_count;
+/*      4      |       4 */    uint32_t last_sample_ms;
+/*      8      |       4 */    uint32_t task_duration_ms;
+/*     12      |       4 */    uint32_t interval_ms;
+/*     16      |       1 */    uint8_t raw_mask;
+/*     17      |       1 */    uint8_t line_mask;
+/*     18      |       1 */    uint8_t selected_mask;
+/*     19      |       1 */    uint8_t prefilter_mask;
+/*     20      |       1 */    uint8_t seam_mask;
+/*     21      |       1 */    GrayKind observation;
+/*     22      |       1 */    LineState state;
+/*     23      |       1 */    LineStopReason stop_reason;
+/*     24      |       4 */    uint32_t button_press_count;
+/*     28      |       4 */    uint32_t start_request_count;
+/*     32      |       1 */    LineStartResult start_result;
+/*     33      |       1 */    uint8_t valid_line_samples;
+/*     34      |       1 */    uint8_t start_raw_mask;
+/*     35      |       1 */    uint8_t start_line_mask;
+/*     36      |       4 */    float position;
+/*     40      |       4 */    float left_command;
+/*     44      |       4 */    float right_command;
+/*     48      |       2 */    uint16_t left_encoder;
+/*     50      |       2 */    uint16_t right_encoder;
+/*     52      |       1 */    _Bool encoder_control_enabled;
+/*     53      |       1 */    _Bool preset_route_enabled;
+/*     54      |       1 */    _Bool odometry_ready;
+/*     55      |       1 */    _Bool imu_enabled;
+/*     56      |       1 */    _Bool imu_ready;
+/* XXX  1-byte hole      */
+/*     58      |       2 */    int16_t imu_gyro_z_raw;
+/*     60      |       4 */    float imu_gyro_z_bias_lsb;
+/*     64      |       1 */    uint8_t imu_init_failure_stage;
+/*     65      |       1 */    uint8_t imu_address_7bit;
+/*     66      |       1 */    _Bool pitch_stop_enabled;
+/*     67      |       1 */    _Bool pitch_stop_latched;
+/*     68      |       4 */    float pitch_deg;
+/*     72      |       4 */    float pitch_over_threshold_ms;
+/*     76      |       4 */    float distance_cm;
+/*     80      |       4 */    float heading_rad;
+/*     84      |       4 */    float left_speed_cm_s;
+/*     88      |       4 */    float right_speed_cm_s;
+/*     92      |       4 */    float left_target_cm_s;
+/*     96      |       4 */    float right_target_cm_s;
+/*    100      |       1 */    RouteState route_state;
+/*    101      |       1 */    RouteFailure route_failure;
+/* XXX  2-byte hole      */
+/*    104      |       4 */    float route_progress_cm;
+/*    108      |       4 */    uint32_t route_elapsed_ms;
+/*    112      |       4 */    uint32_t route_repeat_count;
+/*    116      |       4 */    uint32_t route_completed_laps;
+/*    120      |       1 */    _Bool route_turn_capturing;
+/*    121      |       1 */    _Bool route_turn_forced;
+/*    122      |       1 */    uint8_t route_candidate_samples;
+/* XXX  1-byte hole      */
+/*    124      |       4 */    float route_turn_rad;
+/*    128      |       4 */    uint32_t route_index;
+/*    132      |       4 */    uint32_t route_stop_events;
+/*    136      |       4 */    uint32_t route_stopped_step;
+/*    140      |     128 */    LineStopSnapshot stop_snapshot;
+/*    268      |     128 */    LineStopSnapshot auto_resume_snapshot;
+/*    396      |       4 */    uint32_t auto_resume_count;
+/*    400      |       4 */    uint32_t auto_resume_last_ms;
+/*    404      |       2 */    uint16_t route_junctions_seen;
+/*    406      |       1 */    _Bool route_final_segment_active;
+/* XXX  1-byte hole      */
+/*    408      |       4 */    float route_final_segment_progress_cm;
+/*    412      |       1 */    _Bool route_recovery_window_active;
+/* XXX  3-byte hole      */
+/*    416      |       4 */    float route_recovery_window_progress_cm;
+/*    420      |       4 */    float route_recovery_window_limit_cm;
+/*    424      |      52 */    StraightEntrySnapshot straight_entry_aligned;
+/*    476      |      52 */    StraightEntrySnapshot straight_entry_handoff;
+/*    528      |      96 */    TurnExitDiagnostics turn_exit[2];
+/*    624      |       1 */    _Bool exit_anchor_valid;
+/*    625      |       1 */    _Bool exit_recovery_active;
+/* XXX  2-byte hole      */
+/*    628      |       4 */    float exit_lateral_error_cm;
+/*    632      |       4 */    float imu_gyro_z_calibration_span_lsb;
+/*    636      |       4 */    float imu_gyro_z_calibration_central_span_lsb;
+/*    640      |       4 */    uint32_t imu_calibration_attempts;
+/*    644      |       4 */    uint32_t imu_init_attempts;
+/*    648      |       1 */    HeadingSource heading_source;
+/*    649      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*    652      |       4 */    uint32_t heading_fallback_ms;
+/*    656      |       1 */    _Bool pitch_monitor_available;
+/* XXX  3-byte padding   */
+
+                               /* total size (bytes):  660 */
+                             }
+type = struct {
+/*      0      |       1 */    _Bool valid;
+/*      1      |       1 */    LineStopReason reason;
+/*      2      |       1 */    LineState state_before_stop;
+/*      3      |       1 */    RouteState route_state;
+/*      4      |       1 */    RouteState route_state_before_update;
+/*      5      |       1 */    RouteFailure route_failure;
+/*      6      |       1 */    SpeedFault speed_fault;
+/*      7      |       1 */    uint8_t speed_fault_wheel;
+/*      8      |      16 */    GrayObservation observation;
+/*     24      |       4 */    EncoderCounts counts;
+/*     28      |       4 */    uint32_t sample_ms;
+/*     32      |       4 */    uint32_t reliable_age_ms;
+/*     36      |       4 */    uint32_t route_phase_age_ms;
+/*     40      |       4 */    uint32_t route_index;
+/*     44      |       2 */    uint16_t junctions_seen;
+/*     46      |       1 */    _Bool final_segment_active;
+/* XXX  1-byte hole      */
+/*     48      |       4 */    float final_segment_progress_cm;
+/*     52      |       4 */    float dt_s;
+/*     56      |       4 */    float base;
+/*     60      |       4 */    float left_target_cm_s;
+/*     64      |       4 */    float right_target_cm_s;
+/*     68      |       4 */    float left_speed_cm_s;
+/*     72      |       4 */    float right_speed_cm_s;
+/*     76      |       4 */    float distance_cm;
+/*     80      |       4 */    float route_progress_cm;
+/*     84      |       4 */    float clear_progress_cm;
+/*     88      |       4 */    float turn_rad;
+/*     92      |       4 */    float actual_turn_rad;
+/*     96      |       4 */    uint32_t exit_candidate_age_ms;
+/*    100      |       4 */    float exit_candidate_progress_cm;
+/*    104      |       1 */    _Bool exit_candidate_pending;
+/*    105      |       1 */    uint8_t exit_confirm_samples;
+/*    106      |       1 */    _Bool handoff_early;
+/* XXX  1-byte hole      */
+/*    108      |       4 */    float segment_start_progress_cm;
+/*    112      |       1 */    _Bool turn_exit_branch;
+/*    113      |       1 */    uint8_t exit_line_mask;
+/*    114      |       1 */    _Bool exit_recovery_active;
+/* XXX  1-byte hole      */
+/*    116      |       4 */    float exit_lateral_error_cm;
+/*    120      |       1 */    HeadingSource heading_source;
+/*    121      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*    124      |       4 */    uint32_t heading_fallback_ms;
+
+                               /* total size (bytes):  128 */
+                             }

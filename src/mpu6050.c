@@ -23,16 +23,69 @@
 
 static bool read_reg(Mpu6050 *imu, uint8_t reg, uint8_t *data, uint16_t count)
 {
-    return HAL_I2C_Mem_Read(&imu->i2c, imu->address_7bit << 1U, reg,
+    HAL_StatusTypeDef status=HAL_I2C_Mem_Read(&imu->i2c, imu->address_7bit << 1U, reg,
                             I2C_MEMADD_SIZE_8BIT, data, count,
-                            MPU6050_I2C_TIMEOUT_MS) == HAL_OK;
+                            imu->ready ? MPU6050_I2C_TIMEOUT_MS : MPU6050_INIT_I2C_TIMEOUT_MS);
+    imu->last_i2c_status=(uint32_t)status;
+    imu->last_i2c_error=HAL_I2C_GetError(&imu->i2c);
+    return status==HAL_OK;
 }
 
 static bool write_reg(Mpu6050 *imu, uint8_t reg, uint8_t value)
 {
-    return HAL_I2C_Mem_Write(&imu->i2c, imu->address_7bit << 1U, reg,
+    HAL_StatusTypeDef status=HAL_I2C_Mem_Write(&imu->i2c, imu->address_7bit << 1U, reg,
                              I2C_MEMADD_SIZE_8BIT, &value, 1,
-                             MPU6050_I2C_TIMEOUT_MS) == HAL_OK;
+                             imu->ready ? MPU6050_I2C_TIMEOUT_MS : MPU6050_INIT_I2C_TIMEOUT_MS);
+    imu->last_i2c_status=(uint32_t)status;
+    imu->last_i2c_error=HAL_I2C_GetError(&imu->i2c);
+    return status==HAL_OK;
+}
+
+static bool bus_level(uint16_t pin, GPIO_PinState level)
+{
+    for(uint32_t wait=0;wait<MPU6050_BUS_WAIT_MS;++wait) {
+        if(HAL_GPIO_ReadPin(IMU_I2C_PORT,pin)==level) return true;
+        HAL_Delay(1);
+    }
+    return HAL_GPIO_ReadPin(IMU_I2C_PORT,pin)==level;
+}
+static bool bus_drive(uint16_t pin, GPIO_PinState level)
+{
+    HAL_GPIO_WritePin(IMU_I2C_PORT,pin,level);
+    HAL_Delay(MPU6050_BUS_EDGE_MS);
+    return bus_level(pin,level);
+}
+/* Startup only. ST ES096 2.8.7: APB reset alone cannot unlock the F1
+ * analog filter. Generate SDA/SCL transitions before resetting I2C.
+ * Also clock out an interrupted slave transaction, at most nine pulses. */
+static bool recover_bus(Mpu6050 *imu)
+{
+    ++imu->bus_recovery_count;
+    __HAL_I2C_DISABLE(&imu->i2c);
+    HAL_GPIO_WritePin(IMU_I2C_PORT,IMU_I2C_SCL_PIN|IMU_I2C_SDA_PIN,GPIO_PIN_SET);
+    GPIO_InitTypeDef gpio={0};
+    gpio.Pin=IMU_I2C_SCL_PIN|IMU_I2C_SDA_PIN;
+    gpio.Mode=GPIO_MODE_OUTPUT_OD;gpio.Pull=GPIO_NOPULL;gpio.Speed=GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(IMU_I2C_PORT,&gpio);
+    HAL_Delay(MPU6050_BUS_EDGE_MS);
+    bool ok=bus_level(IMU_I2C_SCL_PIN,GPIO_PIN_SET);
+    for(unsigned pulse=0;ok && pulse<9 &&
+        HAL_GPIO_ReadPin(IMU_I2C_PORT,IMU_I2C_SDA_PIN)==GPIO_PIN_RESET;++pulse)
+        ok=bus_drive(IMU_I2C_SCL_PIN,GPIO_PIN_RESET) &&
+           bus_drive(IMU_I2C_SCL_PIN,GPIO_PIN_SET);
+    ok=ok && bus_level(IMU_I2C_SDA_PIN,GPIO_PIN_SET);
+    if(ok) ok=bus_drive(IMU_I2C_SDA_PIN,GPIO_PIN_RESET) &&
+              bus_drive(IMU_I2C_SCL_PIN,GPIO_PIN_RESET) &&
+              bus_drive(IMU_I2C_SCL_PIN,GPIO_PIN_SET) &&
+              bus_drive(IMU_I2C_SDA_PIN,GPIO_PIN_SET);
+    /* Release even on failure; never drive the shared bus push-pull. */
+    HAL_GPIO_WritePin(IMU_I2C_PORT,gpio.Pin,GPIO_PIN_SET);
+    imu->bus_line_mask=(HAL_GPIO_ReadPin(IMU_I2C_PORT,IMU_I2C_SCL_PIN)==GPIO_PIN_SET?1U:0U) |
+                       (HAL_GPIO_ReadPin(IMU_I2C_PORT,IMU_I2C_SDA_PIN)==GPIO_PIN_SET?2U:0U);
+    gpio.Mode=GPIO_MODE_AF_OD;HAL_GPIO_Init(IMU_I2C_PORT,&gpio);
+    __HAL_RCC_I2C1_FORCE_RESET();
+    __HAL_RCC_I2C1_RELEASE_RESET();
+    return ok;
 }
 
 static bool read_gyro_z(Mpu6050 *imu, int16_t *raw)
@@ -50,7 +103,7 @@ static int16_t signed_word(const uint8_t *bytes)
 #endif
 #endif
 
-bool mpu6050_init(Mpu6050 *imu)
+static bool mpu6050_init_once(Mpu6050 *imu)
 {
     memset(imu, 0, sizeof(*imu));
 #if !MPU6050_ENABLED
@@ -58,13 +111,16 @@ bool mpu6050_init(Mpu6050 *imu)
 #else
     if ((MPU6050_YAW_SIGN != 1 && MPU6050_YAW_SIGN != -1) ||
         (MPU6050_ADDRESS_7BIT != 0x68U && MPU6050_ADDRESS_7BIT != 0x69U) ||
-        MPU6050_PROBE_ATTEMPTS == 0U ||
+        MPU6050_PROBE_ATTEMPTS == 0U || MPU6050_CALIBRATION_ATTEMPTS == 0U ||
         MPU6050_GYRO_BIAS_SAMPLES < 2U || MPU6050_GYRO_CALIBRATION_MS == 0U) return false;
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_AFIO_CLK_ENABLE();
     __HAL_RCC_I2C1_CLK_ENABLE();
     __HAL_AFIO_REMAP_I2C1_ENABLE();
+    /* Reset the old peripheral state before bounded GPIO bus recovery below. */
+    __HAL_RCC_I2C1_FORCE_RESET();
+    __HAL_RCC_I2C1_RELEASE_RESET();
     GPIO_InitTypeDef gpio = {0};
     gpio.Pin = IMU_I2C_SCL_PIN | IMU_I2C_SDA_PIN;
     gpio.Mode = GPIO_MODE_AF_OD;
@@ -81,10 +137,12 @@ bool mpu6050_init(Mpu6050 *imu)
     imu->i2c.Init.OwnAddress2 = 0;
     imu->i2c.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
     imu->i2c.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+    HAL_Delay(MPU6050_POWER_SETTLE_MS);
+    imu->init_failure_stage = 9;
+    if(!recover_bus(imu)) return false;
     imu->init_failure_stage = 1;
     if (HAL_I2C_Init(&imu->i2c) != HAL_OK) return false;
 
-    HAL_Delay(MPU6050_POWER_SETTLE_MS);
     imu->init_failure_stage = 2;
     /* WHO_AM_I stays 0x68 regardless of AD0. Try both possible bus addresses. */
     bool found = false;
@@ -92,13 +150,23 @@ bool mpu6050_init(Mpu6050 *imu)
         for (unsigned alternate = 0; alternate < 2; ++alternate) {
             imu->address_7bit = alternate ? (MPU6050_ADDRESS_7BIT ^ 1U) : MPU6050_ADDRESS_7BIT;
             uint8_t who = 0;
-            if (read_reg(imu, MPU_REG_WHO_AM_I, &who, 1) && who == 0x68U) {
+            bool read_ok=read_reg(imu, MPU_REG_WHO_AM_I, &who, 1);
+            imu->last_who_am_i=who;
+            if (read_ok && who == 0x68U) {
                 found = true;
                 break;
             }
         }
-        if (!found && attempt + 1U < MPU6050_PROBE_ATTEMPTS)
+        if (!found && attempt + 1U < MPU6050_PROBE_ATTEMPTS) {
+            imu->init_failure_stage = 8;
+            if (HAL_I2C_DeInit(&imu->i2c) != HAL_OK) return false;
+            imu->init_failure_stage = 9;
+            if(!recover_bus(imu)) return false;
+            imu->init_failure_stage = 1;
+            if (HAL_I2C_Init(&imu->i2c) != HAL_OK) return false;
+            imu->init_failure_stage = 2;
             HAL_Delay(MPU6050_PROBE_RETRY_MS);
+        }
     }
     if (!found) return false;
     imu->init_failure_stage = 3;
@@ -122,29 +190,67 @@ bool mpu6050_init(Mpu6050 *imu)
     imu->init_failure_stage = 4;
     uint8_t status;
     if (!read_reg(imu, MPU_REG_INT_STATUS, &status, 1)) return false;
-    /* One fixed window. Calibration magnitude/spread are diagnostics, never a
-     * start veto. Median rejects isolated startup spikes without repeated windows. */
+    /* Independent bounded windows while motors remain disabled. A rejected
+     * window never supplies a bias; bus failures remain immediate failures. */
     int16_t samples[MPU6050_GYRO_BIAS_SAMPLES];
-    for (uint32_t i = 0; i < MPU6050_GYRO_BIAS_SAMPLES; ++i) {
-        HAL_Delay(MPU6050_GYRO_CALIBRATION_MS);
-        int16_t sample;
-        if (!read_reg(imu, MPU_REG_INT_STATUS, &status, 1) || !(status & 0x01U) ||
-            !read_gyro_z(imu, &sample)) return false;
-        imu->gyro_z_raw = sample;
-        uint32_t j = i;
-        while (j > 0 && samples[j-1U] > sample) {
-            samples[j] = samples[j-1U];
-            --j;
+    for (uint32_t attempt = 0; attempt < MPU6050_CALIBRATION_ATTEMPTS; ++attempt) {
+        imu->calibration_attempts = attempt + 1U;
+        imu->init_failure_stage = 4;
+        for (uint32_t i = 0; i < MPU6050_GYRO_BIAS_SAMPLES; ++i) {
+            HAL_Delay(MPU6050_GYRO_CALIBRATION_MS);
+            int16_t sample;
+            if (!read_reg(imu, MPU_REG_INT_STATUS, &status, 1) || !(status & 0x01U) ||
+                !read_gyro_z(imu, &sample)) return false;
+            imu->gyro_z_raw = sample;
+            uint32_t j = i;
+            while (j > 0 && samples[j-1U] > sample) {
+                samples[j] = samples[j-1U];
+                --j;
+            }
+            samples[j] = sample;
         }
-        samples[j] = sample;
+        uint32_t middle = MPU6050_GYRO_BIAS_SAMPLES / 2U;
+        imu->gyro_z_bias_lsb = MPU6050_GYRO_BIAS_SAMPLES % 2U ? (float)samples[middle] :
+            0.5f * ((float)samples[middle-1U] + (float)samples[middle]);
+        imu->gyro_z_calibration_span_lsb = (float)((int32_t)samples[MPU6050_GYRO_BIAS_SAMPLES-1U] - samples[0]);
+        imu->init_failure_stage = 7;
+        uint32_t trim = MPU6050_GYRO_BIAS_SAMPLES / 20U;
+        imu->gyro_z_calibration_central_span_lsb =
+            (float)samples[MPU6050_GYRO_BIAS_SAMPLES-1U-trim]-samples[trim];
+        if (fabsf(imu->gyro_z_bias_lsb)>MPU6050_CALIBRATION_MAX_BIAS_LSB ||
+            imu->gyro_z_calibration_central_span_lsb>MPU6050_CALIBRATION_MAX_CENTRAL_SPAN_LSB) continue;
+        imu->ready = true;
+        imu->init_failure_stage = 0;
+        return true;
     }
-    uint32_t middle = MPU6050_GYRO_BIAS_SAMPLES / 2U;
-    imu->gyro_z_bias_lsb = MPU6050_GYRO_BIAS_SAMPLES % 2U ? (float)samples[middle] :
-        0.5f * ((float)samples[middle-1U] + (float)samples[middle]);
-    imu->gyro_z_calibration_span_lsb = (float)((int32_t)samples[MPU6050_GYRO_BIAS_SAMPLES-1U] - samples[0]);
-    imu->ready = true;
-    imu->init_failure_stage = 0;
-    return true;
+    return false;
+#endif
+}
+
+bool mpu6050_init(Mpu6050 *imu)
+{
+#if !MPU6050_ENABLED
+    return mpu6050_init_once(imu);
+#else
+    uint32_t recoveries=0;
+    for (uint32_t attempt = 1; attempt <= MPU6050_INIT_ATTEMPTS; ++attempt) {
+        bool ok = mpu6050_init_once(imu);
+        recoveries+=imu->bus_recovery_count;
+        imu->bus_recovery_count=recoveries;
+        imu->init_attempts = attempt;
+        if (ok) return true;
+        /* Invalid configuration or exhausted stationary windows are not bus faults. */
+        if (imu->init_failure_stage == 0 || imu->init_failure_stage == 7 || imu->init_failure_stage == 8 ||
+            attempt == MPU6050_INIT_ATTEMPTS) return false;
+        if (HAL_I2C_DeInit(&imu->i2c) != HAL_OK) {
+            imu->init_failure_stage = 8;
+            return false;
+        }
+        __HAL_RCC_I2C1_FORCE_RESET();
+        __HAL_RCC_I2C1_RELEASE_RESET();
+        HAL_Delay(MPU6050_INIT_RETRY_MS);
+    }
+    return false;
 #endif
 }
 
@@ -179,6 +285,7 @@ bool mpu6050_update(Mpu6050 *imu, float dt, float *heading_rad)
     float rate = (float)MPU6050_YAW_SIGN *
                  ((float)raw - imu->gyro_z_bias_lsb) /
                  MPU_GYRO_LSB_PER_DPS * DEG_TO_RAD;
+    if(!isfinite(rate) || fabsf(rate)>MPU6050_MAX_YAW_RATE_RAD_S || raw==INT16_MIN || raw==INT16_MAX) return false;
     float next = imu->heading_rad + rate * dt;
     if (!isfinite(next)) return false;
     imu->gyro_z_raw = raw;

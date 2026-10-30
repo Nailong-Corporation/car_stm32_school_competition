@@ -1,0 +1,5 @@
+button_candidate=0
+button_changed_ms=1537
+button_initialized=1
+button_stable=0
+uwTick=56742

@@ -29,8 +29,8 @@
 #error "PRESET_ROUTE_ENABLED requires ENCODER_CONTROL_ENABLED=1"
 #endif
 
-/* MPU6050 航向选择：0 维持编码器轮差估角；1 所有角度/位姿改用 IMU Z 轴积分。
- * 默认 0，接好 PB8/PB9 和 3.3 V、确认装配方向后再改 1 并重新编译。
+/* MPU6050 航向选择：0 编码器轮差估角；1 优先 IMU，失败锁定降级编码器。
+ * 当前 1；初始化失败不阻塞 START，运行丢样从当前航向继续累计轮差。
  * 编码器仍负责里程和左右轮速度闭环；IMU 不提供绝对偏航或厘米位移。
  */
 #ifndef MPU6050_ENABLED
@@ -48,14 +48,20 @@
 #define MPU6050_POWER_SETTLE_MS         100U /* 模块电源启动后再探测，电机保持待机。 */
 #define MPU6050_PROBE_ATTEMPTS            5U
 #define MPU6050_PROBE_RETRY_MS           20U
+#define MPU6050_INIT_ATTEMPTS             3U /* 通信/配置异常后复位 I2C 并完整重试。 */
+#define MPU6050_INIT_RETRY_MS           100U
+#define MPU6050_BUS_EDGE_MS               1U /* 仅启动总线恢复，开漏电平转换后等待。 */
+#define MPU6050_BUS_WAIT_MS               3U /* SCL/SDA 电平确认有界，不在运动中执行。 */
 /* 实际 MPU6050 倒置安装（芯片面朝下、芯片 Z 正轴朝地面），车体右转时
  * 在传感器坐标下读得正 Z 角速度：+1 对应全系统右转正航向。
  * 仅使用水平面偏航角，不融合俯仰/横滚；必须近似水平固定并手持右转核实。 */
 #define MPU6050_YAW_SIGN               1
-#define MPU6050_GYRO_SETTLE_MS         500U /* 唤醒/配置后固定等待；不以波动或零偏大小拒绝启动。 */
-#define MPU6050_GYRO_BIAS_SAMPLES      128U
+#define MPU6050_GYRO_SETTLE_MS         500U /* 唤醒/配置后等待，随后校验静止零偏。 */
+#define MPU6050_GYRO_BIAS_SAMPLES       32U /* 每窗名义 160 ms；静止质量门限不变。 */
 #define MPU6050_GYRO_CALIBRATION_MS    5U
+#define MPU6050_CALIBRATION_ATTEMPTS   5U /* 质量不合格时重采独立窗口，持续异常仍拒绝。 */
 #define MPU6050_I2C_TIMEOUT_MS         2U
+#define MPU6050_INIT_I2C_TIMEOUT_MS   25U /* 电机待机时允许更长初始化事务，运行期仍 2 ms。 */
 
 /* MPU6050 俯仰防拿起保护：默认开启，只有 MPU6050_ENABLED=1 时生效。
  * 通过加速度计重力方向计算车体前后俯仰角的绝对值，超过 40° 连续
@@ -75,11 +81,9 @@
 #define MPU6050_PITCH_MIN_G            0.70f
 #define MPU6050_PITCH_MAX_G            1.30f
 
-/* 路径可恢复停车后，连续有效单线自动恢复当前项；不从第 0 项重跑。
- * 不恢复按键/最终 STOP、无效路径、反向/过转、编码器或控制故障。
- */
+/* Historical retry switch retained for compatibility; route_resume always rejects. */
 #ifndef ROUTE_AUTO_RESUME_ENABLED
-#define ROUTE_AUTO_RESUME_ENABLED     1
+#define ROUTE_AUTO_RESUME_ENABLED     0
 #endif
 #if ROUTE_AUTO_RESUME_ENABLED != 0 && ROUTE_AUTO_RESUME_ENABLED != 1
 #error "ROUTE_AUTO_RESUME_ENABLED must be 0 or 1"
@@ -155,9 +159,11 @@
  * 计数跳变上界与目标速度上限用途不同；还需实测保证相邻采样不跨过半个计数器量程。
  */
 #define ENCODER_INPUT_FILTER         6U     /* 两相输入捕获滤波配置值，不是毫秒数。 */
-#define ODOMETRY_MAX_SPEED_CM_S      100.0f /* 计数合理性检查的轮速上界，另允许计数量化余量。 */
+/* 2026-10-30 用户信息：小车最高可能达到 5 m/s（500 cm/s），量程与目标体系按此预留。 */
+#define VEHICLE_MAX_SPEED_CM_S       500.0f /* 车辆最高可能轮速；前馈换算基准，待实测确认。 */
+#define ODOMETRY_MAX_SPEED_CM_S      650.0f /* 计数合理性检查轮速上界 = 5 m/s×1.3 余量；超过按计数跳变故障。 */
 #define SPEED_FILTER_TAU_S           0.030f /* 测量轮速的一阶低通时间常数，单位 s。 */
-#define WHEEL_TARGET_MAX_CM_S        200.0f  /* 与当前路径表 200 cm/s 一致；目标值，非实测能力。 */
+#define WHEEL_TARGET_MAX_CM_S        500.0f /* 单轮目标速度天花板；路径表 cruise/turn 均不得超过。 */
 
 /* ==================== 五、左右轮速度 PID 内环 ====================
  * 仅编码器模式使用；误差为目标速度减实测速度，单位 cm/s，最终输出为 PWM 指令。
@@ -167,15 +173,23 @@
 #define SPEED_KI                     8.0f  /* 速度积分系数，实际积分使用 dt。 */
 #define SPEED_KD                     0.0f  /* 速度微分系数初值，当前为 0。 */
 #define SPEED_INTEGRAL_LIMIT         10.0f /* 速度误差积分的绝对值上限，积分单位为 cm。 */
-#define SPEED_FEEDFORWARD             3.0f  /* 每 1 cm/s 目标速度对应的 PWM 前馈系数。 */
+/* 2026-10-30 按 5 m/s 满量程修正：前馈 = 满 PWM 255 ÷ 500 cm/s ≈ 0.51 PWM/(cm/s)。
+ * 旧值 3.0 在约 85 cm/s 即饱和，差速修正随之失效；仍为初值，需台架实测重标。 */
+#define SPEED_FEEDFORWARD             (255.0f / VEHICLE_MAX_SPEED_CM_S)
 
 /* ==================== 六、编码器反馈与堵转保护 ====================
  * 目标达到指定值而测得速度持续偏低时停车；反向反馈越过负阈值也会报故障。
  * 这些判断不能覆盖所有断线或打滑情况，阈值与超时须按编码器分辨率及启动特性标定。
  */
 #define SPEED_STALL_TARGET_CM_S       3.0f  /* 目标至少达到此速度时才累计低速保护时间。 */
-#define SPEED_STALL_MEASURED_CM_S     0.5f  /* 低速判定阈值；反向反馈使用其负值作为界限。 */
+#define SPEED_STALL_MEASURED_CM_S     0.5f  /* 堵转低速判定阈值。 */
 #define SPEED_STALL_TIMEOUT_S         0.350f /* 低速持续到此秒数即故障停车。 */
+/* 单计数负反馈先撤去双轮驱动，持续/位移确认后锁定；零目标也检测。
+ * 以下是未实测初值，待机不等同于已经验证的制动。 */
+#define SPEED_REVERSE_THRESHOLD_CM_S  0.5f
+#define SPEED_REVERSE_CONFIRM_S       0.050f
+#define SPEED_REVERSE_CONFIRM_CM      0.10f
+#define SPEED_REVERSE_IMMEDIATE_CM_S  5.0f
 
 /* ==================== 七、白线位置外环与目标速度规划 ====================
  * 仅编码器模式使用；位置误差来自 -7～+7 权重，PID 输出为两轮目标速度的半差（cm/s）。
@@ -189,11 +203,12 @@
 #ifndef TURN_APPROACH_SLOWDOWN_ENABLED
 #define TURN_APPROACH_SLOWDOWN_ENABLED 1
 #endif
+#define JUNCTION_APPROACH_SPEED_CM_S 50.0f /* 最后一段全程限速；按用户实测可检测路口速度，不依赖长度规划。 */
 #ifndef TURN_EXIT_ACCEL_ENABLED
 #define TURN_EXIT_ACCEL_ENABLED        1
 #endif
 #ifndef MOTOR_REVERSE_BRAKE_ENABLED
-#define MOTOR_REVERSE_BRAKE_ENABLED    1
+#define MOTOR_REVERSE_BRAKE_ENABLED    0
 #endif
 #if (TURN_APPROACH_SLOWDOWN_ENABLED != 0 && TURN_APPROACH_SLOWDOWN_ENABLED != 1) || \
     (TURN_EXIT_ACCEL_ENABLED != 0 && TURN_EXIT_ACCEL_ENABLED != 1) || \
@@ -206,98 +221,77 @@
 #define REVERSE_BRAKE_MAX_PWM        60.0f /* 255标尺下的反向指令上限。 */
 
 #define TARGET_RISE_CM_S2           160.0f  /* 恢复/切段加速斜率，单位 cm/s²；6→40 目标约 0.213 s，START 仍受 1 s 包络。 */
-#define LINE_FOLLOW_SPEED_CM_S        12.0f /* 编码器仅巡线时的基础速度；路径模式改用表中 speed。 */
+#define LINE_FOLLOW_SPEED_CM_S        12.0f /* 编码器仅巡线时的基础速度；路径模式改用表中 cruise_speed。 */
 
 /* ==================== 八、丢线、图形干扰与航向保持 ====================
  * 两模式均冻结普通位置 PID，并从最后稳定白线起计时；孤立有效帧不刷新预算。
- * 歧义不额外降速；完全丢线按保持上限降速。编码器纠正估计航向并检查厘米距离；PWM 衰减历史差值。
+ * 歧义按 AMBIGUOUS_SPEED_CM_S 限速；完全丢线按 HOLD_SPEED_CM_S 保持。编码器纠正估计航向并检查厘米距离；PWM 衰减历史差值。
  */
 #define HOLD_SPEED_CM_S              40.0f   /* 编码器模式完全丢线保持的基础速度上限，单位 cm/s。 */
+#define AMBIGUOUS_SPEED_CM_S         80.0f   /* 宽线/多区域歧义期间的基础速度上限，单位 cm/s。 */
 #define HEADING_KP_CM_S_PER_RAD       12.0f /* 每 rad 航向误差产生的目标速度半差，单位 (cm/s)/rad。 */
 #define INTERFERENCE_TIMEOUT_MS     400U   /* 两模式共用：最后稳定观测起的异常总时限，单位 ms。 */
 #define INTERFERENCE_MAX_DISTANCE_CM 8.0f  /* 仅编码器模式：进入异常后允许的里程偏移上限，单位 cm。 */
 
-/* ==================== 九、路口候选确认 ====================
- * 仅开启预设路径时使用；还必须位于当前路径项距离窗口内，形状满足中心白线和所需分支。
- * LEFT/RIGHT 还接受连续中心线到窄侧边分支的短时历史，适配 L 形直角。
- * 普通候选由连续帧数、前进距离和时间窗口联合确认。
- * LEFT/RIGHT 在连续窄线后的整排骤变可优先强制执行，不要求仍在线上或目标侧分支。
+/* ==================== 九、方向无关路口候选与动作 ====================
+ * 近期中心历史 + 任意侧分支，连续帧/位移联合确认。失线与单帧骤变不触发。
  */
-#define JUNCTION_CONFIRM_SAMPLES     3U    /* 候选路口至少连续出现的控制采样帧数。 */
-#define JUNCTION_CONFIRM_DISTANCE_CM 0.10f /* 同一候选确认期间至少前进的距离，单位 cm。 */
-#define JUNCTION_CONFIRM_TIMEOUT_MS  100U  /* 同一候选完成确认的最长时间，单位 ms。 */
-
-#define JUNCTION_CENTER_MEMORY_MS     250U /* L 弯中心线历史的最长寿命；孤立帧不能建立历史。 */
-#define JUNCTION_CENTER_MEMORY_CM     1.5f /* 同一距离窗口内中心线到侧边分支的最大前进距离。 */
-
-/* 整排骤变使用极性转换和多数滤波后的 line_mask；仅当前 LEFT/RIGHT 距离窗口内生效。
- * 前一帧须属于连续 LINE_CONFIRM_SAMPLES 帧窄线，且间隔不超过合法控制周期上限。
- * 全丢线直接触发；其余要求至少 2 路目标，且满足下列任一明显变化。
- * 平滑单步横移 2 权重不会命中；这是形状启发式，不能识别真实曲线/元器件语义。
- */
-#define JUNCTION_ABRUPT_CHANGED_BITS   4U   /* 相邻两帧至少四路翻转。 */
-#define JUNCTION_ABRUPT_WIDTH_GROWTH   2U   /* 目标线路数一次增加至少两路。 */
-#define JUNCTION_ABRUPT_POSITION_JUMP  4.0f /* 窄线横向位置一次跳变的权重阈值。 */
-
-/* 仅路径模式：从表内路口标称位置前 5 cm 开始减速，不扣除距离容差。
- * 5 cm 是按用户反馈缩短后的待实车标定提前量；目标按速度平方随剩余距离插值，非实测制动距离。
- */
-#define JUNCTION_APPROACH_DISTANCE_CM 5.0f
-#define JUNCTION_APPROACH_SPEED_CM_S 20.0f /* 入弯前及候选基础目标，与转弯动作速度独立。 */
-
-/* ==================== 十、路口动作、转角与离口去重 ====================
- * 转弯使用非负前进差速；正常几何出口确认、满 1 s 连续在线或超时在线可进入离口。
- * 转弯与离口分别使用有界超时预算，防止重复推进路径或无限保持。
- */
-#define JUNCTION_ACTION_TIMEOUT_MS   3000U /* 90° 转弯时限；自定义大角度仍按角度比例扩展。 */
-#define JUNCTION_STRAIGHT_TIMEOUT_MS 4500U /* 直行动作保留原时限。 */
-#define JUNCTION_LINE_EXIT_AFTER_MS  1000U /* 转弯满 1 s 后，连续有效单线可结束转弯。 */
-#define JUNCTION_CLEAR_TIMEOUT_MS    1500U /* 确认出口后的独立离口时限，早交接也不能刷新。 */
-#define JUNCTION_TURN_MIN_RAD         1.35f /* 旧几何门槛供圆弧/原策略；普通非圆弧直角还须达到目标90°。 */
-/* 编码器估计接近退出角且已连续沿中心出口线前进时，允许有界退出。
- * 仅在 1.30 rad 以上、连续窄线 50 ms 且前进 0.25 cm 时生效，最终仍需连续中心线。 */
-#define JUNCTION_EXIT_ANGLE_MARGIN_RAD 0.05f
-/* 原角度/连续窄线/前进证据成熟后，回线时允许额外 0.02 rad 角度回差；
- * 无成熟证据不放宽，小角度限制为目标绝对值的 5%。 */
-#define JUNCTION_EXIT_HYSTERESIS_RAD  0.02f
-#define JUNCTION_EXIT_CONFIRM_MS      50U
-#define JUNCTION_EXIT_CONFIRM_CM      0.25f
-#define JUNCTION_TURN_MAX_RAD         2.1f /* 超过此期望方向转角则异常停车，单位 rad。 */
-#define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
-#define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
-#define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
-#define JUNCTION_TURN_SPEED_CM_S      40.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
-#define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
-#define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
-#define JUNCTION_CAPTURE_MAX_HALF_DIFF_CM_S 12.0f /* 非圆弧见线后位置半差上限，不再叠加高速放大。 */
-#define JUNCTION_CAPTURE_LOSS_GRACE_MS 30U /* 已见线后短暂失线先直行，避免立即恢复大差速扫转。 */
-#define JUNCTION_CLEAR_CENTER_MS       50U /* 离口交接须连续中心线，不能偶尔扫过中心就成功。 */
-#define JUNCTION_CLEAR_CENTER_CM       2.0f
-#define JUNCTION_CLEAR_MAX_CM         20.0f /* 尚未稳定回线时禁止沿旧航向跑出数十厘米。 */
-#define JUNCTION_RECAPTURE_LOOKAHEAD_CM 8.0f /* 以已见中心线点和规划出口轴进行有界回线。 */
-#define JUNCTION_RECAPTURE_BIAS_RAD    0.35f
-#define JUNCTION_RECAPTURE_MAX_HALF_RATIO 0.4f /* 回线半差请求比例上限；反馈分配后内轮仍保持正向。 */
-#define STEERING_FEEDBACK_MIN_CM_S      5.0f /* 外轮已可靠前进时，用实测轮速保留内轮纠偏余量。 */
+#define JUNCTION_CONFIRM_SAMPLES       3U
+#define JUNCTION_CONFIRM_DISTANCE_CM   0.10f
+#define JUNCTION_CONFIRM_TIMEOUT_MS    100U
+#define JUNCTION_CENTER_MEMORY_MS      250U
+#define JUNCTION_CENTER_MEMORY_CM      1.5f
+#define JUNCTION_ACTION_TIMEOUT_MS     3000U /* 90 degrees; larger custom angles scale proportionally. */
+#define JUNCTION_STRAIGHT_TIMEOUT_MS   4500U
+#define JUNCTION_CLEAR_TIMEOUT_MS      1500U
+#define JUNCTION_TURN_MIN_RAD          1.35f /* Threshold scaling helper reference; exit requires actual target. */
+#define JUNCTION_EXIT_CONFIRM_MS       50U
+#define JUNCTION_EXIT_CONFIRM_CM       0.25f
+/* 角度余量只配合加倍出口证据（100 ms / 0.5 cm）生效；
+ * 余量 = 目标角 5%（直角 4.5°），满角度只需连续中心线帧数。
+ * 动作超时仍不能豁免角度；错向/过转/超时保护不变。 */
+#define JUNCTION_EXIT_ANGLE_MARGIN_RATIO 0.05f
+#define JUNCTION_PASS_SPEED_CM_S       60.0f /* 非目标路口直行通过速度上限初值；仍受路段 cruise 封顶。 */
+#define JUNCTION_TURN_MAX_RAD          2.1f
+#define JUNCTION_WRONG_WAY_RAD         0.35f
+#define JUNCTION_CENTER_LIMIT          2.0f
+#define JUNCTION_CAPTURE_MIN_RAD       0.70f
+#define JUNCTION_CLEAR_MAX_CM          20.0f
+#define STEERING_FEEDBACK_MIN_CM_S     5.0f
 #define STEERING_FEEDBACK_MIN_HALF_CM_S 0.1f
-#define JUNCTION_CAPTURE_MIN_TURN_CM_S 0.8f /* 最小退出转角前的转向半差下限，防止位置/航向修正抵消。 */
-#define JUNCTION_CAPTURE_HEADING_KP   8.0f /* 捕获阶段向入口 ±90° 施加的航向半差，单位 (cm/s)/rad。 */
-#define JUNCTION_TURN_TARGET_RAD      1.570796327f /* 直角动作的估计航向目标，单位 rad。 */
-#define JUNCTION_TURN_SLOW_RAD        1.25f /* 约 72° 后降低外轮目标，减少冲过出口目标线。 */
-#define JUNCTION_TURN_SLOW_CM_S       3.0f /* 有线航向修正的速度归一化参考；无线续转不采用此低速上限。 */
-#define JUNCTION_CLEAR_DISTANCE_CM    3.0f /* 直行退出的最小前进距离，以及离口去重阶段的额外距离，单位 cm。 */
-/* 下一路口已进入标称位置前 5 cm 时，允许缩短上一弯的离口去重距离。
- * 仅已完成转角/出口确认的转弯使用；仍需这里的前进距离及新的连续窄线保持。 */
-#define JUNCTION_SHORT_CLEAR_CM       0.5f
-/* 紧邻路口的出口中心线附带入口侧孤立边缘分支：仅在已确认转弯内使用。 */
-#define JUNCTION_BRANCH_EXIT_OVERRUN_RAD 0.35f
-#define JUNCTION_BRANCH_EXIT_CONFIRM_MS 100U
-#define JUNCTION_BRANCH_EXIT_CONFIRM_CM 0.5f
+#define JUNCTION_CAPTURE_MIN_TURN_CM_S  0.8f
+#define JUNCTION_CAPTURE_CENTER_BIAS_CM_S 1.2f /* 仅居中且PID近零时补角；不覆盖非零位置纠偏。 */
+#define JUNCTION_CAPTURE_HEADING_KP    8.0f
+#define JUNCTION_TURN_TARGET_RAD       1.570796327f
+/* 未标定的转弯收敛初值：近目标角降低外轮目标，角速度阻尼不代表物理制动。 */
+#define JUNCTION_SETTLE_BAND_RAD       0.60f
+#define JUNCTION_SETTLE_SPEED_CM_S    16.0f
+#define JUNCTION_SETTLE_HEADING_KP    24.0f /* 近角度半差比例，受外轮上限约束。 */
+#define JUNCTION_YAW_DAMPING           2.5f /* (cm/s)/(rad/s)，输出轮速半差。 */
+#define JUNCTION_YAW_FILTER_TAU_S      0.030f
+#define JUNCTION_EXIT_SPEED_CM_S      16.0f /* 转弯 CLEARING 上限，另受 turn_speed/cruise 限制。 */
 
-
-/* ==================== 十一、路径距离窗口保护 ====================
- * 启动建立首段基准，切段保留转弯及离口的出口方向位移；整段行驶不设时间限制。
- * 越过距离窗口仍未确认路口则失败停车；路口确认和动作/离口仍有各自时限。
- * STOP 同样要求在窗口内确认路口，不能仅因到达预计里程就调用成功回调。
- */
+/* Count-navigation braking: measured calibration required before setting lengths. */
+#ifndef BRAKING_CALIBRATION_CONFIRMED
+#define BRAKING_CALIBRATION_CONFIRMED 1
+#endif
+#ifndef BRAKING_SAFE_DECEL_CM_S2
+#define BRAKING_SAFE_DECEL_CM_S2 120.0f
+#endif
+#define BRAKING_DISTANCE_MARGIN_CM 2.0f
+#define BRAKING_TARGET_JERK_CM_S3 800.0f
+#define MPU6050_CALIBRATION_MAX_BIAS_LSB 328.0f
+#define MPU6050_CALIBRATION_MAX_CENTRAL_SPAN_LSB 64.0f
+#define MPU6050_MAX_YAW_RATE_RAD_S 12.0f
+#define JUNCTION_SEARCH_TIMEOUT_MS 2000U
+#define JUNCTION_SEARCH_MAX_CM 12.0f
+#define JUNCTION_ENTRY_BRAKE_TIMEOUT_MS 1200U /* 入口滑行降速时限；2026-10-30 由 500 ms 放宽。 */
+#define JUNCTION_ENTRY_BRAKE_MAX_CM 10.0f     /* 入口滑行降速距离；2 cm 在百 cm/s 级只够几十 ms。 */
+#define JUNCTION_COUNT_CLEAR_MS 50U
+#define JUNCTION_COUNT_CLEAR_CM 2.0f /* 离口重新武装距离：防同一路口尾缘重复计数；路口间距须大于此值。 */
+#define JUNCTION_STRAIGHT_EXIT_MAX_WIDTH 3U /* 直行过图形的出口：居中且至多3路，侧边/宽图形不解锁。 */
+#define JUNCTION_ADJACENT_EXIT_MS 20U /* 已确认转弯出口后，短中心走廊与新分离分支联合交接。 */
+#define JUNCTION_ADJACENT_EXIT_CM 0.30f
+#define OPPORTUNISTIC_FALLBACK_ENABLED 0
 
 #endif

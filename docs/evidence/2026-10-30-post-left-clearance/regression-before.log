@@ -1,0 +1,1 @@
+Assertion failed: (p.index==1 && p.state==ROUTE_FOLLOW && p.junctions_seen==0), function test_clearance_lateral_motion, file test_navigation.c, line 179.

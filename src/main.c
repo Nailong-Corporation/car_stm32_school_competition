@@ -70,22 +70,22 @@ static uint8_t read_raw(void)
 
 static bool button_press(uint32_t now_ms)
 {
-    static bool initialized, candidate, stable;
-    static uint32_t changed_ms;
+    static bool button_initialized, button_candidate, button_stable;
+    static uint32_t button_changed_ms;
     bool pressed = HAL_GPIO_ReadPin(START_STOP_PORT, START_STOP_PIN) == GPIO_PIN_RESET;
-    if (!initialized) {
-        initialized = true;
-        candidate = stable = pressed;
-        changed_ms = now_ms;
+    if (!button_initialized) {
+        button_initialized = true;
+        button_candidate = button_stable = pressed;
+        button_changed_ms = now_ms;
         return false; /* Held-at-boot button never starts the car. */
     }
-    if (pressed != candidate) {
-        candidate = pressed;
-        changed_ms = now_ms;
+    if (pressed != button_candidate) {
+        button_candidate = pressed;
+        button_changed_ms = now_ms;
     }
-    if (candidate != stable && (uint32_t)(now_ms - changed_ms) >= BUTTON_DEBOUNCE_MS) {
-        stable = candidate;
-        return stable;
+    if (button_candidate != button_stable && (uint32_t)(now_ms - button_changed_ms) >= BUTTON_DEBOUNCE_MS) {
+        button_stable = button_candidate;
+        return button_stable;
     }
     return false;
 }
@@ -99,6 +99,27 @@ static bool watchdog_init(void)
     __HAL_DBGMCU_UNFREEZE_IWDG();
     return HAL_IWDG_Init(&watchdog) == HAL_OK;
 }
+
+#if MPU6050_ENABLED
+static void publish_imu_init(void)
+{
+    g_diagnostics.imu_enabled = true;
+    g_diagnostics.imu_ready = imu.ready;
+    g_diagnostics.imu_init_failure_stage = imu.init_failure_stage;
+    g_diagnostics.imu_address_7bit = imu.address_7bit;
+    g_diagnostics.imu_gyro_z_bias_lsb = imu.gyro_z_bias_lsb;
+    g_diagnostics.imu_gyro_z_raw = imu.gyro_z_raw;
+    g_diagnostics.imu_gyro_z_calibration_span_lsb = imu.gyro_z_calibration_span_lsb;
+    g_diagnostics.imu_gyro_z_calibration_central_span_lsb = imu.gyro_z_calibration_central_span_lsb;
+    g_diagnostics.imu_calibration_attempts = imu.calibration_attempts;
+    g_diagnostics.imu_init_attempts = imu.init_attempts;
+    g_diagnostics.imu_bus_recovery_count = imu.bus_recovery_count;
+    g_diagnostics.imu_last_i2c_status = imu.last_i2c_status;
+    g_diagnostics.imu_last_i2c_error = imu.last_i2c_error;
+    g_diagnostics.imu_last_who_am_i = imu.last_who_am_i;
+    g_diagnostics.imu_bus_line_mask = imu.bus_line_mask;
+}
+#endif
 
 void Error_Handler(void)
 {
@@ -116,15 +137,10 @@ int main(void)
     if (HAL_Init() != HAL_OK || !clock_init()) Error_Handler();
     sensor_gpio_init();
 #if MPU6050_ENABLED
-    /* Calibrate while the motor is in reset-safe standby, before enabling IWDG. */
-    if (!mpu6050_init(&imu)) {
-        g_diagnostics.imu_init_failure_stage = imu.init_failure_stage;
-        g_diagnostics.imu_address_7bit = imu.address_7bit;
-        g_diagnostics.imu_gyro_z_bias_lsb = imu.gyro_z_bias_lsb;
-        g_diagnostics.imu_gyro_z_raw = imu.gyro_z_raw;
-        g_diagnostics.imu_gyro_z_calibration_span_lsb = imu.gyro_z_calibration_span_lsb;
-        Error_Handler();
-    }
+    /* One bounded startup sequence, never while driving. Failed IMU calibration
+     * no longer traps START in a retry-only loop: the controller uses encoders. */
+    (void)mpu6050_init(&imu);
+    publish_imu_init();
 #endif
 #if ENCODER_CONTROL_ENABLED
     if (!encoder_init()) Error_Handler();
@@ -148,10 +164,7 @@ int main(void)
     g_diagnostics.imu_enabled = MPU6050_ENABLED != 0;
     g_diagnostics.pitch_stop_enabled = MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED;
 #if MPU6050_ENABLED
-    g_diagnostics.imu_ready = imu.ready;
-    g_diagnostics.imu_gyro_z_bias_lsb = imu.gyro_z_bias_lsb;
-    g_diagnostics.imu_gyro_z_calibration_span_lsb = imu.gyro_z_calibration_span_lsb;
-    g_diagnostics.imu_address_7bit = imu.address_7bit;
+    publish_imu_init();
 #endif
     if (!watchdog_init()) Error_Handler();
     uint32_t last_control_ms = HAL_GetTick();
@@ -183,7 +196,8 @@ int main(void)
             bool imu_valid = false;
             float imu_heading_rad = 0.0f;
 #if MPU6050_ENABLED
-            imu_valid = mpu6050_update(&imu, (float)interval / 1000.0f, &imu_heading_rad);
+            if (imu.ready && follow.heading_source == HEADING_IMU)
+                imu_valid = mpu6050_update(&imu, (float)interval / 1000.0f, &imu_heading_rad);
             g_diagnostics.imu_ready = imu_valid;
             g_diagnostics.imu_gyro_z_raw = imu.gyro_z_raw;
 #if MPU6050_PITCH_STOP_ENABLED
@@ -207,6 +221,11 @@ int main(void)
             line_follow_update_heading(&follow, observation, counts, now_ms,
                                (float)interval / 1000.0f, start_pending,
                                imu_valid, imu_heading_rad);
+            g_diagnostics.heading_source = follow.heading_source;
+            g_diagnostics.heading_fallback_reason = follow.heading_fallback_reason;
+            g_diagnostics.heading_fallback_ms = follow.heading_fallback_ms;
+            g_diagnostics.pitch_monitor_available = MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED &&
+                imu_valid && follow.heading_source == HEADING_IMU;
 #if MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED
             /* Tilt is a latched safety stop even in IDLE or a route auto-resume.
              * Run before motor_apply so no motor command from this cycle reaches STBY. */
@@ -259,7 +278,7 @@ int main(void)
             g_diagnostics.route_repeat_count = follow.route.repeat_count;
             g_diagnostics.route_completed_laps = follow.route.completed_laps;
             g_diagnostics.route_turn_capturing = follow.route.turn_capturing;
-            g_diagnostics.route_turn_forced = follow.route.turn_forced;
+            g_diagnostics.route_turn_forced = false;
             g_diagnostics.route_candidate_samples = follow.route.candidate_count;
             g_diagnostics.route_turn_rad = follow.odometry.heading_rad - follow.route.entry_heading;
             g_diagnostics.route_index = (uint32_t)follow.route.index;
@@ -274,11 +293,12 @@ int main(void)
             g_diagnostics.auto_resume_snapshot = follow.auto_resume_snapshot;
             g_diagnostics.auto_resume_count = follow.auto_resume_count;
             g_diagnostics.auto_resume_last_ms = follow.auto_resume_last_ms;
-            g_diagnostics.route_recovery_window_active = follow.route.recovery_window_active;
-            g_diagnostics.route_recovery_window_progress_cm = follow.route.recovery_window_active ?
-                follow.odometry.distance_cm - follow.route.recovery_window_origin_cm : 0.0f;
-            g_diagnostics.route_recovery_window_limit_cm = follow.route.recovery_window_active ?
-                fmaxf(2.0f * follow.route.steps[follow.route.index].tolerance, GRAY_FORWARD_OFFSET_CM) : 0.0f;
+            g_diagnostics.route_recovery_window_active = false;
+            g_diagnostics.route_recovery_window_progress_cm = 0.0f;
+            g_diagnostics.route_recovery_window_limit_cm = 0.0f;
+            g_diagnostics.route_junctions_seen = follow.route.junctions_seen;
+            g_diagnostics.route_final_segment_active = follow.route.final_segment_active;
+            g_diagnostics.route_final_segment_progress_cm = follow.odometry.distance_cm-follow.route.final_segment_origin_cm;
             if (HAL_IWDG_Refresh(&watchdog) != HAL_OK) Error_Handler();
         }
         __WFI(); /* SysTick wakes every ms; no blocking delay or serial output. */

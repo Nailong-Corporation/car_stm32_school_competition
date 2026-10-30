@@ -1,0 +1,129 @@
+
+warning: Couldn't find general-purpose registers in core file.
+
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = {
+  junctions_seen = 1,
+  passing_junction = false,
+  final_segment_active = true,
+  search_pending = false,
+  final_segment_origin_cm = 0,
+  search_origin_cm = 0,
+  search_ms = 0,
+  last_sample_ms = 6310,
+  measured_left_cm_s = 4.47961044,
+  measured_right_cm_s = 42.0388794,
+  steps = 0x8008130 <scalbnf+88>,
+  count = 4,
+  index = 0,
+  state = ROUTE_FAILED,
+  failure = ROUTE_FAILURE_TURN_LIMIT,
+  origin_cm = 0,
+  entry_cm = 52.0921364,
+  entry_heading = -0.0834725201,
+  clear_cm = 0,
+  approach_center_cm = 51.5725594,
+  action_start_heading = -0.0834725201,
+  segment_ms = 950,
+  phase_ms = 5330,
+  approach_center_ms = 5310,
+  exit_candidate_ms = 0,
+  exit_candidate_cm = 0,
+  exit_candidate_pending = false,
+  repeat_action = LEFT,
+  repeat_count = 0,
+  completed_laps = 0,
+  candidate_count = 0 '\000',
+  exit_count = 0 '\000',
+  approach_center_count = 0 '\000',
+  have_approach_center = false,
+  valid = true,
+  stop_pending = false,
+  callback_dispatched = false,
+  corner_arc_complete = true,
+  turn_capturing = false,
+  lap_boundary = false,
+  capture_line_seen = true,
+  line_exit_confirmed = false,
+  capture_line_ms = 6075,
+  line_exit_heading_rad = 0,
+  stop_callback = 0x8003f99 <line_follow_update_heading+3216>,
+  callback_context = 0x0,
+  turn_ended_on_line = false
+}
+type = struct {
+/*      0      |       1 */    LineState state;
+/*      1      |       1 */    LineStopReason stop_reason;
+/*      2      |       1 */    LineStartResult start_result;
+/* XXX  1-byte hole      */
+/*      4      |     100 */    Odometry odometry;
+/*    104      |     136 */    RoutePlanner route;
+/*    240      |     100 */    SpeedControl speed;
+/*    340      |       8 */    BrakingSlew braking_slew;
+/*    348      |       1 */    _Bool braking_active;
+/* XXX  3-byte hole      */
+/*    352      |       4 */    float braking_origin_cm;
+/*    356      |      36 */    Pid pid;
+/*    392      |      12 */    MotorCommand command;
+/*    404      |       1 */    _Bool have_reliable;
+/*    405      |       1 */    _Bool abnormal;
+/*    406      |       1 */    uint8_t valid_count;
+/* XXX  1-byte hole      */
+/*    408      |       4 */    float reliable_position;
+/*    412      |       4 */    float base;
+/*    416      |       4 */    float correction;
+/*    420      |       4 */    float left_target_cm_s;
+/*    424      |       4 */    float right_target_cm_s;
+/*    428      |       4 */    float hold_heading_rad;
+/*    432      |       4 */    float abnormal_origin_cm;
+/*    436      |       4 */    float held_pwm_correction;
+/*    440      |       4 */    float turn_yaw_rate_rad_s;
+/*    444      |       1 */    _Bool exit_anchor_valid;
+/*    445      |       1 */    _Bool exit_recovery_active;
+/* XXX  2-byte hole      */
+/*    448      |       4 */    float exit_anchor_x_cm;
+/*    452      |       4 */    float exit_anchor_y_cm;
+/*    456      |       4 */    float exit_axis_rad;
+/*    460      |       4 */    float exit_lateral_error_cm;
+/*    464      |       1 */    _Bool exit_accelerating;
+/* XXX  3-byte hole      */
+/*    468      |       4 */    float startup_elapsed_s;
+/*    472      |       4 */    uint32_t last_reliable_ms;
+/*    476      |       4 */    uint32_t sample_ms;
+/*    480      |       4 */    float sample_dt_s;
+/*    484      |      16 */    GrayObservation observation;
+/*    500      |       4 */    EncoderCounts sample_counts;
+/*    504      |       1 */    RouteState route_state_before_update;
+/* XXX  3-byte hole      */
+/*    508      |     128 */    LineStopSnapshot stop_snapshot;
+/*    636      |     128 */    LineStopSnapshot auto_resume_snapshot;
+/*    764      |       4 */    uint32_t auto_resume_count;
+/*    768      |       4 */    uint32_t auto_resume_last_ms;
+/*    772      |      52 */    StraightEntrySnapshot straight_entry_aligned;
+/*    824      |      52 */    StraightEntrySnapshot straight_entry_handoff;
+/*    876      |      96 */    TurnExitDiagnostics turn_exit[2];
+/*    972      |    1736 */    TurnTrace turn_trace;
+/*   2708      |       1 */    HeadingSource heading_source;
+/*   2709      |       1 */    HeadingFallbackReason heading_fallback_reason;
+/* XXX  2-byte hole      */
+/*   2712      |       4 */    uint32_t heading_fallback_ms;
+
+                               /* total size (bytes): 2716 */
+                             }
+type = struct {
+/*      0      |      36 */    Pid left;
+/*     36      |      36 */    Pid right;
+/*     72      |       4 */    float left_stall_s;
+/*     76      |       4 */    float right_stall_s;
+/*     80      |       4 */    float left_reverse_s;
+/*     84      |       4 */    float right_reverse_s;
+/*     88      |       4 */    float left_reverse_cm;
+/*     92      |       4 */    float right_reverse_cm;
+/*     96      |       1 */    _Bool reverse_pending;
+/*     97      |       1 */    SpeedFault fault;
+/*     98      |       1 */    uint8_t fault_wheel;
+/* XXX  1-byte padding   */
+
+                               /* total size (bytes):  100 */
+                             }

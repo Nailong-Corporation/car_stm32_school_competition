@@ -1,0 +1,1 @@
+Assertion failed: (fabsf((f.left_target_cm_s)-(f.right_target_cm_s))<.001f), function test_diode_straight_clearance, file test_turn_speed_switches.c, line 15.
