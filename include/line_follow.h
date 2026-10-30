@@ -78,6 +78,25 @@ typedef struct {
     uint32_t last_ms;
     uint8_t next, count;
 } TurnTrace;
+/* 路口入口逐帧历史：最近640 ms；动作提交/失败后冻结，正常切段后重新记录，自动恢复不清除。 */
+#define ENTRY_TRACE_CAPACITY 128U
+#define ENTRY_EVENT_CAPACITY 64U
+typedef struct {
+    uint32_t ms;
+    float progress_cm, left_speed, right_speed;
+    float prior_base, prior_left_target, prior_right_target;
+    float prior_left_pwm, prior_right_pwm; /* 上周期下发值，与本帧轮速配对检查响应。 */
+    uint8_t mask, prefilter_mask, seam_mask, kind;
+    uint8_t narrow_before, state_before, state_after, index;
+    uint8_t window_band; /* 0窗口前，1窗口内，2越窗，3 AUTO。 */
+} EntryTraceSample;
+typedef struct {
+    EntryTraceSample samples[ENTRY_TRACE_CAPACITY];
+    EntryTraceSample events[ENTRY_EVENT_CAPACITY]; /* 仅掩码、阶段或窗口变化时记录。 */
+    uint8_t next, count;
+    uint8_t event_next, event_count;
+    bool frozen;
+} EntryTrace;
 typedef struct {
     LineState state;
     LineStopReason stop_reason;
@@ -108,6 +127,7 @@ typedef struct {
     StraightEntrySnapshot straight_entry_aligned, straight_entry_handoff;
     TurnExitDiagnostics turn_exit[2]; /* 前两个弯的离口角度记录，START清零。 */
     TurnTrace turn_trace; /* 接受人工 START 清零；停止后读取 follow.turn_trace。 */
+    EntryTrace entry_trace; /* 入口证据，接受人工 START 或成功离口切段清零。 */
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,

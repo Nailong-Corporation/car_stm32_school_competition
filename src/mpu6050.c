@@ -25,14 +25,14 @@ static bool read_reg(Mpu6050 *imu, uint8_t reg, uint8_t *data, uint16_t count)
 {
     return HAL_I2C_Mem_Read(&imu->i2c, imu->address_7bit << 1U, reg,
                             I2C_MEMADD_SIZE_8BIT, data, count,
-                            MPU6050_I2C_TIMEOUT_MS) == HAL_OK;
+                            imu->ready ? MPU6050_I2C_TIMEOUT_MS : MPU6050_INIT_I2C_TIMEOUT_MS) == HAL_OK;
 }
 
 static bool write_reg(Mpu6050 *imu, uint8_t reg, uint8_t value)
 {
     return HAL_I2C_Mem_Write(&imu->i2c, imu->address_7bit << 1U, reg,
                              I2C_MEMADD_SIZE_8BIT, &value, 1,
-                             MPU6050_I2C_TIMEOUT_MS) == HAL_OK;
+                             imu->ready ? MPU6050_I2C_TIMEOUT_MS : MPU6050_INIT_I2C_TIMEOUT_MS) == HAL_OK;
 }
 
 static bool read_gyro_z(Mpu6050 *imu, int16_t *raw)
@@ -97,8 +97,18 @@ bool mpu6050_init(Mpu6050 *imu)
                 break;
             }
         }
-        if (!found && attempt + 1U < MPU6050_PROBE_ATTEMPTS)
+        if (!found && attempt + 1U < MPU6050_PROBE_ATTEMPTS) {
+            /* 仅上电、电机保持待机时恢复本机I2C状态，运行期不复位/重试。
+             * 无法修复从机持续拉低总线或接线故障；后续仍须WHO_AM_I成功。 */
+            ++imu->init_recovery_attempts;
+            imu->init_failure_stage = 1;
+            if (HAL_I2C_DeInit(&imu->i2c) != HAL_OK) return false;
+            __HAL_RCC_I2C1_FORCE_RESET();
+            __HAL_RCC_I2C1_RELEASE_RESET();
+            if (HAL_I2C_Init(&imu->i2c) != HAL_OK) return false;
+            imu->init_failure_stage = 2;
             HAL_Delay(MPU6050_PROBE_RETRY_MS);
+        }
     }
     if (!found) return false;
     imu->init_failure_stage = 3;

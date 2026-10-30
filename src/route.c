@@ -29,6 +29,8 @@ static void begin_segment(RoutePlanner *p, float distance_cm, uint32_t now_ms)
     p->online_samples = 0;
     p->online_ms = 0;
     p->turn_ended_on_line = false;
+    p->loss_branch_samples=0;
+    p->loss_branch_ready=false;
 }
 
 /**
@@ -41,10 +43,16 @@ bool route_is_narrow_line(GrayObservation obs)
         obs.white_count > 0U && obs.white_count <= SENSOR_MAX_REGION_WIDTH;
 }
 
+bool route_step_is_auto(RouteStep step)
+{
+    return step.distance == AUTO;
+}
+
 bool route_waiting_after_straight(const RoutePlanner *p, float distance_cm)
 {
     if (!p->valid || p->index == 0U || p->index >= p->count ||
-        p->steps[p->index - 1U].action != STRAIGHT) return false;
+        p->steps[p->index - 1U].action != STRAIGHT ||
+        route_step_is_auto(p->steps[p->index])) return false;
     Action action = p->steps[p->index].action;
     return (action == LEFT || action == RIGHT || action == CUSTOM_TURN) &&
         distance_cm - p->origin_cm < p->steps[p->index].distance;
@@ -67,8 +75,8 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
     p->valid = steps != NULL && count > 0U;
     for (size_t i = 0; p->valid && i < count; ++i) {
         RouteStep s = steps[i];
-        p->valid = isfinite(s.distance) && isfinite(s.tolerance) &&
-            s.distance > 0.0f && s.tolerance >= 0.0f && s.tolerance < s.distance &&
+        p->valid = (route_step_is_auto(s) || (isfinite(s.distance) && isfinite(s.tolerance) &&
+            s.distance > 0.0f && s.tolerance >= 0.0f && s.tolerance < s.distance)) &&
             (unsigned)s.action <= (unsigned)CUSTOM_TURN && s.speed > 0 &&
             (s.action != CUSTOM_TURN || (isfinite(s.angle_deg) &&
              s.angle_deg != 0.0f && fabsf(s.angle_deg) <= 360.0f)) &&
@@ -126,7 +134,8 @@ bool route_prepares_straight(const RoutePlanner *p)
 {
     if (!p->valid || p->index >= p->count || !route_uses_corner_arc(p)) return false;
     size_t next_index = p->lap_boundary ? 0U : p->index + 1U;
-    return next_index < p->count && p->steps[next_index].action == STRAIGHT;
+    return next_index < p->count && p->steps[next_index].action == STRAIGHT &&
+        !route_step_is_auto(p->steps[next_index]);
 }
 
 /* 编码器航向本身右转为正，不对 ±180°/360° 取模，以保留实际转动方向与圈数。 */
@@ -231,7 +240,7 @@ static void begin_action(RoutePlanner *p, float distance_cm, float heading_rad,
     p->action_start_heading = heading_rad;
     p->exit_candidate_pending = false;
     p->outgoing_cm = 0.0f;
-    if (p->steps[p->index].action == STRAIGHT) {
+    if (p->steps[p->index].action == STRAIGHT && !route_step_is_auto(p->steps[p->index])) {
         /* STRAIGHT 是按表通过的里程点，图形内部不要求存在中心线。
          * 入口窗口可提前/滞后触发，下一项仍从本项标称点起算。 */
         p->entry_cm = p->origin_cm + p->steps[p->index].distance;
@@ -284,7 +293,7 @@ static bool branch_exit_line(const RoutePlanner *p, GrayObservation obs, float h
         turn < angle-fminf(JUNCTION_EXIT_ANGLE_MARGIN_RAD,angle*.1f) ||
         turn > angle+JUNCTION_BRANCH_EXIT_OVERRUN_RAD) return false;
     size_t next = p->lap_boundary ? 0U : p->index+1U;
-    if (next >= p->count ||
+    if (next >= p->count || route_step_is_auto(p->steps[next]) ||
         p->outgoing_cm < p->steps[next].distance-JUNCTION_APPROACH_DISTANCE_CM ||
         p->outgoing_cm > p->steps[next].distance+p->steps[next].tolerance) return false;
     unsigned left=3, right=4;
@@ -345,6 +354,8 @@ bool route_resume(RoutePlanner *p, RouteState failed_phase, float distance_cm,
         p->recovery_window_origin_cm = distance_cm;
         p->have_approach_center = false;
         p->approach_center_count = p->narrow_count = p->candidate_count = 0;
+        p->loss_branch_samples=0;
+        p->loss_branch_ready=false;
         p->previous_line_ms = now_ms;
     } else {
         project_outgoing(p, distance_cm, heading_rad);
@@ -378,25 +389,29 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         return;
     }
     RouteStep s = p->steps[p->index];
-    if (s.action == STRAIGHT && !p->segment_heading_valid) {
+    bool automatic = route_step_is_auto(s);
+    if (s.action == STRAIGHT && !automatic && !p->segment_heading_valid) {
         p->segment_heading_rad = heading_rad;
         p->segment_heading_valid = true;
     }
     float progress = distance_cm - p->origin_cm;
     float window_progress = p->recovery_window_active ? distance_cm-p->recovery_window_origin_cm : progress;
-    float window_low = p->recovery_window_active ? 0.0f : s.distance-s.tolerance;
-    float window_high = p->recovery_window_active ?
-        fmaxf(2.0f*s.tolerance, GRAY_FORWARD_OFFSET_CM) : s.distance+s.tolerance;
+    float window_low = 0.0f, window_high = 0.0f;
+    if (!automatic) {
+        window_low = p->recovery_window_active ? 0.0f : s.distance-s.tolerance;
+        window_high = p->recovery_window_active ?
+            fmaxf(2.0f*s.tolerance, GRAY_FORWARD_OFFSET_CM) : s.distance+s.tolerance;
+    }
     if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
-        if (window_progress > window_high) {
+        if (!automatic && window_progress > window_high) {
             fail(p, ROUTE_FAILURE_WINDOW);
             return;
         }
     }
     if (p->state == ROUTE_FOLLOW || p->state == ROUTE_CANDIDATE) {
-        bool in_window = window_progress >= window_low && window_progress <= window_high;
+        bool in_window = automatic || (window_progress >= window_low && window_progress <= window_high);
         /* 末项的大容差不能使终点提前降速/转向；最早从标称位置前减速区开始确认。 */
-        if (!p->recovery_window_active && s.action == STOP &&
+        if (!automatic && !p->recovery_window_active && s.action == STOP &&
             progress < s.distance - JUNCTION_APPROACH_DISTANCE_CM)
             in_window = false;
         Action action = route_current_action(p);
@@ -404,15 +419,41 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
          * 必须走满本段标称距离，再允许强制入口或普通形状确认；自动恢复也不绕过。 */
         if (route_waiting_after_straight(p, distance_cm))
             in_window = false;
-        if (in_window && s.action == STRAIGHT) {
+        if (!automatic && in_window && s.action == STRAIGHT) {
             accept_step(p, distance_cm, heading_rad, now_ms, false);
             return;
         }
-        bool forced = in_window && (action == LEFT || action == RIGHT) &&
+        bool branch_match=in_window && junction_matches(p,obs,action,distance_cm,now_ms);
+#if JUNCTION_REQUIRE_DIRECTION_EVIDENCE
+        if (!in_window || (uint32_t)(now_ms-p->previous_line_ms)>CONTROL_MAX_INTERVAL_MS ||
+            (uint32_t)(now_ms-p->loss_branch_ms)>JUNCTION_LOSS_BRANCH_MAX_MS ||
+            distance_cm<p->loss_branch_cm || distance_cm-p->loss_branch_cm>JUNCTION_LOSS_BRANCH_MAX_CM) {
+            p->loss_branch_ready=false;
+            p->loss_branch_samples=0;
+        }
+        if (branch_match && (action==LEFT || action==RIGHT)) {
+            if ((uint32_t)(now_ms-p->previous_line_ms)>CONTROL_MAX_INTERVAL_MS)
+                p->loss_branch_samples=0;
+            if (p->loss_branch_samples<JUNCTION_LOSS_BRANCH_SAMPLES) ++p->loss_branch_samples;
+            p->loss_branch_ms=now_ms;
+            p->loss_branch_cm=distance_cm;
+            if (p->loss_branch_samples>=JUNCTION_LOSS_BRANCH_SAMPLES) p->loss_branch_ready=true;
+        } else {
+            p->loss_branch_samples=0;
+            uint8_t side=action==LEFT ? 0x03U : 0xc0U;
+            uint8_t opposite=action==LEFT ? 0xc0U : 0x03U;
+            if ((obs.line_mask&opposite)!=0U && (obs.line_mask&side)==0U)
+                p->loss_branch_ready=false;
+        }
+#endif
+        bool forced = !automatic && in_window && (action == LEFT || action == RIGHT) &&
+#if JUNCTION_REQUIRE_DIRECTION_EVIDENCE
+            (branch_match || (obs.line_mask==0 && p->loss_branch_ready)) &&
+#endif
             row_changed_abruptly(p, obs, now_ms);
         remember_line(p, obs, now_ms);
         if (forced) {
-            /* 不再等中心/指定分支、候选帧数或普通 PID 的在线判断。方向只取路径表。 */
+            /* 方向证据门禁已通过，不再等普通候选；纯丢线不能凭空提交动作。 */
             p->candidate_count = 0;
             accept_step(p, distance_cm, heading_rad, now_ms, forced);
             return;
@@ -427,9 +468,16 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
                 p->approach_center_cm = distance_cm;
             }
         } else p->approach_center_count = 0;
-        if (!in_window || !junction_matches(p, obs, action, distance_cm, now_ms)) {
+        if (!branch_match) {
             p->candidate_count = 0;
             p->state = ROUTE_FOLLOW;
+            return;
+        }
+        if (automatic || route_uses_corner_arc(p)) {
+            /* AUTO 和圆弧均在匹配路口形状的当帧提交动作。
+             * 数字圆弧仍须在距离窗口内，不能再等普通候选距离而驶过入口。
+             * AUTO 无距离先验，仍不能把丢线骤变当作路口。 */
+            accept_step(p, distance_cm, heading_rad, now_ms, false);
             return;
         }
         if (p->state == ROUTE_FOLLOW) {
@@ -650,7 +698,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         size_t next_index = p->lap_boundary ? 0U : p->index + 1U;
         if (next_index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
         float clearance = distance_cm - p->clear_cm;
-        if(action!=STRAIGHT && p->outgoing_cm>p->steps[next_index].distance+p->steps[next_index].tolerance) {
+        if(action!=STRAIGHT && !route_step_is_auto(p->steps[next_index]) && p->outgoing_cm>p->steps[next_index].distance+p->steps[next_index].tolerance) {
             fail(p,ROUTE_FAILURE_WINDOW);
             return; /* 不把已越过的下一路口交接成合法新路段。 */
         }
@@ -675,8 +723,9 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
                             clearance >= JUNCTION_CLEAR_DISTANCE_CM && stable_clear;
         if (s.action == STRAIGHT) {
             /* 下一窗口比常规 3 cm 去重更近时，在该窗口起点交接，不能压过下一路口。 */
-            float straight_clear = fminf(JUNCTION_CLEAR_DISTANCE_CM,
-                p->steps[next_index].distance - p->steps[next_index].tolerance);
+            float straight_clear = route_step_is_auto(p->steps[next_index]) ? JUNCTION_CLEAR_DISTANCE_CM :
+                fminf(JUNCTION_CLEAR_DISTANCE_CM,
+                      p->steps[next_index].distance - p->steps[next_index].tolerance);
             normal_clear = p->outgoing_cm >= straight_clear;
         }
         if (route_prepares_straight(p))
@@ -684,7 +733,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         /* 下一项临近时不继续固定 3 cm 离口，避免切段后窗口已耗尽。
          * 这里不放大/平移窗口、不清零继承里程；直行动作仍使用完整离口距离。
          * 转角与出口确认已在 EXECUTING 完成，再要求 0.5 cm 和新的连续窄线证据，允许出口线横移。 */
-        bool early_clear = fabsf(route_turn_target_rad(p)) >= JUNCTION_CAPTURE_MIN_RAD &&
+        bool early_clear = !route_step_is_auto(p->steps[next_index]) && fabsf(route_turn_target_rad(p)) >= JUNCTION_CAPTURE_MIN_RAD &&
             p->outgoing_cm >= p->steps[next_index].distance - JUNCTION_APPROACH_DISTANCE_CM &&
             p->outgoing_cm <= p->steps[next_index].distance + p->steps[next_index].tolerance &&
             clearance >= JUNCTION_SHORT_CLEAR_CM &&
@@ -697,7 +746,7 @@ void route_update(RoutePlanner *p, GrayObservation obs, float distance_cm,
         } else ++p->index;
         p->turn_capturing = false;
         if (p->index >= p->count) { fail(p, ROUTE_FAILURE_INVALID); return; }
-        bool short_segment = p->steps[p->index].distance <
+        bool short_segment = !route_step_is_auto(p->steps[p->index]) && p->steps[p->index].distance <
             CORNER_RADIUS_CM + GRAY_FORWARD_OFFSET_CM + JUNCTION_SHORT_CLEAR_CM;
         begin_segment(p, distance_cm - p->outgoing_cm, now_ms);
         p->segment_heading_valid = short_segment;

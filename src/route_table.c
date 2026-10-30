@@ -8,6 +8,9 @@
  * 保留用户路径表和真实进度，不能保证此短段路口可捕获。
  * STOP 同样需要在距离窗口内确认路口；ROUTE_REPEAT_COUNT 控制总轮数，
  * 非最终轮的 STOP 标记按 ROUTE_REPEAT_ACTION（当前 LEFT）转向/离口后回到首项。表内 60 cm/s 保留用户设置，须不超过 WHEEL_TARGET_MAX_CM_S。 */
+/* 第一列 distance 可填 AUTO，例如 {AUTO, 0.0f, LEFT, 60, 0.0f, false}。
+ * AUTO 忽略第二列 tolerance，沿线等待目标侧路口，检测到后同周期减速并执行。
+ * AUTO 支持 LEFT/RIGHT/CUSTOM_TURN/STRAIGHT/STOP；数字距离仍使用原窗口逻辑。 */
 /* 第六列 corner_arc_enabled：true 启用本项 90° 圆弧；false 使用原转弯。
  * STOP 非最终轮映射为左右转时也使用本项开关，最终轮仍正常停车。
  * STRAIGHT / 非 ±90° CUSTOM_TURN 不走圆弧，无论开关值。
@@ -25,10 +28,10 @@ const RouteStep route[] = {
     {70.0f, 16.0f, STOP, 80, 0.0f, true},
     */
     /* 赛道 2 */
-    {65.0f, 5.0f, LEFT, 200, 0.0f, true},
-    {219.0f, 16.0f, LEFT, 200, 0.0f, true},
-    {75.0f, 10.0f, LEFT, 200, 0.0f, true},
-    {219.0f, 16.0f, STOP, 200, 0.0f, true},
+    {65.0f, 12.0f, LEFT, 200, 0.0f, false}, /* 实测55.35 cm已见分支，窗口起点改为53 cm。 */
+    {190.0f, 16.0f, LEFT, 200, 0.0f, false},
+    {65.0f, 12.0f, LEFT, 200, 0.0f, false},
+    {219.0f, 16.0f, STOP, 200, 0.0f, false},
 
     /* 赛道 3
     {200.0f, 15.0f, RIGHT, 120, 0.0f, false},

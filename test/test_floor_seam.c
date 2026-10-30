@@ -101,7 +101,7 @@ static void test_junction_guard(void)
     route_start(&p,0,0); gray_sensor_init(&sensor);
     for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x18),9,0,5+5*i);
     for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0),9,0,30+5*i);
-    CHECK(p.state==ROUTE_EXECUTING && p.turn_forced); /* 真实无线原行为保留。 */
+    CHECK(p.state==ROUTE_FOLLOW && !p.turn_forced); /* 无目标侧分支证据的真实丢线也不能盲转。 */
     route_start(&p,0,0); gray_sensor_init(&sensor);
     for (unsigned i=0;i<5;++i) route_update(&p,sample(&sensor,0x18),9,0,5+5*i);
     for (unsigned i=0;i<3;++i) route_update(&p,sample(&sensor,0x1f),9,0,30+5*i);

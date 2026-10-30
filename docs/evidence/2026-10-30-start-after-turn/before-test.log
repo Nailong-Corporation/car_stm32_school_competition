@@ -1,0 +1,1 @@
+Assertion failed: (f.route.valid && f.route.failure == ROUTE_FAILURE_NONE), function main, file test_configured_start.c, line 27.

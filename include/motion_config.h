@@ -56,6 +56,7 @@
 #define MPU6050_GYRO_BIAS_SAMPLES      128U
 #define MPU6050_GYRO_CALIBRATION_MS    5U
 #define MPU6050_I2C_TIMEOUT_MS         2U
+#define MPU6050_INIT_I2C_TIMEOUT_MS   25U /* 仅电机待机的初始化阶段；运行期仍2 ms。 */
 
 /* MPU6050 俯仰防拿起保护：默认开启，只有 MPU6050_ENABLED=1 时生效。
  * 通过加速度计重力方向计算车体前后俯仰角的绝对值，超过 40° 连续
@@ -125,7 +126,7 @@
  * 同步采用测试工程的公共距离系数，统一修正里程、反馈轮速和编码器估计航向。
  * 保留下面的轮径/每圈计数原值，不重复补偿；直线测距通过不代表转角/路径已实测。
  */
-#define ODOMETRY_DISTANCE_SCALE       2.15f
+#define ODOMETRY_DISTANCE_SCALE       2.21f
 /* 2026-10-29：本轮编码器估计97.59°，用户目测约75°，暂取75/97.59≈0.77。
  * 只修正轮差到航向的比例，不改直线距离/轮速；目测初值，非精确转角标定。
  * 主机理想几何回归可显式置1，生产固件仅使用本头文件默认值。 */
@@ -185,7 +186,8 @@
 #define POSITION_KI_CM_S              0.0f   /* 白线位置积分系数初值。 */
 #define POSITION_KD_CM_S              0.025f /* 白线位置微分系数。 */
 #define POSITION_CURVE_SLOWDOWN       0.35f  /* 最大位置偏差时，相对路段基础速度的降速比例。 */
-/* 转弯速度功能独立开关：修改头文件后 pio run，不增加构建环境。 */
+/* 转弯速度功能独立开关：修改头文件后 pio run，不增加构建环境。
+ * AUTO 距离项检测路口后的减速始终生效，不受提前减速开关控制。 */
 #ifndef TURN_APPROACH_SLOWDOWN_ENABLED
 #define TURN_APPROACH_SLOWDOWN_ENABLED 1
 #endif
@@ -232,17 +234,30 @@
 
 /* 整排骤变使用极性转换和多数滤波后的 line_mask；仅当前 LEFT/RIGHT 距离窗口内生效。
  * 前一帧须属于连续 LINE_CONFIRM_SAMPLES 帧窄线，且间隔不超过合法控制周期上限。
- * 全丢线直接触发；其余要求至少 2 路目标，且满足下列任一明显变化。
+ * 生产入口还须满足下方方向证据门禁；全丢线本身不再代表目标路口。
  * 平滑单步横移 2 权重不会命中；这是形状启发式，不能识别真实曲线/元器件语义。
  */
 #define JUNCTION_ABRUPT_CHANGED_BITS   4U   /* 相邻两帧至少四路翻转。 */
 #define JUNCTION_ABRUPT_WIDTH_GROWTH   2U   /* 目标线路数一次增加至少两路。 */
 #define JUNCTION_ABRUPT_POSITION_JUMP  4.0f /* 窄线横向位置一次跳变的权重阈值。 */
+/* 用户确认目标前存在同侧支路：纯丢线不得单独提交转弯。
+ * 仅主机历史回归可显式设0比较旧行为；生产保持1。 */
+#ifndef JUNCTION_REQUIRE_DIRECTION_EVIDENCE
+#define JUNCTION_REQUIRE_DIRECTION_EVIDENCE 1
+#endif
+#if JUNCTION_REQUIRE_DIRECTION_EVIDENCE != 0 && JUNCTION_REQUIRE_DIRECTION_EVIDENCE != 1
+#error "JUNCTION_REQUIRE_DIRECTION_EVIDENCE must be 0 or 1"
+#endif
+#define JUNCTION_LOSS_BRANCH_SAMPLES 2U
+#define JUNCTION_LOSS_BRANCH_MAX_MS 100U
+#define JUNCTION_LOSS_BRANCH_MAX_CM 1.5f
 
-/* 仅路径模式：从表内路口标称位置前 5 cm 开始减速，不扣除距离容差。
- * 5 cm 是按用户反馈缩短后的待实车标定提前量；目标按速度平方随剩余距离插值，非实测制动距离。
+/* 仅数字路径项：在最早允许动作的位置前完成目标减速。
+ * 提前量为max(5 cm,(表速²-入弯速²)/(2a))；a为未标定规划值。
+ * 普通转弯终点为窗口起点，STOP仍受标称前5 cm确认门禁，STRAIGHT/AUTO除外。
  */
 #define JUNCTION_APPROACH_DISTANCE_CM 5.0f
+#define JUNCTION_APPROACH_DECEL_CM_S2 160.0f /* 规划减速度初值，尚非实测制动能力。 */
 #define JUNCTION_APPROACH_SPEED_CM_S 20.0f /* 入弯前及候选基础目标，与转弯动作速度独立。 */
 
 /* ==================== 十、路口动作、转角与离口去重 ====================
@@ -266,7 +281,7 @@
 #define JUNCTION_WRONG_WAY_RAD        0.35f /* 反向转角超过此值则异常停车，单位 rad。 */
 #define JUNCTION_CENTER_LIMIT         2.0f /* 退出动作时允许的中心位置误差，单位为传感器权重。 */
 #define STRAIGHT_ENTRY_ALIGN_RAD      0.05f /* 圆弧接 STRAIGHT：出口航向误差最多约 2.9°，连续 3 帧对齐后离口。 */
-#define JUNCTION_TURN_SPEED_CM_S      40.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
+#define JUNCTION_TURN_SPEED_CM_S      80.0f /* 轴中点圆弧速度；18 对应内/外轮 4.95/31.05 cm/s。 */
 #define JUNCTION_CAPTURE_MIN_RAD     0.70f /* 约 40° 后允许捕获侧边窄出口线，仍须满足最终退出转角。 */
 #define JUNCTION_CAPTURE_SPEED_CM_S   6.0f /* 捕获后前进找正的基础目标，避免慢速扫线代替沿线收敛。 */
 #define JUNCTION_CAPTURE_MAX_HALF_DIFF_CM_S 12.0f /* 非圆弧见线后位置半差上限，不再叠加高速放大。 */

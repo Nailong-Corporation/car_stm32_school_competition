@@ -411,6 +411,7 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
             f->straight_entry_aligned = f->straight_entry_handoff = (StraightEntrySnapshot){0};
             memset(f->turn_exit,0,sizeof(f->turn_exit));
             memset(&f->turn_trace,0,sizeof(f->turn_trace));
+            memset(&f->entry_trace,0,sizeof(f->entry_trace));
             f->exit_anchor_valid=f->exit_recovery_active=false;
             f->exit_lateral_error_cm=0;
             f->start_result = LINE_START_ACCEPTED;
@@ -441,7 +442,54 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
     if(previous_route==ROUTE_CLEARING && previous_index<2 && f->turn_exit[previous_index].valid)
         f->turn_exit[previous_index].minimum_turn_rad=fminf(
             f->turn_exit[previous_index].minimum_turn_rad,previous_turn);
+    uint8_t narrow_before=f->route.narrow_count;
+    float entry_progress=f->odometry.distance_cm-f->route.origin_cm;
     route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
+    /* 正常完成离口后开始记录下一路口；失败后的自动恢复不经过此交接，
+     * 因此仍保留首次失败证据。否则第一个弯会永久占住整轮入口记录。 */
+    if (previous_route==ROUTE_CLEARING && f->route.state==ROUTE_FOLLOW)
+        memset(&f->entry_trace,0,sizeof(f->entry_trace));
+    if (!f->entry_trace.frozen &&
+        (previous_route==ROUTE_FOLLOW || previous_route==ROUTE_CANDIDATE)) {
+        EntryTrace *trace=&f->entry_trace;
+        RouteStep entry_step=f->route.steps[previous_index];
+        float window_progress=f->route.recovery_window_active ?
+            f->odometry.distance_cm-f->route.recovery_window_origin_cm : entry_progress;
+        float low=f->route.recovery_window_active ? 0 : entry_step.distance-entry_step.tolerance;
+        float high=f->route.recovery_window_active ?
+            fmaxf(2*entry_step.tolerance,GRAY_FORWARD_OFFSET_CM) : entry_step.distance+entry_step.tolerance;
+        EntryTraceSample sample={
+            .ms=now_ms, .progress_cm=entry_progress,
+            .left_speed=f->odometry.left_speed_cm_s, .right_speed=f->odometry.right_speed_cm_s,
+            .prior_base=f->base, .prior_left_target=f->left_target_cm_s,
+            .prior_right_target=f->right_target_cm_s,
+            .prior_left_pwm=f->command.left, .prior_right_pwm=f->command.right,
+            .mask=obs.line_mask, .prefilter_mask=obs.prefilter_mask,
+            .seam_mask=obs.seam_mask, .kind=(uint8_t)obs.kind,
+            .narrow_before=narrow_before, .state_before=(uint8_t)previous_route,
+            .state_after=(uint8_t)f->route.state,
+            .index=(uint8_t)(previous_index>UINT8_MAX ? UINT8_MAX : previous_index),
+            .window_band=route_step_is_auto(entry_step) ? 3U :
+                window_progress<low ? 0U : window_progress>high ? 2U : 1U
+        };
+        trace->samples[trace->next]=sample;
+        trace->next=(uint8_t)((trace->next+1U)%ENTRY_TRACE_CAPACITY);
+        if (trace->count<ENTRY_TRACE_CAPACITY) ++trace->count;
+        /* 长时间同样的无线帧不能淹没早先的分支/丢线/窗口开放事件。 */
+        EntryTraceSample *last=&trace->events[(trace->event_next+ENTRY_EVENT_CAPACITY-1U)%ENTRY_EVENT_CAPACITY];
+        if (trace->event_count==0 || sample.mask!=last->mask ||
+            sample.prefilter_mask!=last->prefilter_mask || sample.seam_mask!=last->seam_mask ||
+            sample.kind!=last->kind || sample.state_before!=last->state_before ||
+            sample.state_after!=last->state_after || sample.index!=last->index ||
+            sample.window_band!=last->window_band) {
+            trace->events[trace->event_next]=sample;
+            trace->event_next=(uint8_t)((trace->event_next+1U)%ENTRY_EVENT_CAPACITY);
+            if (trace->event_count<ENTRY_EVENT_CAPACITY) ++trace->event_count;
+        }
+    }
+    if (f->route.state==ROUTE_FAILED ||
+        (previous_route!=ROUTE_EXECUTING && f->route.state==ROUTE_EXECUTING))
+        f->entry_trace.frozen=true;
     if(previous_route!=ROUTE_EXECUTING && f->route.state==ROUTE_EXECUTING) {
         f->exit_anchor_valid=false;
         f->exit_lateral_error_cm=0;
@@ -507,23 +555,27 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
         progress = f->route.outgoing_cm;
     }
     float base_speed = (float)speed_step.speed;
-    /* 按表内路口位置前 5 cm 规划减速；容差窗口只决定是否允许确认路口。
-     * 窗口内提前确认的路口仍立即进入候选低速或转弯动作。
-     * v² 随剩余距离线性变化，对理想跟随目标的直线行驶相当于恒定减速度。
-     * 这里只改变速度，不放宽 route_update 的距离/形状确认门禁。
+    /* 在最早允许提交路口动作的位置前完成目标减速。
+     * v² <= slow² + 2*a*remaining，至少保留5 cm减速区；高速段自动提前。
+     * STOP最早确认点还受标称位置前5 cm门禁限制；STRAIGHT/AUTO不做距离减速。
+     * 规划减速度不是已标定的机械制动能力，入口仍由route_update独立确认。
      */
-    if (speed_step.action != STRAIGHT && f->route.recovery_window_active &&
+    if (!route_step_is_auto(speed_step) && speed_step.action != STRAIGHT && f->route.recovery_window_active &&
         (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE))
         base_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
-    bool approach_slow = TURN_APPROACH_SLOWDOWN_ENABLED &&
+    bool approach_slow = !route_step_is_auto(speed_step) && TURN_APPROACH_SLOWDOWN_ENABLED &&
         (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE ||
          (TURN_EXIT_ACCEL_ENABLED && f->route.state == ROUTE_CLEARING && step.action != STRAIGHT));
     float slow_speed = fminf(base_speed, JUNCTION_APPROACH_SPEED_CM_S);
-    float remaining = speed_step.distance - progress;
+    float entry_lead = speed_step.action == STOP ?
+        fminf(speed_step.tolerance, JUNCTION_APPROACH_DISTANCE_CM) : speed_step.tolerance;
+    float remaining = speed_step.distance - entry_lead - progress;
+    float braking_distance = fmaxf(JUNCTION_APPROACH_DISTANCE_CM,
+        (base_speed*base_speed-slow_speed*slow_speed)/(2.0f*JUNCTION_APPROACH_DECEL_CM_S2));
     if (approach_slow && speed_step.action != STRAIGHT && (f->route.state == ROUTE_CANDIDATE || remaining <= 0.0f)) {
         base_speed = slow_speed;
-    } else if (approach_slow && speed_step.action != STRAIGHT && remaining < JUNCTION_APPROACH_DISTANCE_CM) {
-        float fraction = remaining / JUNCTION_APPROACH_DISTANCE_CM;
+    } else if (approach_slow && speed_step.action != STRAIGHT && remaining < braking_distance) {
+        float fraction = remaining / braking_distance;
         base_speed = sqrtf(slow_speed * slow_speed +
                            (base_speed * base_speed - slow_speed * slow_speed) * fraction);
     }
@@ -539,7 +591,8 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
         }
         f->abnormal = false;
         f->state = LINE_JUNCTION;
-        float turn_outer = TURN_APPROACH_SLOWDOWN_ENABLED && route_current_action(&f->route) != STRAIGHT ?
+        float turn_outer = (TURN_APPROACH_SLOWDOWN_ENABLED || route_step_is_auto(step)) &&
+            route_current_action(&f->route) != STRAIGHT ?
             fminf((float)step.speed, JUNCTION_APPROACH_SPEED_CM_S) : (float)step.speed;
         float turn_base = fminf(turn_outer, JUNCTION_TURN_SPEED_CM_S);
         float correction;
@@ -726,7 +779,7 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
         f->abnormal = false;
         straight_targets(f, base_speed,
                 HEADING_KP_CM_S_PER_RAD * (f->route.segment_heading_rad - f->odometry.heading_rad), dt);
-    } else if (step.action == STRAIGHT && f->route.state == ROUTE_FOLLOW) {
+    } else if (step.action == STRAIGHT && !route_step_is_auto(step) && f->route.state == ROUTE_FOLLOW) {
         /* 连续 STRAIGHT 之间也可能仍在电阻内部：窗口前沿用路段轴，不能重新跟随侧线。 */
         pid_reset(&f->pid);
         f->state = LINE_TRACKING;

@@ -1,0 +1,4 @@
+AUTO route passed: invert=0 approach=0 (305 checks)
+AUTO route passed: invert=0 approach=1 (305 checks)
+AUTO route passed: invert=1 approach=0 (305 checks)
+AUTO route passed: invert=1 approach=1 (305 checks)

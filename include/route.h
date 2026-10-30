@@ -3,11 +3,14 @@
 #include "gray_sensor.h"
 #include <stddef.h>
 
+/* 距离列填 AUTO：按下一路口触发，完全忽略 tolerance。 */
+#define AUTO (-1.0f)
+
 typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
 typedef struct {
-    float distance;   /* cm from start / previous junction reference point */
-    float tolerance;  /* inclusive +/- cm intersection window */
-    Action action;    /* 显式 STRAIGHT 为里程通过点，不要求图形中心线；转弯/STOP 仍需确认。 */
+    float distance;   /* cm from start / previous junction reference point, or AUTO */
+    float tolerance;  /* inclusive +/- cm intersection window; ignored for AUTO */
+    Action action;    /* 数字 STRAIGHT 为里程点；AUTO 各动作均由路口形状触发。 */
     int speed;        /* target forward speed, cm/s, NOT PWM */
     float angle_deg;  /* CUSTOM_TURN only: (0, 360] clockwise, [-360, 0) counterclockwise. */
     bool corner_arc_enabled; /* true: 90° 圆弧切角；false: 原转弯控制。 */
@@ -66,6 +69,10 @@ typedef struct {
     uint32_t online_ms;
     bool turn_ended_on_line; /* 本项因满 1 s 在线或超时在线转入离口；切段/START 清零。 */
     uint8_t exit_line_mask; /* 本帧路径出口区域；不修改原始灰度观测。 */
+    uint8_t loss_branch_samples;
+    bool loss_branch_ready;
+    uint32_t loss_branch_ms;
+    float loss_branch_cm;
 } RoutePlanner;
 
 extern const RouteStep route[];
@@ -86,7 +93,8 @@ float route_turn_target_rad(const RoutePlanner *planner);
 float route_turn_threshold_rad(const RoutePlanner *planner, float right_angle_threshold);
 uint32_t route_action_timeout_ms(const RoutePlanner *planner);
 bool route_is_narrow_line(GrayObservation obs);
-/* STRAIGHT 后的转弯必须走满本段标称距离，提前容差内仍保持出口航向。 */
+bool route_step_is_auto(RouteStep step);
+/* STRAIGHT 后的数字距离转弯须走满标称距离；AUTO 不使用此距离门禁。 */
 bool route_waiting_after_straight(const RoutePlanner *planner, float distance_cm);
 /* 90° 圆弧后紧接显式 STRAIGHT：图形入口前即按出口航向保护，不能借用普通捕线。 */
 bool route_prepares_straight(const RoutePlanner *planner);

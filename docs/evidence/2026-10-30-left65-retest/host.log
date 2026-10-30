@@ -1,0 +1,24 @@
+AUTO route passed: invert=0 approach=0 (943 checks)
+AUTO route passed: invert=0 approach=1 (943 checks)
+AUTO route passed: invert=1 approach=0 (943 checks)
+AUTO route passed: invert=1 approach=1 (943 checks)
+PASS: turn approach=0 exit=0 reverse brake=0 (5488 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=0 exit=0 reverse brake=1 (5440 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=0 exit=1 reverse brake=0 (5490 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=0 exit=1 reverse brake=1 (5442 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=1 exit=0 reverse brake=0 (5490 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=1 exit=0 reverse brake=1 (5442 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=1 exit=1 reverse brake=0 (5492 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: turn approach=1 exit=1 reverse brake=1 (5444 checks)
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+PASS: MPU fixed median calibration; centered-line button START accepted; spike rejection; probe/bus faults; stationary/90deg integration
+Assertion failed: (fabsf(o.distance_cm-wheel*.5f)<.001f), function main, file test_heading_scale.c, line 26.
+test/run_host_tests.sh: line 74:  3763 Abort trap: 6           "$test_binary"

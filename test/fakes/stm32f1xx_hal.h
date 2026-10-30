@@ -23,8 +23,11 @@ typedef struct { void *Instance; I2C_InitTypeDef Init; } I2C_HandleTypeDef;
 #define GPIO_MODE_AF_OD 3U
 #define __HAL_RCC_AFIO_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_I2C1_CLK_ENABLE() ((void)0)
+#define __HAL_RCC_I2C1_FORCE_RESET() ((void)0)
+#define __HAL_RCC_I2C1_RELEASE_RESET() ((void)0)
 #define __HAL_AFIO_REMAP_I2C1_ENABLE() ((void)0)
 HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *i2c);
+HAL_StatusTypeDef HAL_I2C_DeInit(I2C_HandleTypeDef *i2c);
 HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *i2c, uint16_t address, uint16_t reg,
                                 uint16_t size, uint8_t *data, uint16_t count, uint32_t timeout);
 HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *i2c, uint16_t address, uint16_t reg,

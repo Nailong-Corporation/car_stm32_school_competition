@@ -16,6 +16,7 @@ typedef struct {
     uint8_t init_failure_stage;
     TiltGuard pitch_guard;
     bool ready;
+    uint8_t init_recovery_attempts; /* 启动探测失败后实际执行的I2C外设重初始化次数。 */
 } Mpu6050;
 
 /* Must be called once with motors stopped; calibrates the stationary gyro bias. */

@@ -1,0 +1,1 @@
+Assertion failed: (p.state==ROUTE_EXECUTING && !p.turn_forced), function test_numeric_arc_immediate_entry, file test_route_auto.c, line 175.

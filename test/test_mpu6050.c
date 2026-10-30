@@ -10,10 +10,14 @@ GPIO_TypeDef fake_gpio_a, fake_gpio_b;
 static uint8_t registers[128];
 static unsigned samples, scenario;
 static unsigned probe_reads, delayed_ms;
+static unsigned recovery_calls, last_timeout;
 static int16_t stationary_raw = -5;
 void HAL_GPIO_Init(GPIO_TypeDef *port, GPIO_InitTypeDef *gpio) { (void)port; (void)gpio; }
 void HAL_Delay(uint32_t ms) { assert(ms > 0); delayed_ms += ms; }
-HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *i2c) { (void)i2c; return HAL_OK; }
+HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *i2c)
+{ (void)i2c; return scenario==14 && recovery_calls>0 ? HAL_ERROR : HAL_OK; }
+HAL_StatusTypeDef HAL_I2C_DeInit(I2C_HandleTypeDef *i2c)
+{ (void)i2c; ++recovery_calls; return HAL_OK; }
 HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *i2c, uint16_t address, uint16_t reg,
         uint16_t size, uint8_t *data, uint16_t count, uint32_t timeout)
 {
@@ -25,12 +29,14 @@ HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *i2c, uint16_t address, ui
 HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *i2c, uint16_t address, uint16_t reg,
         uint16_t size, uint8_t *data, uint16_t count, uint32_t timeout)
 {
-    (void)i2c; (void)address; (void)size; (void)timeout;
+    (void)i2c; (void)address; (void)size;
+    last_timeout=timeout;
     memset(data, 0, count);
     if (reg == 0x75U) {
         assert(delayed_ms >= MPU6050_POWER_SETTLE_MS);
         ++probe_reads;
-        if (scenario == 9 || (scenario == 7 && probe_reads <= 2) ||
+        if (scenario == 9 || ((scenario==13 || scenario==14) && recovery_calls==0) ||
+            (scenario == 7 && probe_reads <= 2) ||
             (scenario == 8 && address != (0x69U << 1U))) return HAL_ERROR;
         *data = scenario == 10 ? 0x00U : 0x68U;
     }
@@ -60,6 +66,16 @@ HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *i2c, uint16_t address, uin
 int main(void)
 {
     Mpu6050 imu;
+    scenario=13; recovery_calls=probe_reads=delayed_ms=samples=0;
+    assert(mpu6050_init(&imu) && imu.ready);
+    assert(recovery_calls==1 && imu.init_recovery_attempts==1);
+    assert(last_timeout==MPU6050_INIT_I2C_TIMEOUT_MS);
+    float recovered_heading=0;
+    assert(mpu6050_update(&imu,.005f,&recovered_heading));
+    assert(last_timeout==MPU6050_I2C_TIMEOUT_MS);
+    scenario=14; recovery_calls=probe_reads=delayed_ms=samples=0;
+    assert(!mpu6050_init(&imu) && !imu.ready && imu.init_failure_stage==1);
+    assert(recovery_calls==1);
     for (scenario = 3; scenario <= 5; ++scenario) {
         samples = 0;
         assert(!mpu6050_init(&imu) && !imu.ready);
@@ -84,6 +100,7 @@ int main(void)
         } else {
             assert(!ok && !imu.ready && imu.init_failure_stage == 2);
             assert(probe_reads == 2U * MPU6050_PROBE_ATTEMPTS);
+            assert(imu.init_recovery_attempts==MPU6050_PROBE_ATTEMPTS-1U);
             assert(delayed_ms == MPU6050_POWER_SETTLE_MS +
                    (MPU6050_PROBE_ATTEMPTS - 1U) * MPU6050_PROBE_RETRY_MS);
         }

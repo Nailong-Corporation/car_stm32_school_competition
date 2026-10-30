@@ -1,0 +1,39 @@
+PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup
+PASS: MPU yaw/IMU fault lock; tilt remains stopped until level + explicit START; IDLE pickup/0x30 restart
+GRAY_INVERT_ENABLED=1
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+Assertion failed: (f.route.index==2 && f.route.state==ROUTE_FOLLOW), function test_spatial_short_s, file test_navigation.c, line 2182.
+test/.auto_remaining.sh: line 26: 81775 Abort trap: 6           "$test_binary"
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+GRAY_INVERT_ENABLED=0
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production route/raw grayscale START accepted; no-line, excessive speed and enabled IMU fault gates retained
+Assertion failed: (f.route.index==2 && f.route.state==ROUTE_FOLLOW), function test_spatial_short_s, file test_navigation.c, line 2182.
+test/.auto_remaining.sh: line 26: 81909 Abort trap: 6           "$test_binary"
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: seam filter=1 polarity=1 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=1 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=1; 782 checks
+PASS: seam filter=1 polarity=0 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=0 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=1; 782 checks
+REMAINING_FAILURES=2

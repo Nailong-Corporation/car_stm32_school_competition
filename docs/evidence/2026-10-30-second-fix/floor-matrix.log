@@ -1,0 +1,12 @@
+PASS: seam filter=0 polarity=0 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=1; 782 checks
+PASS: seam filter=1 polarity=0 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=1 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=1; 782 checks
+PASS: seam filter=1 polarity=1 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=1; 837 checks

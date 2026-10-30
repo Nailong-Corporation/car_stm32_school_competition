@@ -1,0 +1,2 @@
+Assertion failed: (f.route.index==2 && f.route.state==ROUTE_FOLLOW), function test_spatial_short_s, file test_navigation.c, line 2182.
+Assertion failed: (f.route.index==2 && f.route.state==ROUTE_FOLLOW), function test_spatial_short_s, file test_navigation.c, line 2182.
