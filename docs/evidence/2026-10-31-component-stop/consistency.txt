@@ -1,0 +1,1 @@
+Local ELF layout: snapshots byte-identical=True, size=128. Flash not compared.

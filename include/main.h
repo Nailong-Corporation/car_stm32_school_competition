@@ -57,6 +57,10 @@ typedef struct {
     uint32_t imu_bus_recovery_count, imu_last_i2c_status, imu_last_i2c_error;
     uint8_t imu_last_who_am_i;
     uint8_t imu_bus_line_mask;
+    JunctionEvidence route_candidate_kind, route_last_confirmed_kind;
+    JunctionReject route_candidate_reject;
+    uint8_t route_candidate_sides;
+    uint32_t route_candidate_restarts, route_smooth_edge_rejections;
 } ControlDiagnostics;
 
 /* Debugger access only. 0 = none, 1 = one-shot start, 2 = stop. No ISR writes. */

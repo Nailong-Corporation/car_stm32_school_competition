@@ -61,6 +61,8 @@ typedef struct {
     uint8_t exit_line_mask;
     bool exit_recovery_active;
     float exit_lateral_error_cm;
+    uint32_t component_recovery_age_ms;
+    float component_recovery_progress_cm;
     HeadingSource heading_source;
     HeadingFallbackReason heading_fallback_reason;
     uint32_t heading_fallback_ms;
@@ -89,6 +91,23 @@ typedef struct {
     uint32_t last_ms;
     uint8_t next, count;
 } TurnTrace;
+/* Full control-period input/output-state record; freezes at first stop.
+ * Raw GPIO enables offline replay through the actual sensor filter. */
+#define NAVIGATION_TRACE_CAPACITY 128U
+typedef struct {
+    uint32_t ms;
+    float dt_s, heading_rad, distance_cm, left_speed_cm_s, right_speed_cm_s;
+    uint32_t route_index;
+    uint16_t junctions_seen;
+    EncoderCounts counts;
+    uint8_t raw_mask, line_mask, prefilter_mask, observation;
+    uint8_t route_before, route_after, evidence, sides, rejection, heading_source;
+    uint8_t candidate_samples, stop_reason;
+} NavigationTraceSample;
+typedef struct {
+    NavigationTraceSample samples[NAVIGATION_TRACE_CAPACITY];
+    uint16_t next, count;
+} NavigationTrace;
 typedef struct {
     LineState state;
     LineStopReason stop_reason;
@@ -126,6 +145,7 @@ typedef struct {
     HeadingSource heading_source;
     HeadingFallbackReason heading_fallback_reason;
     uint32_t heading_fallback_ms; /* Sticky until line_follow_init / MCU reset. */
+    NavigationTrace navigation_trace;
 } LineFollow;
 void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,

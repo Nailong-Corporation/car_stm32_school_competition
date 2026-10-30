@@ -1,0 +1,1 @@
+Assertion failed: (p.junctions_seen==0 && p.candidate_restarts>0), function test_branch_identity, file test_junction_evidence.c, line 15.

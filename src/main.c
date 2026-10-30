@@ -280,6 +280,12 @@ int main(void)
             g_diagnostics.route_turn_capturing = follow.route.turn_capturing;
             g_diagnostics.route_turn_forced = false;
             g_diagnostics.route_candidate_samples = follow.route.candidate_count;
+            g_diagnostics.route_candidate_kind=follow.route.candidate_kind;
+            g_diagnostics.route_last_confirmed_kind=follow.route.last_confirmed_kind;
+            g_diagnostics.route_candidate_reject=follow.route.candidate_reject;
+            g_diagnostics.route_candidate_sides=follow.route.candidate_sides;
+            g_diagnostics.route_candidate_restarts=follow.route.candidate_restarts;
+            g_diagnostics.route_smooth_edge_rejections=follow.route.smooth_edge_rejections;
             g_diagnostics.route_turn_rad = follow.odometry.heading_rad - follow.route.entry_heading;
             g_diagnostics.route_index = (uint32_t)follow.route.index;
             g_diagnostics.stop_snapshot = follow.stop_snapshot;

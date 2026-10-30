@@ -1,0 +1,8 @@
+warning: Couldn't find general-purpose registers in core file.
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = (LineStopSnapshot *) 0x20000340 <follow+528>
+$2 = (LineStopSnapshot *) 0x20000d6c <g_diagnostics+140>
+$3 = 128
+$4 = 2 '\002'
+$5 = 48 '0'

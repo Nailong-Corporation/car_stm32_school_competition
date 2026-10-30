@@ -238,6 +238,10 @@
  */
 #define JUNCTION_CONFIRM_SAMPLES       3U
 #define JUNCTION_CONFIRM_DISTANCE_CM   0.10f
+#define JUNCTION_EDGE_CONFIRM_SAMPLES    4U /* 弱证据：边缘L形或分离分支，不与强候选共用三帧门槛。 */
+#define JUNCTION_EDGE_CONFIRM_CM        0.15f
+#define JUNCTION_EDGE_MAX_WIDTH           3U
+#define JUNCTION_SMOOTH_POSITION_STEP    2.0f /* 重叠单线逐步横移，不能单凭移到边缘计数。 */
 #define JUNCTION_CONFIRM_TIMEOUT_MS    100U
 #define JUNCTION_CENTER_MEMORY_MS      250U
 #define JUNCTION_CENTER_MEMORY_CM      1.5f
@@ -270,6 +274,9 @@
 #define JUNCTION_YAW_DAMPING           2.5f /* (cm/s)/(rad/s)，输出轮速半差。 */
 #define JUNCTION_YAW_FILTER_TAU_S      0.030f
 #define JUNCTION_EXIT_SPEED_CM_S      16.0f /* 转弯 CLEARING 上限，另受 turn_speed/cruise 限制。 */
+#define COMPONENT_RECOVERY_SPEED_CM_S 16.0f /* 已捕线近出口/离口遇图形：保持进入时航向找线。 */
+#define COMPONENT_RECOVERY_MAX_CM     12.0f
+#define COMPONENT_RECOVERY_TIMEOUT_MS 1200U
 
 /* Count-navigation braking: measured calibration required before setting lengths. */
 #ifndef BRAKING_CALIBRATION_CONFIRMED

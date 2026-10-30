@@ -28,7 +28,7 @@ static void update(RoutePlanner *p,float *d,uint32_t *t,uint8_t m,float h,unsign
 static void init(RoutePlanner *p,const RouteStep *s,size_t n)
 {route_init(p,s,n,NULL,NULL);p->repeat_count=1;route_start(p,0,0);CHECK(p->valid);}
 static void junction(RoutePlanner *p,float *d,uint32_t *t,uint8_t branch,float h)
-{update(p,d,t,0x18,h,4);update(p,d,t,branch,h,3);}
+{update(p,d,t,0x18,h,4);update(p,d,t,branch,h,(branch&0x18U)?3:4);}
 static void clear(RoutePlanner *p,float *d,uint32_t *t,float h)
 {update(p,d,t,0x18,h,40);} /* 2.0 cm + 50 ms 离口去重证据（JUNCTION_COUNT_CLEAR_*）。 */
 static void stop_callback(size_t i,void *c)
@@ -152,7 +152,9 @@ static void test_fast_exit(void)
   update(&p,&d,&t,0xff,sign*1.76f,1);
   update(&p,&d,&t,0x18,sign*1.76f,2);CHECK(p.state==ROUTE_EXECUTING);
   t+=CONTROL_MAX_INTERVAL_MS+1;
-  update(&p,&d,&t,0x18,sign*1.76f,1);CHECK(p.state==ROUTE_EXECUTING && p.exit_count==1);
+  update(&p,&d,&t,0x18,sign*1.76f,1);
+  CHECK(p.state==ROUTE_EXECUTING && p.component_recovery_active &&
+        p.component_recovery_line_samples==0); /* gap breaks recovery confirmation */
   init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x18,sign*JUNCTION_TURN_TARGET_RAD*.96f,4);
   CHECK(p.state==ROUTE_CLEARING); /* Ordinary turn: the line completes capture. */
@@ -197,6 +199,11 @@ static void test_clearance_lateral_motion(void)
    CHECK(p.index==0); /* No carry-over of pre-interruption distance. */
    t+=CONTROL_MAX_INTERVAL_MS+1;
    update(&p,&d,&t,0x04,h,1);
+   if(i>0) {
+    CHECK(p.component_recovery_active && p.component_recovery_line_samples==0);
+    update(&p,&d,&t,0x18,h,3); /* graph recovery requires a centered exit */
+    CHECK(!p.component_recovery_active);
+   }
    CHECK(p.exit_count==1 && p.exit_candidate_cm==d);
    update(&p,&d,&t,0x04,h,40);
    CHECK(p.index==1 && p.state==ROUTE_FOLLOW);

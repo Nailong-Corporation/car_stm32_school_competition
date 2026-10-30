@@ -28,6 +28,15 @@ typedef enum {
     ROUTE_FAILURE_EXIT_RECAPTURE = 8 /* 8：捕获/离口超距仍未稳定回线；不自动恢复跳段。 */
 } RouteFailure;
 typedef void (*RouteStopCallback)(size_t step_index, void *context);
+typedef enum {
+    JUNCTION_EVIDENCE_NONE, JUNCTION_EVIDENCE_CENTER_BRANCH,
+    JUNCTION_EVIDENCE_EDGE, JUNCTION_EVIDENCE_SEPARATED
+} JunctionEvidence;
+typedef enum {
+    JUNCTION_REJECT_NONE, JUNCTION_REJECT_SHAPE, JUNCTION_REJECT_HISTORY,
+    JUNCTION_REJECT_SAMPLE_GAP, JUNCTION_REJECT_SIDE_CHANGE,
+    JUNCTION_REJECT_SMOOTH_EDGE
+} JunctionReject;
 typedef struct {
     uint16_t junctions_seen;
     bool passing_junction, final_segment_active, search_pending;
@@ -64,6 +73,18 @@ typedef struct {
     float next_junction_cm;
     bool candidate_separated; /* 已在转弯离口中连续确认的新分离分支证据。 */
     bool line_confirmed_exit_used;
+    JunctionEvidence candidate_kind, last_confirmed_kind;
+    JunctionReject candidate_reject;
+    uint8_t candidate_sides; /* bit 0 left, bit 1 right; intersect across frames. */
+    uint8_t next_junction_sides;
+    uint8_t previous_line_mask, smooth_edge_sides;
+    bool previous_line_valid;
+    float previous_line_position;
+    uint32_t candidate_restarts, smooth_edge_rejections;
+    bool component_recovery_active, component_recovery_used;
+    uint8_t component_recovery_line_samples;
+    uint32_t component_recovery_ms;
+    float component_recovery_cm, component_recovery_heading;
 } RoutePlanner;
 
 /* Speed feedback must be updated before route_update in production. */

@@ -1,0 +1,122 @@
+PASS: junction identity, mirrored curve/L/separated evidence, raw filter replay, frozen trace and captured EXIT_LOST (487 checks)
+PASS: junction identity, mirrored curve/L/separated evidence, raw filter replay, frozen trace and captured EXIT_LOST (487 checks)
+PASS: approach=0 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: mirrored angle settling, yaw damping, low-speed clearance, custom angles and no-exit timeout
+PASS: mirrored angle settling, yaw damping, low-speed clearance, custom angles and no-exit timeout
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: single-count START, transient inhibit, mirrored reverse time/distance/severe gates and lock
+PASS: MPU stationary median calibration and movement rejection; centered-line button START accepted; spike rejection; probe/bus faults; stationary/90deg integration
+PASS: production heading scale, distance/speed, pose and mirrored 90-degree control gates
+PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup
+PASS: MPU yaw, startup/runtime encoder fallback, continuous mirrored turns, sticky source and encoder fault lock; tilt restart gates
+GRAY_INVERT_ENABLED=1
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (8229 checks)
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+GRAY_INVERT_ENABLED=0
+PASS: 256 masks, filtering/continuity, PID and PWM; 120977 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (8229 checks)
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: seam filter=1 polarity=1 encoder=0 route=0; 837 checks
+=================================================================
+==81579==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x00016eeee1b0 at pc 0x000101502fbc bp 0x00016eeebf90 sp 0x00016eeebf68
+WRITE of size 9040 at 0x00016eeee1b0 thread T0
+==81579==WARNING: external symbolizer didn't start up correctly!
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x101502fb8"
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x100f3a164"
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x100f11940"
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x100f1089c"
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x19c513e7c"
+    #0 0x000101502fb8 in __asan_memset+0x1e0 (/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.asan_osx_dynamic.dylib:arm64e+0x3efb8)
+    #1 0x000100f3a164 in line_follow_init+0x16c (/private/var/folders/22/c4j0h0n904gbvx1yt7092s7h0000gn/T/car_stm32_test.DdGi7R:arm64+0x10002a164)
+    #2 0x000100f11940 in test_start_and_tracking+0x2d4 (/private/var/folders/22/c4j0h0n904gbvx1yt7092s7h0000gn/T/car_stm32_test.DdGi7R:arm64+0x100001940)
+    #3 0x000100f1089c in main+0x1c (/private/var/folders/22/c4j0h0n904gbvx1yt7092s7h0000gn/T/car_stm32_test.DdGi7R:arm64+0x10000089c)
+    #4 0x00019c513e7c in start+0x1a1c (/usr/lib/dyld:arm64e+0x31e7c)
+
+Address 0x00016eeee1b0 is located in stack of thread T0 at offset 8048 in frame
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x100f11678"
+    #0 0x000100f11678 in test_start_and_tracking+0xc (/private/var/folders/22/c4j0h0n904gbvx1yt7092s7h0000gn/T/car_stm32_test.DdGi7R:arm64+0x100001678)
+
+  This frame has 7 object(s):
+    [32, 8048) 'f' (line 52)
+    [8304, 8309) 'sensor' (line 52) <== Memory access at offset 8048 partially underflows this variable
+    [8336, 8368) 'byval-temp' (line 53) <== Memory access at offset 8048 partially underflows this variable
+    [8400, 8420) 'agg.tmp' (line 56) <== Memory access at offset 8048 partially underflows this variable
+    [8464, 8496) 'byval-temp' (line 63) <== Memory access at offset 8048 partially underflows this variable
+    [8528, 8548) 'agg.tmp' (line 66) <== Memory access at offset 8048 partially underflows this variable
+    [8592, 8612) 'agg.tmp' (line 71) <== Memory access at offset 8048 partially underflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x101502fb8"
+==81579==WARNING: Can't read from symbolizer at fd 3
+==81579==WARNING: atos failed to symbolize address "0x100f3a164"
+SUMMARY: AddressSanitizer: stack-buffer-overflow (/private/var/folders/22/c4j0h0n904gbvx1yt7092s7h0000gn/T/car_stm32_test.DdGi7R:arm64+0x10002a164) in line_follow_init+0x16c
+Shadow bytes around the buggy address:
+  0x00016eeedf00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x00016eeedf80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x00016eeee000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x00016eeee080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x00016eeee100: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x00016eeee180: 00 00 00 00 00 00[f2]f2 f2 f2 f2 f2 f2 f2 f2 f2
+  0x00016eeee200: f2 f2 f2 f2 f2 f2 f2 f2 f2 f2 f2 f2 f2 f2 f2 f2
+  0x00016eeee280: f2 f2 f2 f2 f2 f2 05 f2 f2 f2 00 00 00 00 f2 f2
+  0x00016eeee300: f2 f2 f8 f8 f8 f2 f2 f2 f2 f2 f8 f8 f8 f8 f2 f2
+  0x00016eeee380: f2 f2 f8 f8 f8 f2 f2 f2 f2 f2 f8 f8 f8 f3 f3 f3
+  0x00016eeee400: f3 f3 f3 f3 00 00 00 00 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==81579==ABORTING
+test/run_host_tests.sh: line 194: 81579 Abort trap: 6           "$test_binary"

@@ -79,12 +79,12 @@ static void test_diode_straight_clearance(void)
   RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
   junction(&p,&d,&t,0x0f,0);
   CHECK(p.state==ROUTE_CLEARING && p.junctions_seen==1);
-  for(unsigned i=0;i<80 && p.state!=ROUTE_FAILED;++i) {
+  for(unsigned i=0;i<300 && p.state!=ROUTE_FAILED;++i) {
    uint8_t m=condition==0?0x3c:(condition==1 && i%20U==19U?0x18:0x03);
    update(&p,&d,&t,m,0,1);
    CHECK(p.junctions_seen==1);
   }
-  CHECK(p.failure==ROUTE_FAILURE_CLEAR_LINE_LOST && p.index==0);
+  CHECK(p.failure==(condition==0?ROUTE_FAILURE_EXIT_RECAPTURE:ROUTE_FAILURE_CLEAR_LINE_LOST) && p.index==0);
  }
  RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
  RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;

@@ -1,0 +1,1 @@
+Assertion failed: (p.component_recovery_active && p.component_recovery_used), function test_recovery_limits, file test_component_recovery.c, line 18.

@@ -80,6 +80,10 @@ void line_follow_stop(LineFollow *f, LineStopReason reason)
         f->stop_snapshot = (LineStopSnapshot){
             .exit_recovery_active=f->exit_recovery_active,
             .exit_lateral_error_cm=f->exit_lateral_error_cm,
+            .component_recovery_age_ms=f->route.component_recovery_used?
+                (uint32_t)(f->sample_ms-f->route.component_recovery_ms):0U,
+            .component_recovery_progress_cm=f->route.component_recovery_used?
+                fabsf(f->odometry.distance_cm-f->route.component_recovery_cm):0.0f,
             .turn_exit_branch = 0,
             .exit_line_mask = 0,
             .handoff_early = 0,
@@ -331,7 +335,7 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
  * 编码器模式用 counts 更新里程和速度内环，仅开启路径时推进路口；PWM 模式忽略 counts。
  * 非法观测或时序进入故障停车；启动请求为一次性，超时判断先于恢复确认。
  */
-void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCounts counts,
+static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request,
                         bool imu_valid, float imu_heading_rad)
 {
@@ -408,6 +412,7 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
         f->straight_entry_aligned = f->straight_entry_handoff = (StraightEntrySnapshot){0};
         memset(f->turn_exit,0,sizeof(f->turn_exit));
         memset(&f->turn_trace,0,sizeof(f->turn_trace));
+        memset(&f->navigation_trace,0,sizeof(f->navigation_trace));
         f->exit_anchor_valid=f->exit_recovery_active=false;
         f->exit_lateral_error_cm=0;
         f->start_result = LINE_START_ACCEPTED;
@@ -443,6 +448,7 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
             f->turn_exit[previous_index].minimum_turn_rad,previous_turn);
     route_set_speed(&f->route, f->odometry.left_speed_cm_s, f->odometry.right_speed_cm_s);
     route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
+    f->exit_recovery_active=f->route.component_recovery_active;
     if (completing_turn && f->route.state==ROUTE_FOLLOW)
         f->exit_accelerating=TURN_EXIT_ACCEL_ENABLED;
     if(previous_route!=ROUTE_EXECUTING && f->route.state==ROUTE_EXECUTING) {
@@ -476,7 +482,6 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
     }
     if (f->route.state == ROUTE_FAILED) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
     if (f->route.state == ROUTE_FINISHED) { line_follow_stop(f, LINE_STOP_ROUTE_COMPLETE); return; }
-    f->exit_recovery_active=false;
     if (previous_route == ROUTE_EXECUTING && f->route.state == ROUTE_CLEARING) {
         f->exit_accelerating = false; /* 离口完成才开启下一段加速。 */
         /* A completed, confirmed maneuver establishes a fresh line history. */
@@ -547,7 +552,13 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
     float base_speed = LINE_FOLLOW_SPEED_CM_S;
 #endif
 #if PRESET_ROUTE_ENABLED
-    if (f->route.state == ROUTE_EXECUTING) {
+    if(f->route.component_recovery_active) {
+        f->state=LINE_JUNCTION;f->abnormal=false;f->exit_accelerating=false;
+        pid_reset(&f->pid);
+        outer_targets(f,fminf(step.turn_speed,COMPONENT_RECOVERY_SPEED_CM_S),
+            HEADING_KP_CM_S_PER_RAD*(f->route.component_recovery_heading-f->odometry.heading_rad)-
+                JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s,dt);
+    } else if (f->route.state == ROUTE_EXECUTING) {
         f->exit_accelerating=false;
         if(previous_route!=ROUTE_EXECUTING) {pid_reset(&f->pid);speed_control_reset(&f->speed);}
         f->abnormal=false; f->state=LINE_JUNCTION;
@@ -709,6 +720,39 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
                               dt, &f->command)) line_follow_stop(f, LINE_STOP_ENCODER);
 #if PRESET_ROUTE_ENABLED
 #endif
+#endif
+}
+
+void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCounts counts,
+                        uint32_t now_ms, float dt, bool start_request,
+                        bool imu_valid, float imu_heading_rad)
+{
+#if PRESET_ROUTE_ENABLED
+    LineState previous=f->state;
+    RouteState before=f->route.state;
+#endif
+    line_follow_update_heading_impl(f,obs,counts,now_ms,dt,start_request,imu_valid,imu_heading_rad);
+#if PRESET_ROUTE_ENABLED
+    /* Include the stopping frame, then preserve evidence while stopped/idle.
+     * START clears the ring only after the normal acceptance gates succeed. */
+    if(previous==LINE_TRACKING || previous==LINE_GAP_HOLD || previous==LINE_JUNCTION ||
+       f->state==LINE_TRACKING || f->state==LINE_GAP_HOLD || f->state==LINE_JUNCTION) {
+        NavigationTrace *trace=&f->navigation_trace;
+        trace->samples[trace->next]=(NavigationTraceSample){
+            .ms=now_ms,.dt_s=dt,.heading_rad=f->odometry.heading_rad,
+            .distance_cm=f->odometry.distance_cm,
+            .left_speed_cm_s=f->odometry.left_speed_cm_s,.right_speed_cm_s=f->odometry.right_speed_cm_s,
+            .route_index=(uint32_t)f->route.index,.junctions_seen=f->route.junctions_seen,
+            .counts=counts,.raw_mask=obs.raw_mask,.line_mask=obs.line_mask,
+            .prefilter_mask=obs.prefilter_mask,.observation=(uint8_t)obs.kind,
+            .route_before=(uint8_t)before,.route_after=(uint8_t)f->route.state,
+            .evidence=(uint8_t)f->route.candidate_kind,.sides=f->route.candidate_sides,
+            .rejection=(uint8_t)f->route.candidate_reject,.heading_source=(uint8_t)f->heading_source,
+            .candidate_samples=f->route.candidate_count,.stop_reason=(uint8_t)f->stop_reason
+        };
+        trace->next=(uint16_t)((trace->next+1U)%NAVIGATION_TRACE_CAPACITY);
+        if(trace->count<NAVIGATION_TRACE_CAPACITY) ++trace->count;
+    }
 #endif
 }
 

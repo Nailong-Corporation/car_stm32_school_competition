@@ -3,6 +3,29 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 test_binary=$(mktemp "${TMPDIR:-/tmp}/car_stm32_test.XXXXXX")
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
+# User-authorized bounded straight recovery through component graphics.
+for imu in 0 1; do
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+        -fsanitize=address,undefined -fno-omit-frame-pointer \
+        -I"$project_dir/include" -DMPU6050_ENABLED="$imu" -DODOMETRY_HEADING_SCALE=1.0f \
+        "$project_dir/test/test_component_recovery.c" "$project_dir/src/gray_sensor.c" \
+        "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" \
+        "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+        "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+    "$test_binary"
+done
+# Branch identity/curve rejection plus raw GPIO filter replay in both polarities.
+for invert in 0 1; do
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+        -fsanitize=address,undefined -fno-omit-frame-pointer \
+        -I"$project_dir/include" -DMPU6050_ENABLED=0 -DODOMETRY_HEADING_SCALE=1.0f \
+        -DGRAY_INVERT_ENABLED="$invert" \
+        "$project_dir/test/test_junction_evidence.c" "$project_dir/src/gray_sensor.c" \
+        "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" \
+        "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+        "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+    "$test_binary" "$project_dir/docs/evidence/2026-10-31-component-stop/trace.csv"
+done
 # Independent approach / exit / reverse brake switches, all eight combinations.
 for approach in 0 1; do
     for exit_accel in 0 1; do
