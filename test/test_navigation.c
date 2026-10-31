@@ -227,6 +227,14 @@ static void test_braking(void)
  float previous=p.allowed_speed;
  for(unsigned d=1;d<25;++d) {p=braking_plan(40,6,20,(float)d,20,30,2,true);CHECK(p.valid && p.allowed_speed<=previous);previous=p.allowed_speed;}
  NEAR(p.allowed_speed,6);CHECK(isinf(p.required_decel));
+ BrakingDecision decision=braking_decide(100,50,30,60,120,3);
+ CHECK(decision.reverse_needed && !decision.distance_exhausted && decision.required_decel>120);
+ decision=braking_decide(60,50,100,1000,120,3);
+ CHECK(!decision.reverse_needed); /* IMU spike cannot raise calibrated bound. */
+ decision=braking_decide(80,50,40,15,120,3);
+ CHECK(decision.reverse_needed); /* Weak measured deceleration reduces feasibility. */
+ CHECK(braking_decide(60,50,2,0,120,3).distance_exhausted);
+ CHECK(!braking_decide(45,50,0,0,120,3).reverse_needed);
  CHECK(!braking_plan(40,6,20,0,0,0,2,false).valid);
  CHECK(!braking_plan(40,6,NAN,0,0,30,2,true).valid);
  CHECK(braking_plan(40,6,0,1000,0,0,2,false).allowed_speed==40);
@@ -267,9 +275,51 @@ static void test_search_and_slew(void)
  f.route.final_segment_origin_cm=f.odometry.distance_cm-101;
  tick(&f,&counts,&now,0,0,0x18,false);
  CHECK(f.base<=s[0].turn_speed && f.route.state==ROUTE_FOLLOW && f.route.junctions_seen==0);
+ /* Synthetic high wheel feedback at exhausted distance locks a route stop. */
+ f.odometry.left_speed_cm_s=f.odometry.right_speed_cm_s=80;
+ tick(&f,&counts,&now,0,0,0x18,false);
+ CHECK(f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_BRAKE_DISTANCE);
+ CHECK(f.stop_snapshot.braking_required_cm_s2>0 && !f.command.enabled);
  #endif
 #endif
 }
+#if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
+static void test_bounded_approach_reverse(void)
+{
+ RouteStep steps[]={{1,50,LEFT,200,0,false,100},{1,50,STOP,200,0,false,0}};
+ LineFollow f;EncoderCounts counts;uint32_t now;
+ start(&f,&counts,&now,steps,2);
+ f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
+ /* A short remaining distance and filtered positive feedback need stronger
+  * deceleration; IMU sample overrides the wheel derivative for this frame. */
+ f.route.final_segment_origin_cm=f.odometry.distance_cm-80;
+ f.odometry.left_speed_cm_s=f.odometry.right_speed_cm_s=100;
+ f.heading_source=HEADING_IMU;
+ line_follow_set_braking_accel(&f,true,-5);
+ now+=5;
+ line_follow_update_heading(&f,mask(0x18),counts,now,.005f,false,true,f.odometry.heading_rad);
+ CHECK(f.braking_imu_used && f.braking_reverse_active && f.braking_reverse_ms==5);
+ CHECK(f.command.enabled && f.command.left<0 && f.command.right<0);
+ CHECK(f.command.left>=-REVERSE_BRAKE_MAX_PWM && f.command.right>=-REVERSE_BRAKE_MAX_PWM);
+ line_follow_set_braking_accel(&f,false,0);
+ tick(&f,&counts,&now,0,0,0x18,false);
+ CHECK(!f.braking_imu_used && f.braking_reverse_ms>=5 &&
+       f.braking_reverse_ms<=BRAKING_REVERSE_MAX_MS);
+ /* Loss immediately cancels the torque request even if the deadline remains. */
+ tick(&f,&counts,&now,0,0,0,false);
+ CHECK(!f.braking_reverse_active && f.command.left>=0 && f.command.right>=0);
+ /* A new accepted START is required to reset the per-leg torque budget.
+  * Keep positive feedback synthetic while stationary to test the software bound. */
+ for(unsigned i=0;i<60;++i) {
+  f.odometry.left_speed_cm_s=f.odometry.right_speed_cm_s=100;
+  now+=5;
+  line_follow_update_heading(&f,mask(0x18),counts,now,.005f,false,true,f.odometry.heading_rad);
+  CHECK(f.state!=LINE_STOPPED && f.braking_reverse_ms<=BRAKING_REVERSE_MAX_MS);
+ }
+ CHECK(f.braking_reverse_ms==BRAKING_REVERSE_MAX_MS);
+ CHECK(!f.braking_reverse_active && f.command.left>=0 && f.command.right>=0);
+}
+#endif
 static void test_loops(void)
 {
  RouteStep s[]={{1,6,STOP,20,0,false,0}};
@@ -392,11 +442,9 @@ static void test_final_leg_ramp(void)
   CHECK(f.state!=LINE_STOPPED);
   CHECK(f.left_target_cm_s>=0 && f.right_target_cm_s>=0);
  }
- /* 仍须能摆脱旧的约15 cm/s衰减反馈，同时服从最后一段50 cm/s上限。 */
- CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)>40);
-#if TURN_APPROACH_SLOWDOWN_ENABLED
- CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_APPROACH_SPEED_CM_S+.001f);
-#endif
+ /* 仍须能摆脱旧的约15 cm/s衰减反馈；已测长度按距离包络减速。 */
+ CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)>JUNCTION_APPROACH_SPEED_CM_S);
+ CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=s[0].cruise_speed+.001f);
  CHECK(f.odometry.distance_cm>50);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
  /* 包络下降仍要即时生效，不能因斜坡状态领先而超速冲向路口。 */
@@ -408,5 +456,8 @@ static void test_final_leg_ramp(void)
 int main(void)
 {
  test_counts();test_noise_and_straight();test_l_edges_and_confirmation();test_entry_brake();test_angles_and_failures();test_fast_exit();test_clearance_lateral_motion();test_braking();test_search_and_slew();test_loops();test_control();test_closed_turns();test_adjacent_graphic_guards();test_line_exit_guards();test_final_leg_ramp();
+#if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
+ test_bounded_approach_reverse();
+#endif
  printf("PASS: count navigation, short junctions, angle/entry/STOP safety, braking (%u checks)\n",checks);return 0;
 }

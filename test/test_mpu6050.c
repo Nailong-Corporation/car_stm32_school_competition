@@ -97,6 +97,14 @@ int main(void)
     assert(mpu6050_init(&imu) && imu.ready && bus_unlocked);
     assert(imu.bus_recovery_count==1 && imu.last_i2c_status==HAL_OK && imu.last_who_am_i==0x68);
     assert(imu.bus_line_mask==3);
+#if MPU6050_PITCH_STOP_ENABLED
+    assert(imu.accel_baseline_valid && fabsf(imu.accel_x_baseline_g)<.001f);
+    runtime_phase=true;
+    float accel_heading=0;
+    assert(mpu6050_update(&imu,.005f,&accel_heading));
+    assert(imu.accel_valid && fabsf(imu.accel_x_cm_s2)<.01f);
+    runtime_phase=false;
+#endif
     for(scenario=19;scenario<=21;++scenario) {
         recovery_clocks=0;bus_sequence=0;bus_unlocked=false;
         bool ok=mpu6050_init(&imu);

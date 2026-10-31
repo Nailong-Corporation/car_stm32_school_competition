@@ -11,6 +11,8 @@ typedef struct {
     float gyro_z_bias_lsb;
     float gyro_z_calibration_span_lsb; /* Max-min during startup; retained on rejected calibration. */
     float heading_rad; /* Continuous relative yaw: clockwise/right is positive. */
+    float accel_x_baseline_g, accel_x_cm_s2;
+    bool accel_baseline_valid, accel_valid; /* Longitudinal dynamic acceleration. */
     int16_t gyro_z_raw;
     uint8_t address_7bit;
     uint8_t init_failure_stage;

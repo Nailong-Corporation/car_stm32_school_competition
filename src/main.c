@@ -218,6 +218,14 @@ int main(void)
                 g_diagnostics.start_raw_mask = observation.raw_mask;
                 g_diagnostics.start_line_mask = observation.line_mask;
             }
+            line_follow_set_braking_accel(&follow,
+#if MPU6050_ENABLED && MPU6050_PITCH_STOP_ENABLED && BRAKING_IMU_ACCEL_SIGN_CONFIRMED
+                imu_valid && imu.accel_valid && follow.heading_source==HEADING_IMU,
+                imu.accel_x_cm_s2
+#else
+                false,0.0f
+#endif
+            );
             line_follow_update_heading(&follow, observation, counts, now_ms,
                                (float)interval / 1000.0f, start_pending,
                                imu_valid, imu_heading_rad);

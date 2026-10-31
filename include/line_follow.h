@@ -63,6 +63,9 @@ typedef struct {
     float exit_lateral_error_cm;
     uint32_t component_recovery_age_ms;
     float component_recovery_progress_cm;
+    float braking_accel_cm_s2, braking_required_cm_s2;
+    uint32_t braking_reverse_ms;
+    bool braking_imu_used, braking_reverse_active;
     HeadingSource heading_source;
     HeadingFallbackReason heading_fallback_reason;
     uint32_t heading_fallback_ms;
@@ -118,6 +121,12 @@ typedef struct {
     BrakingSlew braking_slew;
     bool braking_active;
     float braking_origin_cm;
+    float braking_accel_cm_s2, braking_previous_speed_cm_s;
+    float braking_required_cm_s2;
+    uint32_t braking_reverse_ms;
+    bool braking_speed_primed, braking_imu_used, braking_reverse_active;
+    bool braking_imu_sample_valid;
+    float braking_imu_sample_cm_s2;
     Pid pid; /* White-line position: PWM difference when open, cm/s when closed. */
     MotorCommand command; /* Final PWM output in either mode. */
     bool have_reliable, abnormal;
@@ -151,6 +160,8 @@ void line_follow_init(LineFollow *follow, OdometryCalibration calibration,
                        const RouteStep *steps, size_t count,
                        RouteStopCallback callback, void *context);
 void line_follow_stop(LineFollow *follow, LineStopReason reason);
+/* A fresh, calibrated IMU longitudinal acceleration sample for the next update. */
+void line_follow_set_braking_accel(LineFollow *follow, bool valid, float accel_cm_s2);
 /* Caller has a fresh level IMU sample and an explicit START; preserves snapshot
  * until START is actually accepted. Other fault stops cannot be cleared here. */
 void line_follow_acknowledge_tilt(LineFollow *follow);

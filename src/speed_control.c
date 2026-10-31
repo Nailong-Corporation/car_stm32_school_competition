@@ -34,7 +34,8 @@ void speed_control_init(SpeedControl *s)
  * 目标为零时复位并输出零；反向保护在双轮入口统一检测，低速持续超限或非法值返回故障码。
  * stall 保存低速累计秒数，pwm 接收含前馈及抗饱和 PID 的输出。
  */
-static SpeedFault wheel(Pid *pid, float target, float measured, float dt, float *stall, float *pwm)
+static SpeedFault wheel(Pid *pid, float target, float measured, float dt, float *stall,
+                        bool reverse_brake, float *pwm)
 {
     if (!isfinite(target) || target < 0.0f || target > WHEEL_TARGET_MAX_CM_S ||
         !isfinite(measured)) return SPEED_FAULT_INPUT;
@@ -47,13 +48,19 @@ static SpeedFault wheel(Pid *pid, float target, float measured, float dt, float 
         *stall + dt : 0.0f;
     if (*stall >= SPEED_STALL_TIMEOUT_S) return SPEED_FAULT_STALL;
 #if MOTOR_REVERSE_BRAKE_ENABLED
-    /* 只对确认的正向超速施加反向力矩；不请求负轮速，不累积制动积分。 */
-    if (measured > target + REVERSE_BRAKE_MARGIN_CM_S) {
-        pid_reset(pid);
-        *pwm = -fminf(REVERSE_BRAKE_MAX_PWM,
-                     REVERSE_BRAKE_KP * (measured - target - REVERSE_BRAKE_MARGIN_CM_S));
+    /* 仅显式请求才对正向超速施加反向力矩；PID 抗饱和限制负 PWM。 */
+    if (reverse_brake && measured > BRAKING_REVERSE_MIN_SPEED_CM_S &&
+        measured > target + REVERSE_BRAKE_MARGIN_CM_S) {
+        /* Same speed PID error and anti-windup as forward drive; negative PWM
+         * represents torque against positive motion, never a reverse speed target. */
+        float effort=0;
+        if(!pid_update_bounded(pid,target-measured,dt,-REVERSE_BRAKE_MAX_PWM,0,
+                               0,&effort)) return SPEED_FAULT_PID;
+        *pwm=effort;
         return SPEED_FAULT_NONE;
     }
+#else
+    (void)reverse_brake;
 #endif
     return pid_update_bounded(pid, target - measured, dt, 0.0f, MOTOR_PWM_LIMIT,
                               target * SPEED_FEEDFORWARD, pwm) ? SPEED_FAULT_NONE : SPEED_FAULT_PID;
@@ -80,8 +87,8 @@ static bool reverse_confirmed(float measured, float dt, float *age, float *dista
  * 轻微反向待确认时返回 true 但 command 禁用；确认故障返回 false。
  * 任一轮反馈或计算失败时保持禁用零输出、清空两轮历史并返回 false。
  */
-bool speed_control_update(SpeedControl *s, float lt, float rt, float lm, float rm,
-                          float dt, MotorCommand *command)
+bool speed_control_update_braking(SpeedControl *s, float lt, float rt, float lm, float rm,
+                          float dt, bool reverse_brake, MotorCommand *command)
 {
     *command = (MotorCommand){0};
     s->fault = SPEED_FAULT_NONE;
@@ -113,11 +120,11 @@ bool speed_control_update(SpeedControl *s, float lt, float rt, float lm, float r
     }
     float l = 0, r = 0;
     if (fault == SPEED_FAULT_NONE) {
-        fault = wheel(&s->left, lt, lm, dt, &s->left_stall_s, &l);
+        fault = wheel(&s->left, lt, lm, dt, &s->left_stall_s, reverse_brake, &l);
         failed_wheel = 1;
     }
     if (fault == SPEED_FAULT_NONE) {
-        fault = wheel(&s->right, rt, rm, dt, &s->right_stall_s, &r);
+        fault = wheel(&s->right, rt, rm, dt, &s->right_stall_s, reverse_brake, &r);
         failed_wheel = 2;
     }
     if (fault != SPEED_FAULT_NONE) {
@@ -128,4 +135,11 @@ bool speed_control_update(SpeedControl *s, float lt, float rt, float lm, float r
     }
     *command = (MotorCommand){l, r, lt > 0.0f || rt > 0.0f};
     return true;
+}
+
+
+bool speed_control_update(SpeedControl *s,float lt,float rt,float lm,float rm,
+                          float dt,MotorCommand *command)
+{
+    return speed_control_update_braking(s,lt,rt,lm,rm,dt,false,command);
 }

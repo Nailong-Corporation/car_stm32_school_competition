@@ -203,12 +203,33 @@
 #ifndef TURN_APPROACH_SLOWDOWN_ENABLED
 #define TURN_APPROACH_SLOWDOWN_ENABLED 1
 #endif
-#define JUNCTION_APPROACH_SPEED_CM_S 50.0f /* 最后一段全程限速；按用户实测可检测路口速度，不依赖长度规划。 */
+#define JUNCTION_APPROACH_SPEED_CM_S 50.0f /* 最后一段全程限速；距离包络可进一步限制。 */
+#define BRAKING_ACCEL_FILTER_TAU_S 0.080f /* 轮速差分/IMU 纵向加速度低通。 */
+#define BRAKING_IMU_TILT_LIMIT_DEG 5.0f /* 相对静止基线超限则使用编码器差分。 */
+#define BRAKING_REVERSE_MAX_MS 250U /* 每段累计反向力矩时间上限。 */
+#define BRAKING_REVERSE_MIN_SPEED_CM_S 8.0f /* 低速前切断反向输出，禁止倒车。 */
+#define BRAKING_REVERSE_GUARD_CM 3.0f /* 预留反向作用期间的距离/反应余量。 */
+/* IMU X 正向和反向力矩需架空/低速核对后分别启用。未确认时仍以编码器差分规划，
+ * 若被动减速不能满足距离约束，路径入口继续停车，不假定反转有效。 */
+#ifndef BRAKING_IMU_ACCEL_SIGN_CONFIRMED
+#define BRAKING_IMU_ACCEL_SIGN_CONFIRMED 0
+#endif
+#define BRAKING_IMU_ACCEL_SIGN 1
+#ifndef BRAKING_REVERSE_HARDWARE_CONFIRMED
+#define BRAKING_REVERSE_HARDWARE_CONFIRMED 0
+#endif
+#if (BRAKING_IMU_ACCEL_SIGN_CONFIRMED != 0 && BRAKING_IMU_ACCEL_SIGN_CONFIRMED != 1) || \
+    (BRAKING_REVERSE_HARDWARE_CONFIRMED != 0 && BRAKING_REVERSE_HARDWARE_CONFIRMED != 1)
+#error "Braking hardware confirmation flags must be 0 or 1"
+#endif
 #ifndef TURN_EXIT_ACCEL_ENABLED
 #define TURN_EXIT_ACCEL_ENABLED        1
 #endif
 #ifndef MOTOR_REVERSE_BRAKE_ENABLED
 #define MOTOR_REVERSE_BRAKE_ENABLED    0
+#endif
+#if BRAKING_REVERSE_HARDWARE_CONFIRMED && (!MOTOR_REVERSE_BRAKE_ENABLED || !PRESET_ROUTE_ENABLED)
+#error "Reverse approach braking requires route and reverse motor control"
 #endif
 #if (TURN_APPROACH_SLOWDOWN_ENABLED != 0 && TURN_APPROACH_SLOWDOWN_ENABLED != 1) || \
     (TURN_EXIT_ACCEL_ENABLED != 0 && TURN_EXIT_ACCEL_ENABLED != 1) || \

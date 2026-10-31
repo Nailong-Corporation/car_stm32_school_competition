@@ -18,6 +18,26 @@ BrakingPlan braking_plan(float cruise,float entry,float length,float progress,
     return p;
 }
 
+BrakingDecision braking_decide(float speed,float entry,float remaining,
+                               float observed_decel,float safe_decel,float guard)
+{
+    BrakingDecision d={0};
+    if(!isfinite(speed) || !isfinite(entry) || !isfinite(remaining) ||
+       !isfinite(observed_decel) || !isfinite(safe_decel) || !isfinite(guard) ||
+       speed<0 || entry<0 || remaining<0 || safe_decel<=0 || guard<0) {
+        d.distance_exhausted=true;return d;
+    }
+    if(speed<=entry) return d;
+    float usable=fmaxf(0,remaining-guard);
+    d.required_decel=usable>0 ? (speed*speed-entry*entry)/(2*usable) : INFINITY;
+    d.distance_exhausted=usable<=0;
+    /* A single optimistic sensor spike must never increase the calibrated bound.
+     * Do not treat a positive acceleration transient as measured braking. */
+    float available=observed_decel>0 ? fminf(safe_decel,observed_decel) : safe_decel;
+    d.reverse_needed=d.required_decel>available;
+    return d;
+}
+
 float braking_slew(BrakingSlew *s,float cap,float dt,float acceleration,float jerk)
 {
     if(!s || !isfinite(cap) || cap<0 || !isfinite(dt) || dt<=0 ||

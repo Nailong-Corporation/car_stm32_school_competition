@@ -14,6 +14,12 @@ static bool locked(LineStopReason reason)
            reason == LINE_STOP_IMU || reason == LINE_STOP_TILT;
 }
 
+void line_follow_set_braking_accel(LineFollow *f, bool valid, float accel_cm_s2)
+{
+    f->braking_imu_sample_valid=valid && isfinite(accel_cm_s2);
+    f->braking_imu_sample_cm_s2=f->braking_imu_sample_valid?accel_cm_s2:0;
+}
+
 void line_follow_acknowledge_tilt(LineFollow *f)
 {
     if (f->state == LINE_STOPPED && f->stop_reason == LINE_STOP_TILT)
@@ -84,6 +90,11 @@ void line_follow_stop(LineFollow *f, LineStopReason reason)
                 (uint32_t)(f->sample_ms-f->route.component_recovery_ms):0U,
             .component_recovery_progress_cm=f->route.component_recovery_used?
                 fabsf(f->odometry.distance_cm-f->route.component_recovery_cm):0.0f,
+            .braking_accel_cm_s2=f->braking_accel_cm_s2,
+            .braking_required_cm_s2=f->braking_required_cm_s2,
+            .braking_reverse_ms=f->braking_reverse_ms,
+            .braking_imu_used=f->braking_imu_used,
+            .braking_reverse_active=f->braking_reverse_active,
             .turn_exit_branch = 0,
             .exit_line_mask = 0,
             .handoff_early = 0,
@@ -426,6 +437,10 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         f->startup_elapsed_s = 0.0f;
         f->braking_slew = (BrakingSlew){0};
         f->braking_active=false;
+        f->braking_speed_primed=false;
+        f->braking_reverse_ms=0;
+        f->braking_reverse_active=false;
+        f->braking_required_cm_s2=0;
         f->turn_yaw_rate_rad_s=0;
         pid_reset(&f->pid);
         speed_control_reset(&f->speed);
@@ -507,12 +522,46 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             f->braking_slew=(BrakingSlew){fmaxf(f->left_target_cm_s,f->right_target_cm_s),0};
             f->braking_origin_cm=f->route.final_segment_origin_cm;
             f->braking_active=true;
+            f->braking_speed_primed=false;
+            f->braking_reverse_ms=0;
+            f->braking_reverse_active=false;
         }
+        float speed=fmaxf(fabsf(f->odometry.left_speed_cm_s),
+                          fabsf(f->odometry.right_speed_cm_s));
+        float raw_accel=f->braking_imu_sample_valid && f->heading_source==HEADING_IMU ?
+            f->braking_imu_sample_cm_s2 :
+            (f->braking_speed_primed ? (speed-f->braking_previous_speed_cm_s)/dt : 0.0f);
+        f->braking_imu_used=f->braking_imu_sample_valid && f->heading_source==HEADING_IMU;
+        f->braking_previous_speed_cm_s=speed;
+        if(!f->braking_speed_primed) f->braking_accel_cm_s2=raw_accel;
+        else f->braking_accel_cm_s2+=dt/(BRAKING_ACCEL_FILTER_TAU_S+dt)*
+            (raw_accel-f->braking_accel_cm_s2);
+        f->braking_speed_primed=true;
         BrakingPlan plan = braking_plan(base_speed, step.turn_speed,
             step.final_segment_length_cm, f->odometry.distance_cm-f->route.final_segment_origin_cm,
             fmaxf(fabsf(f->odometry.left_speed_cm_s),fabsf(f->odometry.right_speed_cm_s)),
             BRAKING_SAFE_DECEL_CM_S2, BRAKING_DISTANCE_MARGIN_CM, BRAKING_CALIBRATION_CONFIRMED);
         if (!plan.valid) { line_follow_stop(f,LINE_STOP_ROUTE); return; }
+        BrakingDecision decision=braking_decide(speed,step.turn_speed,plan.remaining_cm,
+            -f->braking_accel_cm_s2,BRAKING_SAFE_DECEL_CM_S2,BRAKING_REVERSE_GUARD_CM);
+        f->braking_required_cm_s2=decision.required_decel;
+        f->braking_reverse_active=false;
+        if(decision.distance_exhausted && speed>step.turn_speed+REVERSE_BRAKE_MARGIN_CM_S) {
+            f->route.failure=ROUTE_FAILURE_BRAKE_DISTANCE;
+            f->route.state=ROUTE_FAILED;
+            line_follow_stop(f,LINE_STOP_ROUTE);return;
+        }
+#if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
+        if(decision.reverse_needed && !decision.distance_exhausted && narrow && stable &&
+           f->route.state==ROUTE_FOLLOW &&
+           fminf(f->odometry.left_speed_cm_s,f->odometry.right_speed_cm_s)>
+               BRAKING_REVERSE_MIN_SPEED_CM_S &&
+           f->braking_reverse_ms<BRAKING_REVERSE_MAX_MS) {
+            uint32_t frame_ms=(uint32_t)(dt*1000.0f+0.5f);
+            if(frame_ms<=BRAKING_REVERSE_MAX_MS-f->braking_reverse_ms)
+                f->braking_reverse_active=true;
+        }
+#endif
         /* 斜坡只跟踪速度包络，不得钳到实际轮目标：目标本身含位置曲线降速，
          * 两者相扣会衰减收敛到 rise/(曲线损失)，pos=1 时约 15 cm/s，车辆无法加速。
          * 包络下降由 braking_slew 的 cap 即时钳低，状态限速在下方 fminf 处理，
@@ -520,15 +569,13 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         base_speed = braking_slew(&f->braking_slew,plan.allowed_speed,dt,
                                    TARGET_RISE_CM_S2,BRAKING_TARGET_JERK_CM_S3);
     }
-    else f->braking_active=false;
-    /* 倒数第二口确认就降速，覆盖离口去重；count=1 从 START/切段低速检测。
-     * 离口确认仍单独建立最后一段距离起点，不提前修改里程语义。
-     * 距离规划仅进一步收紧，长度为 0 也不能跳过此限速。
-     * 放在包络斜坡之后，防止继承的高速目标或包络状态延迟降速。 */
+    else {f->braking_active=false;f->braking_reverse_active=false;}
+    /* 未测量末段长度时整段低速搜口；有测量值则在离口确认后
+     * 按距离包络减速。倒数第二口尚未离口时保持低速去重。 */
     bool clearing_penultimate=f->route.state==ROUTE_CLEARING && f->route.passing_junction &&
         (uint32_t)f->route.junctions_seen+1U==step.junction_count;
     if (TURN_APPROACH_SLOWDOWN_ENABLED &&
-        ((f->route.final_segment_active &&
+        ((f->route.final_segment_active && step.final_segment_length_cm==0 &&
           (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE)) ||
          clearing_penultimate))
         base_speed=fminf(base_speed,JUNCTION_APPROACH_SPEED_CM_S);
@@ -715,9 +762,21 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         }
     }
 #endif
-    if (!speed_control_update(&f->speed, f->left_target_cm_s, f->right_target_cm_s,
+    if(f->state!=LINE_TRACKING ||
+       fminf(f->odometry.left_speed_cm_s-f->left_target_cm_s,
+             f->odometry.right_speed_cm_s-f->right_target_cm_s)<=REVERSE_BRAKE_MARGIN_CM_S)
+        f->braking_reverse_active=false;
+    if(f->braking_reverse_active)
+        f->braking_reverse_ms+=(uint32_t)(dt*1000.0f+0.5f);
+    if (!speed_control_update_braking(&f->speed, f->left_target_cm_s, f->right_target_cm_s,
                               f->odometry.left_speed_cm_s, f->odometry.right_speed_cm_s,
-                              dt, &f->command)) line_follow_stop(f, LINE_STOP_ENCODER);
+                              dt,
+#if PRESET_ROUTE_ENABLED
+                              f->braking_reverse_active && f->state==LINE_TRACKING && narrow,
+#else
+                              false,
+#endif
+                              &f->command)) line_follow_stop(f, LINE_STOP_ENCODER);
 #if PRESET_ROUTE_ENABLED
 #endif
 #endif

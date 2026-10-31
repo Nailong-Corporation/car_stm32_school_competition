@@ -219,6 +219,20 @@ static bool mpu6050_init_once(Mpu6050 *imu)
             (float)samples[MPU6050_GYRO_BIAS_SAMPLES-1U-trim]-samples[trim];
         if (fabsf(imu->gyro_z_bias_lsb)>MPU6050_CALIBRATION_MAX_BIAS_LSB ||
             imu->gyro_z_calibration_central_span_lsb>MPU6050_CALIBRATION_MAX_CENTRAL_SPAN_LSB) continue;
+#if MPU6050_PITCH_STOP_ENABLED
+        /* Static gravity baseline; a failed read only disables accel estimation. */
+        uint8_t gravity[14];
+        if (read_reg(imu, MPU_REG_ACCEL_XOUT_H, gravity, sizeof(gravity))) {
+            float ax=signed_word(&gravity[0])/MPU_ACCEL_LSB_PER_G;
+            float ay=signed_word(&gravity[2])/MPU_ACCEL_LSB_PER_G;
+            float az=signed_word(&gravity[4])/MPU_ACCEL_LSB_PER_G;
+            float norm=sqrtf(ax*ax+ay*ay+az*az);
+            if(norm>=MPU6050_PITCH_MIN_G && norm<=MPU6050_PITCH_MAX_G) {
+                imu->accel_x_baseline_g=ax;
+                imu->accel_baseline_valid=true;
+            }
+        }
+#endif
         imu->ready = true;
         imu->init_failure_stage = 0;
         return true;
@@ -264,6 +278,7 @@ bool mpu6050_update(Mpu6050 *imu, float dt, float *heading_rad)
 #else
     if (!imu->ready || heading_rad == NULL || !isfinite(dt) || dt <= 0.0f ||
         dt > (float)CONTROL_MAX_INTERVAL_MS / 1000.0f) return false;
+    imu->accel_valid=false;
     uint8_t status;
     int16_t raw;
     /* 1 kHz sensor samples vs 200 Hz control: missing DATA_RDY means stale yaw. */
@@ -275,10 +290,18 @@ bool mpu6050_update(Mpu6050 *imu, float dt, float *heading_rad)
     uint8_t sample[14];
     if (!read_reg(imu, MPU_REG_ACCEL_XOUT_H, sample, sizeof(sample))) return false;
     raw = signed_word(&sample[12]);
-    if (!tilt_guard_update(&imu->pitch_guard,
-            signed_word(&sample[0]) / MPU_ACCEL_LSB_PER_G,
-            signed_word(&sample[2]) / MPU_ACCEL_LSB_PER_G,
-            signed_word(&sample[4]) / MPU_ACCEL_LSB_PER_G, dt)) return false;
+    float ax=signed_word(&sample[0])/MPU_ACCEL_LSB_PER_G;
+    float ay=signed_word(&sample[2])/MPU_ACCEL_LSB_PER_G;
+    float az=signed_word(&sample[4])/MPU_ACCEL_LSB_PER_G;
+    if (!tilt_guard_update(&imu->pitch_guard,ax,ay,az,dt)) return false;
+    float norm=sqrtf(ax*ax+ay*ay+az*az);
+    float pitch_shift=atan2f(ax,hypotf(ay,az))-
+                      atan2f(imu->accel_x_baseline_g,hypotf(ay,az));
+    if(imu->accel_baseline_valid && norm>=MPU6050_PITCH_MIN_G &&
+       norm<=MPU6050_PITCH_MAX_G && fabsf(pitch_shift)<=BRAKING_IMU_TILT_LIMIT_DEG*DEG_TO_RAD) {
+        imu->accel_x_cm_s2=BRAKING_IMU_ACCEL_SIGN*(ax-imu->accel_x_baseline_g)*981.0f;
+        imu->accel_valid=true;
+    }
 #else
     if (!read_gyro_z(imu, &raw)) return false;
 #endif

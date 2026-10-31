@@ -140,7 +140,7 @@ static void test_fast_penultimate_junction(void)
 }
 static void test_final_segment_speed_cap(void)
 {
- /* Both measured and unknown lengths must slow from the start of count=1. */
+ /* Unknown length is slow throughout; measured length uses the distance envelope. */
  for(unsigned length=0;length<2;++length) {
   RouteStep steps[]={{1,50,LEFT,200,0,false,length?1000:0},
                      {1,50,STOP,200,0,false,0}};
@@ -150,7 +150,8 @@ static void test_final_segment_speed_cap(void)
   f.braking_active=false;
   tick(&f,&c,&now,0,0,0x18,false);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
-  NEAR(f.left_target_cm_s,50);NEAR(f.right_target_cm_s,50);
+  NEAR(f.left_target_cm_s,length?200:50);
+  NEAR(f.right_target_cm_s,length?200:50);
 #else
   NEAR(f.left_target_cm_s,200);NEAR(f.right_target_cm_s,200);
 #endif
@@ -196,8 +197,10 @@ int main(void)
  test_final_segment_speed_cap();
  SpeedControl s;MotorCommand out;speed_control_init(&s);
  CHECK(speed_control_update(&s,20,20,80,20,.005f,&out));
+ CHECK(out.left>=0); /* Ordinary speed loop never requests reverse torque. */
+ CHECK(speed_control_update_braking(&s,20,20,80,20,.005f,true,&out));
 #if MOTOR_REVERSE_BRAKE_ENABLED
- CHECK(out.left==-REVERSE_BRAKE_MAX_PWM);
+ CHECK(out.left<0 && out.left>=-REVERSE_BRAKE_MAX_PWM);
 #else
  CHECK(out.left>=0);
 #endif

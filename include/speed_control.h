@@ -19,6 +19,9 @@ void speed_control_init(SpeedControl *speed);
 void speed_control_reset(SpeedControl *speed);
 /* true may still mean disabled output during reverse confirmation; caller must
  * apply command.enabled, not infer motor enable from the return value. */
+bool speed_control_update_braking(SpeedControl *speed, float left_target, float right_target,
+                           float left_measured, float right_measured, float dt,
+                           bool reverse_brake, MotorCommand *command);
 bool speed_control_update(SpeedControl *speed, float left_target, float right_target,
                           float left_measured, float right_measured, float dt,
                           MotorCommand *command);

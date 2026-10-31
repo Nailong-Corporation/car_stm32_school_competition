@@ -25,7 +25,8 @@ typedef enum {
     ROUTE_FAILURE_SEARCH = 9, ROUTE_FAILURE_ENTRY_SPEED = 10,
     ROUTE_FAILURE_EXIT_LOST = 11, /* 已捕获出口再次失线，超过独立时间/距离边界。 */
     ROUTE_FAILURE_CLEAR_LINE_LOST = 12, /* 直行过口未恢复可靠出口线，禁止长距离盲行。 */
-    ROUTE_FAILURE_EXIT_RECAPTURE = 8 /* 8：捕获/离口超距仍未稳定回线；不自动恢复跳段。 */
+    ROUTE_FAILURE_EXIT_RECAPTURE = 8, /* 捕获/离口超距仍未稳定回线。 */
+    ROUTE_FAILURE_BRAKE_DISTANCE = 13 /* 末段余量耗尽仍超入口轮速。 */
 } RouteFailure;
 typedef void (*RouteStopCallback)(size_t step_index, void *context);
 typedef enum {
