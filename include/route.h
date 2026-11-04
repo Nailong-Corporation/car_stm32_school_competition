@@ -5,7 +5,7 @@
 
 typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN, HEXAGON } Action;
 typedef struct {
-    uint16_t junction_count; /* Confirmed physical junctions since last action clearance. */
+    uint16_t junction_count; /* Confirmed junctions + component graphics since last action clearance. */
     float turn_speed;        /* Maximum measured wheel speed before entering a turn, cm/s. */
     Action action;
     int cruise_speed;        /* cm/s, not PWM. */
@@ -26,13 +26,17 @@ typedef enum {
     ROUTE_FAILURE_EXIT_LOST = 11, /* 已捕获出口再次失线，超过独立时间/距离边界。 */
     ROUTE_FAILURE_CLEAR_LINE_LOST = 12, /* 直行过口未恢复可靠出口线，禁止长距离盲行。 */
     ROUTE_FAILURE_EXIT_RECAPTURE = 8, /* 捕获/离口超距仍未稳定回线。 */
-    ROUTE_FAILURE_BRAKE_DISTANCE = 13 /* 末段余量耗尽仍超入口轮速。 */
+    ROUTE_FAILURE_BRAKE_DISTANCE = 13, /* 末段余量耗尽仍超入口轮速。 */
+    ROUTE_FAILURE_COMPONENT_PASS = 14, /* 直行节点穿越超时/超距/航向异常。 */
+    ROUTE_FAILURE_NODE_TYPE = 15 /* 明确图形候选命中转弯/STOP目标，需核对路线计数。 */
 } RouteFailure;
 typedef void (*RouteStopCallback)(size_t step_index, void *context);
 typedef enum {
     JUNCTION_EVIDENCE_NONE, JUNCTION_EVIDENCE_CENTER_BRANCH,
-    JUNCTION_EVIDENCE_EDGE, JUNCTION_EVIDENCE_SEPARATED
+    JUNCTION_EVIDENCE_EDGE, JUNCTION_EVIDENCE_SEPARATED,
+    JUNCTION_EVIDENCE_COMPONENT
 } JunctionEvidence;
+typedef enum { NODE_UNKNOWN, NODE_JUNCTION, NODE_COMPONENT } RouteNodeKind;
 typedef enum {
     JUNCTION_REJECT_NONE, JUNCTION_REJECT_SHAPE, JUNCTION_REJECT_HISTORY,
     JUNCTION_REJECT_SAMPLE_GAP, JUNCTION_REJECT_SIDE_CHANGE,
@@ -99,6 +103,10 @@ typedef struct {
     uint8_t component_recovery_line_samples;
     uint32_t component_recovery_ms;
     float component_recovery_cm, component_recovery_heading;
+    RouteNodeKind last_node_kind;
+    bool component_pass_active;
+    uint32_t component_pass_ms;
+    float component_pass_cm, component_pass_heading, approach_heading;
 } RoutePlanner;
 
 /* Speed feedback must be updated before route_update in production. */

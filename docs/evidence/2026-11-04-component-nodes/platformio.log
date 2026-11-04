@@ -1,0 +1,25 @@
+Processing genericSTM32F103C8 (platform: ststm32; board: genericSTM32F103C8; framework: stm32cube)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/ststm32/genericSTM32F103C8.html
+PLATFORM: ST STM32 (20.0.0) > STM32F103C8 (20k RAM. 64k Flash)
+HARDWARE: STM32F103C8T6 64MHz, 20KB RAM, 64KB Flash
+DEBUG: Current (stlink) External (blackmagic, cmsis-dap, jlink, stlink)
+PACKAGES:
+ - framework-stm32cubef1 @ 1.8.7
+ - tool-ldscripts-ststm32 @ 0.3.0
+ - toolchain-gccarmnoneeabi @ 1.70201.0 (7.2.1)
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 28 compatible libraries
+Scanning dependencies...
+No dependencies
+Building in release mode
+Compiling .pio/build/genericSTM32F103C8/src/line_follow.o
+Linking .pio/build/genericSTM32F103C8/firmware.elf
+Checking size .pio/build/genericSTM32F103C8/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [======    ]  55.8% (used 11432 bytes from 20480 bytes)
+Flash: [======    ]  64.7% (used 42428 bytes from 65536 bytes)
+Building .pio/build/genericSTM32F103C8/firmware.bin
+========================= [SUCCESS] Took 1.09 seconds =========================

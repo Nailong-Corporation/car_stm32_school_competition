@@ -63,6 +63,10 @@ typedef struct {
     float exit_lateral_error_cm;
     uint32_t component_recovery_age_ms;
     float component_recovery_progress_cm;
+    bool component_pass_active;
+    RouteNodeKind node_kind;
+    uint32_t component_pass_age_ms;
+    float component_pass_progress_cm;
     float braking_accel_cm_s2, braking_required_cm_s2;
     uint32_t braking_reverse_ms;
     bool braking_imu_used, braking_reverse_active;
@@ -106,6 +110,8 @@ typedef struct {
     uint8_t raw_mask, line_mask, prefilter_mask, observation;
     uint8_t route_before, route_after, evidence, sides, rejection, heading_source;
     uint8_t candidate_samples, stop_reason;
+    uint8_t node_kind, component_pass_active;
+    float left_target_cm_s, right_target_cm_s;
 } NavigationTraceSample;
 typedef struct {
     NavigationTraceSample samples[NAVIGATION_TRACE_CAPACITY];

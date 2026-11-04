@@ -87,14 +87,14 @@ static void test_diode_straight_clearance(void)
    update(&p,&d,&t,m,0,1);
    CHECK(p.junctions_seen==1);
   }
-  CHECK(p.failure==(condition==0?ROUTE_FAILURE_EXIT_RECAPTURE:ROUTE_FAILURE_CLEAR_LINE_LOST) && p.index==0);
+  CHECK(p.failure==ROUTE_FAILURE_COMPONENT_PASS && p.index==0);
  }
  RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
  RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0x0f,0);
- d=p.capture_line_cm+INTERFERENCE_MAX_DISTANCE_CM;
+ d=p.component_pass_cm+COMPONENT_PASS_MAX_CM;
  route_update(&p,mask(0x18),d,0,t+5); /* A recovery at the distance deadline is too late. */
- CHECK(p.failure==ROUTE_FAILURE_CLEAR_LINE_LOST);
+ CHECK(p.failure==ROUTE_FAILURE_COMPONENT_PASS);
 }
 static void test_fast_penultimate_junction(void)
 {

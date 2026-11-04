@@ -90,6 +90,12 @@ void line_follow_stop(LineFollow *f, LineStopReason reason)
                 (uint32_t)(f->sample_ms-f->route.component_recovery_ms):0U,
             .component_recovery_progress_cm=f->route.component_recovery_used?
                 fabsf(f->odometry.distance_cm-f->route.component_recovery_cm):0.0f,
+            .component_pass_active=f->route.component_pass_active,
+            .node_kind=f->route.last_node_kind,
+            .component_pass_age_ms=f->route.component_pass_active?
+                (uint32_t)(f->sample_ms-f->route.component_pass_ms):0U,
+            .component_pass_progress_cm=f->route.component_pass_active?
+                fabsf(f->odometry.distance_cm-f->route.component_pass_cm):0.0f,
             .braking_accel_cm_s2=f->braking_accel_cm_s2,
             .braking_required_cm_s2=f->braking_required_cm_s2,
             .braking_reverse_ms=f->braking_reverse_ms,
@@ -599,7 +605,14 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     float base_speed = LINE_FOLLOW_SPEED_CM_S;
 #endif
 #if PRESET_ROUTE_ENABLED
-    if(f->route.component_recovery_active) {
+    if(f->route.component_pass_active) {
+        f->state=LINE_JUNCTION;f->abnormal=false;f->exit_accelerating=false;
+        pid_reset(&f->pid);
+        float pass=fminf(base_speed,fminf(COMPONENT_PASS_SPEED_CM_S,JUNCTION_PASS_SPEED_CM_S));
+        outer_targets(f,pass,
+            HEADING_KP_CM_S_PER_RAD*(f->route.component_pass_heading-f->odometry.heading_rad)-
+                JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s,dt);
+    } else if(f->route.component_recovery_active) {
         f->state=LINE_JUNCTION;f->abnormal=false;f->exit_accelerating=false;
         pid_reset(&f->pid);
         outer_targets(f,fminf(step.turn_speed,COMPONENT_RECOVERY_SPEED_CM_S),
@@ -627,7 +640,10 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         outer_targets(f,outer,correction,dt);
     } else if (f->route.state == ROUTE_EXECUTING) {
         f->exit_accelerating=false;
-        if(previous_route!=ROUTE_EXECUTING) {pid_reset(&f->pid);speed_control_reset(&f->speed);}
+        if(previous_route!=ROUTE_EXECUTING) {
+            pid_reset(&f->pid);
+            if(route_current_action(&f->route)!=STRAIGHT) speed_control_reset(&f->speed);
+        }
         f->abnormal=false; f->state=LINE_JUNCTION;
         float direction=route_current_action(&f->route)==LEFT?-1.0f:1.0f;
         float target=route_turn_target_rad(&f->route);
@@ -712,6 +728,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     if (narrow && (stable || !f->abnormal)
 #if PRESET_ROUTE_ENABLED
         && f->route.state != ROUTE_CANDIDATE
+        && !(f->route.state==ROUTE_FOLLOW && gray_has_component_evidence(obs))
 #endif
     ) {
         if (f->abnormal) {
@@ -745,6 +762,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             f->abnormal = true;
             f->hold_heading_rad = f->odometry.heading_rad;
 #if PRESET_ROUTE_ENABLED
+            if(gray_has_component_evidence(obs)) pid_reset(&f->pid);
             /* Do not lock the already overshot yaw as the new exit direction. */
             if(f->route.state==ROUTE_CLEARING && f->route.line_exit_confirmed &&
                route_current_action(&f->route)!=STRAIGHT)
@@ -842,7 +860,10 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
             .route_before=(uint8_t)before,.route_after=(uint8_t)f->route.state,
             .evidence=(uint8_t)f->route.candidate_kind,.sides=f->route.candidate_sides,
             .rejection=(uint8_t)f->route.candidate_reject,.heading_source=(uint8_t)f->heading_source,
-            .candidate_samples=f->route.candidate_count,.stop_reason=(uint8_t)f->stop_reason
+            .candidate_samples=f->route.candidate_count,.stop_reason=(uint8_t)f->stop_reason,
+            .node_kind=(uint8_t)f->route.last_node_kind,
+            .component_pass_active=f->route.component_pass_active,
+            .left_target_cm_s=f->left_target_cm_s,.right_target_cm_s=f->right_target_cm_s
         };
         trace->next=(uint16_t)((trace->next+1U)%NAVIGATION_TRACE_CAPACITY);
         if(trace->count<NAVIGATION_TRACE_CAPACITY) ++trace->count;

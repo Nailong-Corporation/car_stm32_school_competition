@@ -4,6 +4,20 @@
 
 static const float weights[8] = {-7.0f, -5.0f, -3.0f, -1.0f, 1.0f, 3.0f, 5.0f, 7.0f};
 
+bool gray_has_component_evidence(GrayObservation o)
+{
+    unsigned regions=0, width=0, count=0;
+    for(unsigned bit=0;bit<=8;++bit) {
+        if(bit<8 && (o.line_mask&(1U<<bit))) {++width;++count;continue;}
+        if(width) {
+            /* Isolated channels remain noise/seam evidence, never a new node. */
+            if(width<2) return false;
+            ++regions;width=0;
+        }
+    }
+    return (regions==1 && count>JUNCTION_STRAIGHT_EXIT_MAX_WIDTH) || regions>=2;
+}
+
 /**
  * @brief 清空灰度传感器的滤波历史、写入位置和有效样本数量。
  */

@@ -75,6 +75,7 @@ static void reset_evidence(RoutePlanner *p, uint32_t now)
     p->previous_line_valid=false;p->smooth_edge_sides=0;
     p->component_recovery_active=p->component_recovery_used=false;
     p->component_recovery_line_samples=0;
+    p->component_pass_active=false;
     p->last_sample_ms=now;
     p->hexagon=(HexagonNavigation){0};
 }
@@ -113,6 +114,7 @@ void route_start(RoutePlanner *p,float d,uint32_t now)
     p->final_segment_active=p->valid && p->steps[0].junction_count==1;
     p->failure=ROUTE_FAILURE_NONE;
     p->last_confirmed_kind=JUNCTION_EVIDENCE_NONE;
+    p->last_node_kind=NODE_UNKNOWN;
     p->candidate_restarts=p->smooth_edge_rejections=0;
     p->state=p->valid && isfinite(d)?ROUTE_FOLLOW:ROUTE_FAILED;
     if(p->state==ROUTE_FAILED) p->failure=ROUTE_FAILURE_INVALID;
@@ -144,6 +146,7 @@ bool route_uses_corner_arc(const RoutePlanner *p)
 /* 编码器航向本身右转为正，不对 ±180°/360° 取模，以保留实际转动方向与圈数。 */
 float route_turn_target_rad(const RoutePlanner *p)
 {
+    if(p->passing_junction) return 0.0f;
     if (p->steps[p->index].action == CUSTOM_TURN || p->steps[p->index].action == HEXAGON)
         return p->steps[p->index].angle_deg * (JUNCTION_TURN_TARGET_RAD / 90.0f);
     Action action = route_current_action(p);
@@ -221,6 +224,8 @@ static void enter_clear(RoutePlanner *p,float d,uint32_t now)
     p->turn_capturing=false;p->turn_ended_on_line=true;
     if(route_current_action(p)==STRAIGHT) {
         p->capture_line_ms=now;p->capture_line_cm=d;
+        p->component_pass_active=true;p->component_pass_ms=now;
+        p->component_pass_cm=d;p->component_pass_heading=p->entry_heading;
     }
 }
 static bool complete_clear(RoutePlanner *p,float d,uint32_t now)
@@ -236,6 +241,71 @@ static bool complete_clear(RoutePlanner *p,float d,uint32_t now)
     p->final_segment_origin_cm=d;p->search_pending=false;
     p->state=ROUTE_FOLLOW;reset_evidence(p,now);
     return true;
+}
+/* RouteState stays CLEARING so counting remains locked. Every confirmed
+ * straight node gets one budget, including all-white/partly visible graphics.
+ * Centered exit evidence, never a component edge, hands position control back. */
+static void component_pass_update(RoutePlanner *p,GrayObservation o,float d,float h,
+                                  uint32_t now,bool adjacent)
+{
+    if((uint32_t)(now-p->component_pass_ms)>=COMPONENT_PASS_TIMEOUT_MS ||
+       fabsf(d-p->component_pass_cm)>=COMPONENT_PASS_MAX_CM ||
+       fabsf(h-p->component_pass_heading)>=COMPONENT_PASS_HEADING_MAX_RAD) {
+        fail(p,ROUTE_FAILURE_COMPONENT_PASS);return;
+    }
+    bool clear=route_is_clear_line(p,o);
+    bool corridor=p->exit_candidate_pending && p->exit_count>=LINE_CONFIRM_SAMPLES &&
+        (uint32_t)(now-p->exit_candidate_ms)>=JUNCTION_ADJACENT_EXIT_MS &&
+        d-p->exit_candidate_cm>=JUNCTION_ADJACENT_EXIT_CM;
+    uint8_t sides;
+    JunctionEvidence kind=junction_shape(o,&sides);
+    if(kind==JUNCTION_EVIDENCE_NONE && gray_has_component_evidence(o)) {
+        kind=JUNCTION_EVIDENCE_COMPONENT;sides=3U;
+    }
+    /* A proven short center corridor followed by fresh shape evidence may be
+     * a close next node. Accumulate it before the ordinary 2 cm rearm gate. */
+    if(adjacent && kind!=JUNCTION_EVIDENCE_NONE && !clear &&
+       (corridor || p->next_junction_samples)) {
+        if(p->next_junction_samples && !(sides&p->next_junction_sides)) {
+            ++p->candidate_restarts;p->next_junction_samples=0;
+            if(!corridor) return;
+        }
+        if(!p->next_junction_samples) {
+            p->next_junction_ms=now;p->next_junction_cm=d;
+            p->next_junction_sides=sides;p->candidate_kind=kind;
+        }
+        p->next_junction_sides&=sides;
+        if(kind!=JUNCTION_EVIDENCE_CENTER_BRANCH) p->candidate_kind=kind;
+        if((uint32_t)(now-p->next_junction_ms)>=JUNCTION_CONFIRM_TIMEOUT_MS) {
+            fail(p,ROUTE_FAILURE_CONFIRM_TIMEOUT);return;
+        }
+        bool weak=p->candidate_kind!=JUNCTION_EVIDENCE_CENTER_BRANCH;
+        unsigned samples=weak?JUNCTION_EDGE_CONFIRM_SAMPLES:JUNCTION_CONFIRM_SAMPLES;
+        float progress=weak?JUNCTION_EDGE_CONFIRM_CM:JUNCTION_CONFIRM_DISTANCE_CM;
+        if(p->next_junction_samples<samples) ++p->next_junction_samples;
+        if(p->next_junction_samples>=samples && d-p->next_junction_cm>=progress) {
+            uint32_t candidate_ms=p->next_junction_ms;
+            float candidate_cm=p->next_junction_cm,heading=p->component_pass_heading;
+            uint8_t confirmed_sides=p->next_junction_sides;
+            JunctionEvidence confirmed_kind=p->candidate_kind;
+            if(!complete_clear(p,d,now)) return;
+            p->state=ROUTE_CANDIDATE;p->phase_ms=candidate_ms;p->entry_cm=candidate_cm;
+            p->entry_heading=heading;p->candidate_count=(uint8_t)samples;
+            p->candidate_kind=confirmed_kind;p->candidate_sides=confirmed_sides;
+            route_update(p,o,d,h,now);return;
+        }
+    } else p->next_junction_samples=0;
+    if(!clear || !adjacent) {p->exit_count=0;p->exit_candidate_pending=false;}
+    if(clear && !p->exit_candidate_pending) {
+        p->exit_candidate_pending=true;p->exit_candidate_ms=now;p->exit_candidate_cm=d;
+    }
+    if(clear && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
+    if(p->exit_count>=LINE_CONFIRM_SAMPLES &&
+       (uint32_t)(now-p->exit_candidate_ms)>=JUNCTION_COUNT_CLEAR_MS &&
+       d-p->exit_candidate_cm>=JUNCTION_COUNT_CLEAR_CM && complete_clear(p,d,now)) {
+        p->have_approach_center=true;p->approach_center_count=LINE_CONFIRM_SAMPLES;
+        p->approach_center_ms=now;p->approach_center_cm=d;p->approach_heading=h;
+    }
 }
 static bool component_recovery(RoutePlanner *p,GrayObservation o,float d,float h,
                                uint32_t now,bool adjacent,bool eligible)
@@ -409,7 +479,8 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
                d-p->search_origin_cm>=JUNCTION_SEARCH_MAX_CM) {fail(p,ROUTE_FAILURE_SEARCH);return;}
         }
         bool narrow=route_is_narrow_line(o);
-        bool center=narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
+        bool center=narrow && o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH &&
+            fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
         /* A continuous overlapping narrow line sliding to one edge is curve
          * evidence, not a newly appearing branch. Latch until stable center
          * returns; a noisy missing frame must not reclassify the same edge. */
@@ -426,6 +497,7 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
             if(p->approach_center_count<LINE_CONFIRM_SAMPLES) ++p->approach_center_count;
             if(p->approach_center_count>=LINE_CONFIRM_SAMPLES) {
                 p->have_approach_center=true;p->approach_center_ms=now;p->approach_center_cm=d;
+                p->approach_heading=h;
                 p->smooth_edge_sides=0;
             }
         } else p->approach_center_count=0;
@@ -438,6 +510,9 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         bool history=(p->state==ROUTE_CANDIDATE && d>=p->entry_cm) || recent_center;
         uint8_t sides;
         JunctionEvidence kind=junction_shape(o,&sides);
+        if(kind==JUNCTION_EVIDENCE_NONE && gray_has_component_evidence(o)) {
+            kind=JUNCTION_EVIDENCE_COMPONENT;sides=3U;
+        }
         bool smooth=kind==JUNCTION_EVIDENCE_EDGE && (sides&p->smooth_edge_sides);
         bool shape=history && kind!=JUNCTION_EVIDENCE_NONE && !smooth;
         /* Real loss / single abrupt frames never count as junctions. */
@@ -461,6 +536,7 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         bool same_sides=p->state==ROUTE_CANDIDATE && p->candidate_sides==sides;
         if(p->state==ROUTE_FOLLOW) {
             p->state=ROUTE_CANDIDATE;p->phase_ms=now;p->entry_cm=d;p->candidate_count=0;
+            p->entry_heading=p->approach_heading;
             p->candidate_kind=kind;p->candidate_sides=sides;
         } else {
             p->candidate_sides&=sides; /* L -> both -> R cannot accumulate as one branch. */
@@ -483,15 +559,25 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         if(p->candidate_count<samples) ++p->candidate_count;
         if(p->candidate_count<samples || d-p->entry_cm<distance) return;
         p->last_confirmed_kind=p->candidate_kind;
+        p->last_node_kind=p->candidate_kind==JUNCTION_EVIDENCE_COMPONENT?NODE_COMPONENT:
+            p->candidate_sides==3U?NODE_UNKNOWN:NODE_JUNCTION;
         ++p->junctions_seen; /* Lock immediately: no recount until clearance. */
         p->passing_junction=p->junctions_seen<s.junction_count;
         p->search_pending=false;
-        if(p->passing_junction) { begin_action(p,d,h,now);enter_clear(p,d,now);return; }
+        if(p->passing_junction) {
+            float heading=p->entry_heading;
+            begin_action(p,d,heading,now);enter_clear(p,d,now);return;
+        }
+        /* A graphic with no junction topology cannot authorize a target turn
+         * or STOP. Configure STRAIGHT for it or fix the mixed-node count. */
+        if(p->last_node_kind==NODE_COMPONENT && route_current_action(p)!=STRAIGHT) {
+            fail(p,ROUTE_FAILURE_NODE_TYPE);return;
+        }
         /* 直行过口无强转风险，不设入口轮速门禁；转弯/STOP 仍先降速到位。 */
         if(route_current_action(p)!=STRAIGHT && !entry_speed_ready(p)) {
             p->state=ROUTE_BRAKING;p->phase_ms=now;p->entry_cm=d;p->entry_heading=h;return;
         }
-        accept_target(p,d,h,now);return;
+        accept_target(p,d,route_current_action(p)==STRAIGHT?p->entry_heading:h,now);return;
     }
     if(p->state==ROUTE_BRAKING) {
         if((uint32_t)(now-p->phase_ms)>=JUNCTION_ENTRY_BRAKE_TIMEOUT_MS ||
@@ -504,6 +590,9 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
     }
     if(s.action==HEXAGON && !p->passing_junction && p->state==ROUTE_EXECUTING) {
         hexagon_update(p,o,d,h,now,adjacent);return;
+    }
+    if(p->component_pass_active) {
+        component_pass_update(p,o,d,h,now,adjacent);return;
     }
     Action action=route_current_action(p);
     float sign=action==LEFT?-1.0f:1.0f;
@@ -596,9 +685,11 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
             if(p->next_junction_samples>=JUNCTION_CONFIRM_SAMPLES &&
                d-p->next_junction_cm>=JUNCTION_CONFIRM_DISTANCE_CM) {
                 uint32_t candidate_ms=p->next_junction_ms;float candidate_cm=p->next_junction_cm;
+                float candidate_heading=p->line_exit_heading_rad;
                 uint8_t confirmed_sides=p->next_junction_sides;
                 if(!complete_clear(p,d,now)) return;
                 p->state=ROUTE_CANDIDATE;p->phase_ms=candidate_ms;p->entry_cm=candidate_cm;
+                p->entry_heading=candidate_heading;
                 p->candidate_count=JUNCTION_CONFIRM_SAMPLES;p->candidate_separated=true;
                 p->candidate_kind=JUNCTION_EVIDENCE_SEPARATED;p->candidate_sides=confirmed_sides;
                 /* Consume the already recorded real samples on the new step;
@@ -635,6 +726,7 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
          * demand three extra blank-corridor frames before the next graphic. */
         p->have_approach_center=true;p->approach_center_count=LINE_CONFIRM_SAMPLES;
         p->approach_center_ms=now;p->approach_center_cm=d;
+        p->approach_heading=h;
     }
 }
 void route_dispatch_stop_callback(RoutePlanner *p)

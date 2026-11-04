@@ -300,6 +300,12 @@
 #define COMPONENT_RECOVERY_SPEED_CM_S 16.0f /* 已捕线近出口/离口遇图形：保持进入时航向找线。 */
 #define COMPONENT_RECOVERY_MAX_CM     12.0f
 #define COMPONENT_RECOVERY_TIMEOUT_MS 1200U
+/* Normal straight-node passage: independent of low-speed turn-exit recovery.
+ * <=15 cm graphic envelope + detection/exit margin; values need track tests. */
+#define COMPONENT_PASS_SPEED_CM_S    60.0f
+#define COMPONENT_PASS_MAX_CM        20.0f
+#define COMPONENT_PASS_TIMEOUT_MS    1500U
+#define COMPONENT_PASS_HEADING_MAX_RAD 0.35f
 
 /* Count-navigation braking: measured calibration required before setting lengths. */
 #ifndef BRAKING_CALIBRATION_CONFIRMED

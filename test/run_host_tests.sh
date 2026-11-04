@@ -3,6 +3,20 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 test_binary=$(mktemp "${TMPDIR:-/tmp}/car_stm32_test.XXXXXX")
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
+# Mixed junction/component nodes, both polarities and heading configurations.
+for invert in 0 1; do
+    for imu in 0 1; do
+        "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I"$project_dir/include" -DGRAY_INVERT_ENABLED="$invert" \
+            -DMPU6050_ENABLED="$imu" -DODOMETRY_HEADING_SCALE=1.0f \
+            "$project_dir/test/test_component_nodes.c" "$project_dir/src/gray_sensor.c" \
+            "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" \
+            "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+            "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+        "$test_binary"
+    done
+done
 # HEXAGON uses the same sensor polarities and sticky heading-source fallback.
 for invert in 0 1; do
     for imu in 0 1; do

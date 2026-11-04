@@ -98,7 +98,8 @@ static void test_control_and_clearance(void)
  RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0xff,0);CHECK(p.passing_junction && p.state==ROUTE_CLEARING);
  update(&p,&d,&t,0xff,0,100);
- CHECK(p.component_recovery_active && p.state==ROUTE_CLEARING && p.junctions_seen==1);
+ CHECK(p.component_pass_active && !p.component_recovery_active &&
+       p.state==ROUTE_CLEARING && p.junctions_seen==1);
  update(&p,&d,&t,0x18,0,45);CHECK(p.state==ROUTE_FOLLOW && p.junctions_seen==1);
 }
 

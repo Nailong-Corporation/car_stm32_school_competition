@@ -1,0 +1,1 @@
+before: /tmp/car-component-regression/repro.c:8: main: Assertion `p.junctions_seen==1' failed.

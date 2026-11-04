@@ -25,6 +25,9 @@ typedef struct {
 
 void gray_sensor_init(GraySensor *sensor);
 GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previous);
+/* Shape evidence only: wide bars or separated groups of >=2 channels.
+ * Symmetric under S0..S7 reversal; does not identify an electrical component. */
+bool gray_has_component_evidence(GrayObservation observation);
 GrayObservation gray_sensor_update(GraySensor *sensor, uint8_t raw_mask,
                                    bool have_previous, float previous);
 
