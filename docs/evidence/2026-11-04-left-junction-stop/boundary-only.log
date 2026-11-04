@@ -1,0 +1,2 @@
+approach action=0 d=60.009998 target=16.516684 speed=20.262175 failure=13
+Assertion failed: (f.state!=LINE_STOPPED && f.route.failure==ROUTE_FAILURE_NONE), function test_approach_braking_boundary, file test_navigation.c, line 482.

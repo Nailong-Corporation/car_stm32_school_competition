@@ -1,0 +1,1 @@
+Assertion failed: (fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=50.001f), function test_counting_speed_and_short_nodes, file test_detection_speed.c, line 42.

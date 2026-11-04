@@ -1,0 +1,1 @@
+Assertion failed: (f.left_target_cm_s>49.9f && f.right_target_cm_s>49.9f), function test_low_cruise_keeps_speed_longer, file test_detection_speed.c, line 65.

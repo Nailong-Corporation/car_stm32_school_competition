@@ -62,6 +62,14 @@ static SpeedFault wheel(Pid *pid, float target, float measured, float dt, float 
 #else
     (void)reverse_brake;
 #endif
+    /* A positive integral from acceleration must not keep driving a wheel
+     * already above its new target. Remove forward effort immediately; the
+     * optional explicit reverse-brake path above remains independent. */
+    if (measured > target + SPEED_COAST_MARGIN_CM_S) {
+        pid_reset(pid);
+        *pwm = 0.0f;
+        return SPEED_FAULT_NONE;
+    }
     return pid_update_bounded(pid, target - measured, dt, 0.0f, MOTOR_PWM_LIMIT,
                               target * SPEED_FEEDFORWARD, pwm) ? SPEED_FAULT_NONE : SPEED_FAULT_PID;
 }

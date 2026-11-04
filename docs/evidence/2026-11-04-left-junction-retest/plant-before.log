@@ -1,0 +1,2 @@
+finite response action=0 d=60.020 speed=41.000/41.000 reason=13
+Assertion failed: (f.state!=LINE_STOPPED), function test_finite_deceleration, file test_passive_braking.c, line 58.

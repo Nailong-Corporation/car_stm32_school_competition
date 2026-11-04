@@ -3,6 +3,28 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 test_binary=$(mktemp "${TMPDIR:-/tmp}/car_stm32_test.XXXXXX")
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
+# Count-phase speed and filtered short nodes, both sensor polarities.
+for invert in 0 1; do
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+        -fsanitize=address,undefined -fno-omit-frame-pointer \
+        -I"$project_dir/include" -DGRAY_INVERT_ENABLED="$invert" -DMPU6050_ENABLED=0 \
+        "$project_dir/test/test_detection_speed.c" "$project_dir/src/gray_sensor.c" \
+        "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" \
+        "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+        "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+    "$test_binary"
+done
+# Passive overspeed output and finite motor response, both sensor polarities.
+for invert in 0 1; do
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+        -fsanitize=address,undefined -fno-omit-frame-pointer \
+        -I"$project_dir/include" -DGRAY_INVERT_ENABLED="$invert" -DMPU6050_ENABLED=0 \
+        "$project_dir/test/test_passive_braking.c" "$project_dir/src/gray_sensor.c" \
+        "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" \
+        "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+        "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+    "$test_binary"
+done
 # Mixed junction/component nodes, both polarities and heading configurations.
 for invert in 0 1; do
     for imu in 0 1; do

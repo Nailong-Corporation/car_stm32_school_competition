@@ -101,6 +101,8 @@ void line_follow_stop(LineFollow *f, LineStopReason reason)
             .braking_reverse_ms=f->braking_reverse_ms,
             .braking_imu_used=f->braking_imu_used,
             .braking_reverse_active=f->braking_reverse_active,
+            .left_command_pwm=f->command.left,.right_command_pwm=f->command.right,
+            .left_speed_integral=f->speed.left.integral,.right_speed_integral=f->speed.right.integral,
             .turn_exit_branch = 0,
             .exit_line_mask = 0,
             .handoff_early = 0,
@@ -515,10 +517,16 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     RouteStep step = f->route.steps[f->route.index];
     float entry_speed_limit = route_entry_speed_limit(&f->route);
     float base_speed = (float)step.cruise_speed;
+    bool count_speed_limited=!f->route.final_segment_active &&
+        (f->route.state==ROUTE_FOLLOW || f->route.state==ROUTE_CANDIDATE ||
+         f->route.component_pass_active);
     if (TURN_EXIT_ACCEL_ENABLED && f->route.state == ROUTE_CLEARING && !f->route.passing_junction) {
         size_t next = f->route.lap_boundary ? 0U : f->route.index + 1U;
         if (next < f->route.count) base_speed = (float)f->route.steps[next].cruise_speed;
     }
+    /* A short branch may be gone before a high-speed candidate can request
+     * deceleration. Preserve the count protocol, cap motion while counting. */
+    if(count_speed_limited) base_speed=fminf(base_speed,JUNCTION_DETECTION_SPEED_CM_S);
     /* 已确认出口不等于已稳定离口：先低速位置巡线，完成去重后再恢复巡航。 */
     if (f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
         base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
@@ -543,13 +551,20 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         else f->braking_accel_cm_s2+=dt/(BRAKING_ACCEL_FILTER_TAU_S+dt)*
             (raw_accel-f->braking_accel_cm_s2);
         f->braking_speed_primed=true;
+        float plan_decel=step.cruise_speed<=BRAKING_LOW_CRUISE_MAX_CM_S?
+            BRAKING_LOW_CRUISE_DECEL_CM_S2:BRAKING_SAFE_DECEL_CM_S2;
         BrakingPlan plan = braking_plan(base_speed, entry_speed_limit,
             step.final_segment_length_cm, f->odometry.distance_cm-f->route.final_segment_origin_cm,
             fmaxf(fabsf(f->odometry.left_speed_cm_s),fabsf(f->odometry.right_speed_cm_s)),
-            BRAKING_SAFE_DECEL_CM_S2, BRAKING_DISTANCE_MARGIN_CM, BRAKING_CALIBRATION_CONFIRMED);
+            plan_decel, BRAKING_DISTANCE_MARGIN_CM+BRAKING_REVERSE_GUARD_CM,
+            SPEED_FILTER_TAU_S+dt,BRAKING_CALIBRATION_CONFIRMED);
         if (!plan.valid) { line_follow_stop(f,LINE_STOP_ROUTE); return; }
+        /* Envelope and feedback deadline must share the SAME usable distance.
+         * Previously only braking_decide subtracted the guard: it required entry
+         * speed 3 cm before the envelope even requested it. Reserve it once in
+         * the plan, preserving the original physical BRAKE_DISTANCE deadline. */
         BrakingDecision decision=braking_decide(speed,entry_speed_limit,plan.remaining_cm,
-            -f->braking_accel_cm_s2,BRAKING_SAFE_DECEL_CM_S2,BRAKING_REVERSE_GUARD_CM);
+            -f->braking_accel_cm_s2,plan_decel,0);
         f->braking_required_cm_s2=decision.required_decel;
         f->braking_reverse_active=false;
         if(decision.distance_exhausted && speed>entry_speed_limit+REVERSE_BRAKE_MARGIN_CM_S) {
@@ -785,6 +800,17 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             targets(f,base,correction,dt);
     }
 #if PRESET_ROUTE_ENABLED
+    /* Heading hold can request a faster outer wheel. Keep both inside the
+     * sampling cap while preserving the requested steering ratio. */
+    if(count_speed_limited) {
+        float peak=fmaxf(f->left_target_cm_s,f->right_target_cm_s);
+        if(peak>JUNCTION_DETECTION_SPEED_CM_S) {
+            float scale=JUNCTION_DETECTION_SPEED_CM_S/peak;
+            f->left_target_cm_s*=scale;f->right_target_cm_s*=scale;
+            f->base=.5f*(f->left_target_cm_s+f->right_target_cm_s);
+            f->correction=.5f*(f->left_target_cm_s-f->right_target_cm_s);
+        }
+    }
     if ((f->route.state == ROUTE_EXECUTING || f->route.state == ROUTE_CLEARING) &&
         (f->turn_trace.count == 0 || (uint32_t)(now_ms-f->turn_trace.last_ms) >= 20U)) {
         TurnTrace *trace = &f->turn_trace;
@@ -863,7 +889,8 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
             .candidate_samples=f->route.candidate_count,.stop_reason=(uint8_t)f->stop_reason,
             .node_kind=(uint8_t)f->route.last_node_kind,
             .component_pass_active=f->route.component_pass_active,
-            .left_target_cm_s=f->left_target_cm_s,.right_target_cm_s=f->right_target_cm_s
+            .left_target_cm_s=f->left_target_cm_s,.right_target_cm_s=f->right_target_cm_s,
+            .left_command_pwm=f->command.left,.right_command_pwm=f->command.right
         };
         trace->next=(uint16_t)((trace->next+1U)%NAVIGATION_TRACE_CAPACITY);
         if(trace->count<NAVIGATION_TRACE_CAPACITY) ++trace->count;

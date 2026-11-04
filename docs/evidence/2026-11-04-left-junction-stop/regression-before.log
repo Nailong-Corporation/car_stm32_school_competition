@@ -1,0 +1,1 @@
+Assertion failed: (f.state!=LINE_STOPPED && f.route.failure==ROUTE_FAILURE_NONE), function test_approach_braking_boundary, file test_navigation.c, line 479.

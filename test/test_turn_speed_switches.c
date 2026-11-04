@@ -164,7 +164,7 @@ static void test_final_segment_speed_cap(void)
  LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  f.base=f.left_target_cm_s=f.right_target_cm_s=200;
- tick(&f,&c,&now,0,0,0x18,false);NEAR(f.base,200);
+ tick(&f,&c,&now,0,0,0x18,false);NEAR(f.base,JUNCTION_DETECTION_SPEED_CM_S);
  float d=0;
  for(unsigned i=0;i<2;++i) {
   junction(&f.route,&d,&now,0xff,0);clear(&f.route,&d,&now,0);
@@ -172,9 +172,9 @@ static void test_final_segment_speed_cap(void)
   f.base=f.left_target_cm_s=f.right_target_cm_s=200;
   tick(&f,&c,&now,0,0,0x18,false);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
-  NEAR(f.base,i==0?200:JUNCTION_SETTLE_SPEED_CM_S);
+  NEAR(f.base,i==0?JUNCTION_DETECTION_SPEED_CM_S:JUNCTION_SETTLE_SPEED_CM_S);
 #else
-  NEAR(f.base,200);
+  NEAR(f.base,i==0?JUNCTION_DETECTION_SPEED_CM_S:200);
 #endif
  }
  /* A completed turn hands off directly to the next count=1 low-speed leg. */

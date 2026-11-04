@@ -2,9 +2,12 @@
 #define BRAKING_PLANNER_H
 #include <stdbool.h>
 typedef struct { float allowed_speed, required_decel, remaining_cm; bool valid; } BrakingPlan;
-/* Pure speed envelope. No route state, junction event, or motor output. */
+/* Pure speed envelope. response_s reserves measured_speed * response_s for
+ * feedback/control lag in the speed cap only; remaining_cm is the hard distance
+ * deadline after margin. No route state, junction event, or motor output. */
 BrakingPlan braking_plan(float cruise, float entry, float length, float progress,
-                         float measured_speed, float decel, float margin, bool calibrated);
+                         float measured_speed, float decel, float margin,
+                         float response_s, bool calibrated);
 /* Decision uses conservative calibrated deceleration and observed braking response;
  * sensor acceleration can only reduce the estimate, never raise the safe bound. */
 typedef struct { bool reverse_needed, distance_exhausted; float required_decel; } BrakingDecision;

@@ -173,6 +173,7 @@
 #define SPEED_KI                     8.0f  /* 速度积分系数，实际积分使用 dt。 */
 #define SPEED_KD                     0.0f  /* 速度微分系数初值，当前为 0。 */
 #define SPEED_INTEGRAL_LIMIT         10.0f /* 速度误差积分的绝对值上限，积分单位为 cm。 */
+#define SPEED_COAST_MARGIN_CM_S       3.0f /* 反馈超目标此值即撤正向PWM并清该轮积分，不输出反向力矩。 */
 /* 2026-10-30 按 5 m/s 满量程修正：前馈 = 满 PWM 255 ÷ 500 cm/s ≈ 0.51 PWM/(cm/s)。
  * 旧值 3.0 在约 85 cm/s 即饱和，差速修正随之失效；仍为初值，需台架实测重标。 */
 #define SPEED_FEEDFORWARD             (255.0f / VEHICLE_MAX_SPEED_CM_S)
@@ -257,6 +258,9 @@
 /* ==================== 九、方向无关路口候选与动作 ====================
  * 近期中心历史 + 任意侧分支，连续帧/位移联合确认。失线与单帧骤变不触发。
  */
+/* 未到最后一段时也必须看清每个计数节点，不能等候选出现才从200减速。
+ * 50是采样速度初值，不代表已验证最短图形识别率；不改表内节点数。 */
+#define JUNCTION_DETECTION_SPEED_CM_S 50.0f
 #define JUNCTION_CONFIRM_SAMPLES       3U
 #define JUNCTION_CONFIRM_DISTANCE_CM   0.10f
 #define JUNCTION_EARLY_CONFIRM_SAMPLES  2U /* 仅目标普通左右转、同侧强中心分支提前确认。 */
@@ -312,8 +316,14 @@
 #define BRAKING_CALIBRATION_CONFIRMED 1
 #endif
 #ifndef BRAKING_SAFE_DECEL_CM_S2
-#define BRAKING_SAFE_DECEL_CM_S2 120.0f
+/* 两次现场120规划均来不及降速，停前低通估计约62/71；改用更早减速的
+ * 40初值，仍非已完成制动力标定，原距离耗尽/入口超速保护继续生效。 */
+#define BRAKING_SAFE_DECEL_CM_S2 40.0f
 #endif
+/* 低巡航速度单独微调：50→16的名义减速距离22.44 cm（原40为28.05）。
+ * 仍为待实测初值；高巡航路段沿用40，不恢复未满足的120规划。 */
+#define BRAKING_LOW_CRUISE_MAX_CM_S 50.0f
+#define BRAKING_LOW_CRUISE_DECEL_CM_S2 50.0f
 #define BRAKING_DISTANCE_MARGIN_CM 2.0f
 #define BRAKING_TARGET_JERK_CM_S3 800.0f
 #define MPU6050_CALIBRATION_MAX_BIAS_LSB 328.0f

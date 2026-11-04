@@ -222,10 +222,15 @@ static void test_clearance_lateral_motion(void)
 }
 static void test_braking(void)
 {
- BrakingPlan p=braking_plan(40,6,20,0,40,30,2,true);
+ BrakingPlan p=braking_plan(40,6,20,0,40,30,2,0,true);
  CHECK(p.valid);NEAR(p.allowed_speed,sqrtf(36+60*18));
+ BrakingPlan delayed=braking_plan(40,6,20,0,40,30,2,.035f,true);
+ CHECK(delayed.valid && delayed.allowed_speed<p.allowed_speed);
+ NEAR(delayed.remaining_cm,p.remaining_cm); /* Response lead never moves the hard deadline. */
+ CHECK(!braking_plan(40,6,20,0,40,30,2,NAN,true).valid);
+ CHECK(!braking_plan(40,6,20,0,40,30,2,-.01f,true).valid);
  float previous=p.allowed_speed;
- for(unsigned d=1;d<25;++d) {p=braking_plan(40,6,20,(float)d,20,30,2,true);CHECK(p.valid && p.allowed_speed<=previous);previous=p.allowed_speed;}
+ for(unsigned d=1;d<25;++d) {p=braking_plan(40,6,20,(float)d,20,30,2,0,true);CHECK(p.valid && p.allowed_speed<=previous);previous=p.allowed_speed;}
  NEAR(p.allowed_speed,6);CHECK(isinf(p.required_decel));
  BrakingDecision decision=braking_decide(100,50,30,60,120,3);
  CHECK(decision.reverse_needed && !decision.distance_exhausted && decision.required_decel>120);
@@ -235,9 +240,9 @@ static void test_braking(void)
  CHECK(decision.reverse_needed); /* Weak measured deceleration reduces feasibility. */
  CHECK(braking_decide(60,50,2,0,120,3).distance_exhausted);
  CHECK(!braking_decide(45,50,0,0,120,3).reverse_needed);
- CHECK(!braking_plan(40,6,20,0,0,0,2,false).valid);
- CHECK(!braking_plan(40,6,NAN,0,0,30,2,true).valid);
- CHECK(braking_plan(40,6,0,1000,0,0,2,false).allowed_speed==40);
+ CHECK(!braking_plan(40,6,20,0,0,0,2,0,false).valid);
+ CHECK(!braking_plan(40,6,NAN,0,0,30,2,0,true).valid);
+ CHECK(braking_plan(40,6,0,1000,0,0,2,0,false).allowed_speed==40);
  RouteStep s[]={{1,6,LEFT,20,0,false,10},{1,6,STOP,20,0,false,0}};
  RoutePlanner r;route_init(&r,s,2,NULL,NULL);
 #if !BRAKING_CALIBRATION_CONFIRMED
@@ -457,8 +462,60 @@ static void test_final_leg_ramp(void)
  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=s[0].turn_speed+.001f);
 #endif
 }
+static void test_approach_braking_boundary(void)
+{
+#if TURN_APPROACH_SLOWDOWN_ENABLED && BRAKING_CALIBRATION_CONFIRMED
+ /* A vehicle following the requested envelope must reach entry speed before
+  * the BRAKE_DISTANCE deadline, for either turn direction and final STOP.
+  * The 65 cm / 50 cm/s first leg matches the captured route configuration. */
+ const Action actions[]={LEFT,RIGHT,STOP};
+ for(unsigned a=0;a<sizeof(actions)/sizeof(actions[0]);++a) {
+  RouteStep s[]={{1,50,actions[a],50,0,false,65},{1,50,STOP,50,0,false,0}};
+  LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,actions[a]==STOP?1:2);
+  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
+  float fractional=0;
+  float deadline=65-BRAKING_DISTANCE_MARGIN_CM-BRAKING_REVERSE_GUARD_CM;
+  bool crossed=false;
+  for(unsigned i=0;i<2000 && f.odometry.distance_cm<65;++i) {
+   float speed=fmaxf(f.left_target_cm_s,f.right_target_cm_s);
+   fractional+=speed*.005f/.01f;
+   int delta=(int)fractional;fractional-=delta;
+   tick(&f,&c,&t,delta,delta,0x18,false);
+   if(f.state==LINE_STOPPED) fprintf(stderr,"approach action=%u d=%f target=%f speed=%f failure=%u\n",
+       a,f.odometry.distance_cm,f.stop_snapshot.left_target_cm_s,
+       f.stop_snapshot.left_speed_cm_s,(unsigned)f.route.failure);
+   CHECK(f.state!=LINE_STOPPED && f.route.failure==ROUTE_FAILURE_NONE);
+   CHECK(f.route.junctions_seen==0 && f.route.state==ROUTE_FOLLOW);
+   if(f.odometry.distance_cm-f.route.final_segment_origin_cm>=deadline) {
+    crossed=true;
+    CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=route_entry_speed_limit(&f.route)+.001f);
+   }
+  }
+  CHECK(crossed && f.odometry.distance_cm>=65);
+  /* Distance never fabricates a junction. A real branch still authorizes it. */
+  for(unsigned i=0;i<4;++i) tick(&f,&c,&t,8,8,actions[a]==RIGHT?0xf8:0x1f,false);
+  CHECK(f.route.junctions_seen==1);
+  /* Filtered feedback may still be slightly above the strict entry gate.
+   * Remain in BRAKING until measured speed is actually below that gate. */
+  for(unsigned i=0;i<20 && f.route.state==ROUTE_BRAKING;++i)
+   tick(&f,&c,&t,7,7,actions[a]==RIGHT?0xf8:0x1f,false);
+  CHECK(actions[a]==STOP?f.state==LINE_STOPPED && f.stop_reason==LINE_STOP_ROUTE_COMPLETE:
+                         f.route.state==ROUTE_EXECUTING);
+ }
+ /* Captured excessive feedback remains a failure at the SAME physical deadline;
+  * earlier planning must not hide an unchanged high-speed field replay. */
+ RouteStep s[]={{1,50,LEFT,50,0,false,65},{1,50,STOP,50,0,false,0}};
+ LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
+ f.route.final_segment_origin_cm=f.odometry.distance_cm-60.1262779f;
+ f.odometry.left_speed_cm_s=37.2934227f;f.odometry.right_speed_cm_s=33.921917f;
+ tick(&f,&c,&t,19,17,0x18,false);
+ CHECK(f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_BRAKE_DISTANCE);
+ CHECK(f.stop_snapshot.junctions_seen==0 && !f.command.enabled);
+#endif
+}
 int main(void)
 {
+ test_approach_braking_boundary();
  test_counts();test_noise_and_straight();test_l_edges_and_confirmation();test_entry_brake();test_angles_and_failures();test_fast_exit();test_clearance_lateral_motion();test_braking();test_search_and_slew();test_loops();test_control();test_closed_turns();test_adjacent_graphic_guards();test_line_exit_guards();test_final_leg_ramp();
 #if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
  test_bounded_approach_reverse();

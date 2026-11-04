@@ -1,0 +1,6 @@
+$1 = (LineFollow *) 0x20000130 <follow>
+$2 = (LineStopSnapshot *) 0x200003c4 <follow+660>
+$3 = (LineStopSnapshot *) 0x20002e60 <g_diagnostics+140>
+$4 = (NavigationTrace *) 0x20000cc4 <follow+2964>
+$5 = 64
+$6 = 176

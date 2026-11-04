@@ -1,0 +1,33 @@
+$1 = (LineFollow *) 0x20000130 <follow>
+$2 = 10104
+$3 = (volatile ControlDiagnostics *) 0x200029b4 <g_diagnostics>
+$4 = 752
+type = struct {
+/*      0      |       4 */    uint32_t ms;
+/*      4      |       4 */    float dt_s;
+/*      8      |       4 */    float heading_rad;
+/*     12      |       4 */    float distance_cm;
+/*     16      |       4 */    float left_speed_cm_s;
+/*     20      |       4 */    float right_speed_cm_s;
+/*     24      |       4 */    uint32_t route_index;
+/*     28      |       2 */    uint16_t junctions_seen;
+/*     30      |       4 */    EncoderCounts counts;
+/*     34      |       1 */    uint8_t raw_mask;
+/*     35      |       1 */    uint8_t line_mask;
+/*     36      |       1 */    uint8_t prefilter_mask;
+/*     37      |       1 */    uint8_t observation;
+/*     38      |       1 */    uint8_t route_before;
+/*     39      |       1 */    uint8_t route_after;
+/*     40      |       1 */    uint8_t evidence;
+/*     41      |       1 */    uint8_t sides;
+/*     42      |       1 */    uint8_t rejection;
+/*     43      |       1 */    uint8_t heading_source;
+/*     44      |       1 */    uint8_t candidate_samples;
+/*     45      |       1 */    uint8_t stop_reason;
+/*     46      |       1 */    uint8_t node_kind;
+/*     47      |       1 */    uint8_t component_pass_active;
+/*     48      |       4 */    float left_target_cm_s;
+/*     52      |       4 */    float right_target_cm_s;
+
+                               /* total size (bytes):   56 */
+                             }

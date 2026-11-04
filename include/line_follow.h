@@ -73,6 +73,8 @@ typedef struct {
     HeadingSource heading_source;
     HeadingFallbackReason heading_fallback_reason;
     uint32_t heading_fallback_ms;
+    float left_command_pwm, right_command_pwm; /* 最近算出的控制输出，停车清零前。 */
+    float left_speed_integral, right_speed_integral;
 } LineStopSnapshot;
 typedef struct {
     bool valid, handed_off;
@@ -112,6 +114,7 @@ typedef struct {
     uint8_t candidate_samples, stop_reason;
     uint8_t node_kind, component_pass_active;
     float left_target_cm_s, right_target_cm_s;
+    float left_command_pwm, right_command_pwm;
 } NavigationTraceSample;
 typedef struct {
     NavigationTraceSample samples[NAVIGATION_TRACE_CAPACITY];

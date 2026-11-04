@@ -1,0 +1,1 @@
+Snapshot copies match (160 bytes); trace next=2, count=128
