@@ -140,7 +140,7 @@ int main(void)
     /* Failed real driver initialization is not a retry-only START trap. */
     LineFollow degraded;
     const RouteStep fallback_steps[]={{1,6,STOP,40,0,false,0}};
-    OdometryCalibration fallback_geometry={4.8f,4.8f,1560,1560,14.5f,-1,1,true};
+    OdometryCalibration fallback_geometry={LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
     line_follow_init(&degraded,fallback_geometry,fallback_steps,1,NULL,NULL);
     for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) {
         float ignored=0;
@@ -201,7 +201,7 @@ int main(void)
     /* Full stationary-calibration driver-to-start path. */
     LineFollow follow;
     const RouteStep steps[] = {{1, 6.0f, STOP, 40, 0, false, 0.0f}};
-    OdometryCalibration geometry = {4.8f,4.8f,1560,1560,14.5f,-1,1,true};
+    OdometryCalibration geometry = {LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
     line_follow_init(&follow,geometry,steps,1,NULL,NULL);
     for (unsigned i = 0; i < LINE_CONFIRM_SAMPLES; ++i) {
         assert(mpu6050_update(&imu,.005f,&heading));

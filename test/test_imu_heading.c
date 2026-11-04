@@ -12,7 +12,7 @@ static void test_turn_fallback(void)
     for (unsigned mirror=0;mirror<2;++mirror) {
         for (unsigned invalid=0;invalid<2;++invalid) {
             const float sign=mirror?-1.0f:1.0f;
-            OdometryCalibration geometry={4.8f,4.8f,1560,1560,14.5f,-1,1,true};
+            OdometryCalibration geometry={LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
             RouteStep steps[]={{1,6,mirror?LEFT:RIGHT,40,0,false,0},{1,6,STOP,40,0,false,0}};
             LineFollow f;
             line_follow_init(&f,geometry,steps,2,NULL,NULL);
@@ -83,7 +83,7 @@ static void test_turn_fallback(void)
 }
 int main(void)
 {
-    OdometryCalibration geometry = {4.8f,4.8f,1560,1560,14.5f,-1,1,true};
+    OdometryCalibration geometry = {LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
     Odometry odo;
     odometry_init(&odo, geometry);
     EncoderCounts count = {30000,30000};

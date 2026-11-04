@@ -9,8 +9,8 @@
 int main(void)
 {
     const float pi=3.14159265359f;
-    OdometryCalibration c={4.8f,4.8f,1560,1560,14.5f,-1,1,true};
-    float cm_per_count=pi*4.8f/1560*ODOMETRY_DISTANCE_SCALE;
+    OdometryCalibration c={LEFT_WHEEL_DIAMETER_CM, RIGHT_WHEEL_DIAMETER_CM, 1560, 1560, WHEEL_TRACK_CM, -1, 1, true};
+    float cm_per_count=pi*LEFT_WHEEL_DIAMETER_CM/1560*ODOMETRY_DISTANCE_SCALE;
     assert(fabsf(ODOMETRY_HEADING_SCALE-.77f)<.00001f);
     for(unsigned mirror=0;mirror<2;++mirror) {
         Odometry o; odometry_init(&o,c); assert(o.ready);
@@ -22,19 +22,19 @@ int main(void)
             assert(odometry_update(&o,counts,.005f));
         }
         float wheel=2000*cm_per_count;
-        float heading=(mirror?-1:1)*wheel/14.5f*.77f;
+        float heading=(mirror?-1:1)*wheel/WHEEL_TRACK_CM*.77f;
         assert(fabsf(o.distance_cm-wheel*.5f)<.001f);
         assert(fabsf(o.heading_rad-heading)<.001f);
         assert(fabsf(o.left_distance_cm-(mirror?0:wheel))<.001f);
         assert(fabsf(o.right_distance_cm-(mirror?wheel:0))<.001f);
         assert(fabsf((mirror?o.right_speed_cm_s:o.left_speed_cm_s)-20*cm_per_count/.005f)<.001f);
-        /* 恒曲率精确积分，校验车轴和16cm前置探头共用修正后的角度。 */
+        /* 恒曲率精确积分，校验车轴和前置探头共用修正后的角度。 */
         float radius=wheel*.5f/fabsf(heading);
         float x=radius*sinf(fabsf(heading));
         float y=(mirror?-1:1)*radius*(1-cosf(heading));
         assert(fabsf(o.x_cm-x)<.001f && fabsf(o.y_cm-y)<.001f);
-        assert(fabsf(o.sensor_x_cm-(x+16*cosf(heading)))<.001f);
-        assert(fabsf(o.sensor_y_cm-(y+16*sinf(heading)))<.001f);
+        assert(fabsf(o.sensor_x_cm-(x+GRAY_FORWARD_OFFSET_CM*cosf(heading)))<.001f);
+        assert(fabsf(o.sensor_y_cm-(y+GRAY_FORWARD_OFFSET_CM*sinf(heading)))<.001f);
     }
     Odometry straight; odometry_init(&straight,c);
     EncoderCounts counts={30000,30000};
@@ -69,7 +69,7 @@ int main(void)
             counts.left=(uint16_t)(counts.left-(mirror?0:20));
             counts.right=(uint16_t)(counts.right+(mirror?20:0));
             now+=5;
-            float raw_angle=i*20*cm_per_count/14.5f;
+            float raw_angle=i*20*cm_per_count/WHEEL_TRACK_CM;
             float corrected=raw_angle*.77f;
             GrayObservation observation=corrected<pi*.5f?gray_classify(0,true,0):center;
             line_follow_update(&f,observation,counts,now,.005f,false);

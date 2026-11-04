@@ -75,13 +75,13 @@ static void test_raw_filter_replay(void)
   RoutePlanner p;GraySensor sensor;gray_sensor_init(&sensor);init(&p,evidence_steps,2);
   float d=0;uint32_t t=0;
   for(unsigned i=0;i<4;++i) {
-   t+=5;d+=fast?1.0f:.25f;
+   t+=5;d+=fast?1.0f:.08f;
    route_update(&p,gray_sensor_update(&sensor,raw_for_line(0x18),true,0),d,0,t);
   }
   unsigned frames=weak?5:4;
   for(unsigned i=0;i<frames;++i) {
-   t+=5;d+=fast?1.0f:.25f;
-   route_set_speed(&p,fast?200:50,fast?200:50);
+   t+=5;d+=fast?1.0f:.08f;
+   route_set_speed(&p,fast?200:16,fast?200:16);
    route_update(&p,gray_sensor_update(&sensor,raw_for_line(weak?0x03:0xff),true,0),d,0,t);
    if(i+1<frames) CHECK(p.junctions_seen==0);
   }

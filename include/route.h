@@ -3,13 +3,13 @@
 #include "gray_sensor.h"
 #include <stddef.h>
 
-typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN } Action;
+typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN, HEXAGON } Action;
 typedef struct {
     uint16_t junction_count; /* Confirmed physical junctions since last action clearance. */
     float turn_speed;        /* Maximum measured wheel speed before entering a turn, cm/s. */
     Action action;
     int cruise_speed;        /* cm/s, not PWM. */
-    float angle_deg;         /* CUSTOM_TURN: clockwise positive, unwrapped. */
+    float angle_deg;         /* CUSTOM_TURN / HEXAGON: clockwise positive, unwrapped. */
     bool corner_arc_enabled;
     float final_segment_length_cm; /* clearance -> target detection; 0 disables planning. */
 } RouteStep;
@@ -38,7 +38,20 @@ typedef enum {
     JUNCTION_REJECT_SAMPLE_GAP, JUNCTION_REJECT_SIDE_CHANGE,
     JUNCTION_REJECT_SMOOTH_EDGE
 } JunctionReject;
+/* Independent sub-FSM while RouteState remains EXECUTING. */
+typedef enum {
+    HEXAGON_OFF, HEXAGON_ENTERING, HEXAGON_FOLLOWING,
+    HEXAGON_EXIT_CANDIDATE, HEXAGON_EXITING, HEXAGON_DONE
+} HexagonState;
 typedef struct {
+    HexagonState state;
+    uint32_t phase_ms, action_ms, line_ms, branch_ms, center_ms;
+    float phase_cm, line_cm, branch_cm, center_cm, hold_heading;
+    uint8_t line_samples, branch_samples, center_samples;
+    bool line_seen, use_line, center_pending, exit_armed;
+} HexagonNavigation;
+typedef struct {
+    HexagonNavigation hexagon;
     uint16_t junctions_seen;
     bool passing_junction, final_segment_active, search_pending;
     float final_segment_origin_cm, search_origin_cm;
@@ -90,6 +103,8 @@ typedef struct {
 
 /* Speed feedback must be updated before route_update in production. */
 void route_set_speed(RoutePlanner *planner, float left_cm_s, float right_cm_s);
+/* Target maneuver's measured entry cap, also used before the target junction. */
+float route_entry_speed_limit(const RoutePlanner *planner);
 extern const RouteStep route[];
 extern const size_t route_count;
 void route_init(RoutePlanner *planner, const RouteStep *steps, size_t count,
@@ -100,7 +115,7 @@ bool route_resume(RoutePlanner *planner, RouteState failed_phase, float distance
                   float heading_rad, uint32_t now_ms);
 void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
                    float heading_rad, uint32_t now_ms);
-/* 返回有效方向：CUSTOM_TURN 按符号映射 LEFT/RIGHT；非末轮 STOP 使用闭合动作。 */
+/* 返回有效方向：CUSTOM_TURN / HEXAGON 按符号映射 LEFT/RIGHT；非末轮 STOP 使用闭合动作。 */
 Action route_current_action(const RoutePlanner *planner);
 /* Effective LEFT/RIGHT above includes CUSTOM_TURN direction; signed target stays unwrapped. */
 bool route_uses_corner_arc(const RoutePlanner *planner);

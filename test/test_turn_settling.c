@@ -157,13 +157,38 @@ static void test_imu_rate_and_fallback(void)
  }
 }
 #endif
+/* First left edge was captured while the outer wheel still moved at ~39 cm/s.
+ * Request the capture speed before the edge appears, leaving time to slow. */
+static void test_pre_capture_turn_speed(void)
+{
+ for(unsigned mirror=0;mirror<2;++mirror) for(unsigned arc=0;arc<2;++arc) {
+  float sign=mirror?1.0f:-1.0f;
+  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,arc!=0,0},
+                     {1,50,STOP,50,0,false,0}};
+  LineFollow f;EncoderCounts c;uint32_t now;
+  prepare_turn(&f,&c,&now,steps,sign,.10f);
+  tick(&f,&c,&now,0,0,0,false);
+  CHECK(f.route.state==ROUTE_EXECUTING && !f.route.capture_line_seen);
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_SETTLE_SPEED_CM_S+.001f);
+  /* Side line gets position PID; center line still must confirm CLEARING. */
+  f.route.entry_heading=f.odometry.heading_rad-sign*.80f;
+  tick(&f,&c,&now,0,0,mirror?0x80:0x01,false);
+  CHECK(f.route.turn_capturing && sign*f.correction>0);
+  for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
+   tick(&f,&c,&now,0,0,0x18,false);
+  CHECK(f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING);
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_SETTLE_SPEED_CM_S+.001f);
+ }
+}
+
 int main(void)
 {
+ test_pre_capture_turn_speed();
  test_line_controls_capture();
  test_settling();
 #if MPU6050_ENABLED
  test_imu_rate_and_fallback();
 #endif
- puts("PASS: mirrored angle settling, yaw damping, low-speed clearance, custom angles and no-exit timeout");
+ puts("PASS: mirrored pre-capture cap, angle settling, yaw damping, clearance, custom angles and no-exit timeout");
  return 0;
 }

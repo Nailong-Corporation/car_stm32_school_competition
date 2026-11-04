@@ -1,5 +1,6 @@
 #include "gray_test_input.h"
 #include "line_follow.h"
+#include "motion_config.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -48,7 +49,7 @@ static void test_masks(void)
 }
 static void test_start_and_tracking(void)
 {
-    const OdometryCalibration c={4.8f,4.8f,1560,1560,14.5f,-1,1,true};
+    const OdometryCalibration c={LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
     LineFollow f; GraySensor sensor; uint32_t now=0;
     line_follow_init(&f,c,route,route_count,NULL,NULL); gray_sensor_init(&sensor);
     for (unsigned i=0;i<10;++i) {

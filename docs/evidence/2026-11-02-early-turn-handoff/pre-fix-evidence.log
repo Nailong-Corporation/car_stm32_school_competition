@@ -1,0 +1,1 @@
+Assertion failed: (p.state==ROUTE_EXECUTING && p.junctions_seen==1), function test_early_strong_evidence, file test_turn_handoff.c, line 36.

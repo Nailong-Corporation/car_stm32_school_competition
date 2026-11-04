@@ -124,31 +124,31 @@
  * 每输出轮一圈计数必须已经包含减速比和 TI12 四倍频，不能重复乘入。
  * 若厂家只给电机轴单相每圈周期数，则输出轮计数约为该值 × 4 × 减速比。
  */
-#define ODOMETRY_CALIBRATION_CONFIRMED 1    /* 2026-10-23 按用户要求启用当前标定配置；实物计数及方向待验证。 */
-/* 2026-10-23 独立 1 m 测试：旧比例下实际走 1.53 m，乘 1.53 后用户确认距离正确。
- * 同步采用测试工程的公共距离系数，统一修正里程、反馈轮速和编码器估计航向。
- * 保留下面的轮径/每圈计数原值，不重复补偿；直线测距通过不代表转角/路径已实测。
+#define ODOMETRY_CALIBRATION_CONFIRMED 1    /* 沿用软件标定门禁确认；换轮后距离比例与转角仍待实测重标。 */
+/* 历史：2026-10-23 独立 1 m 测试曾用 1.53 修正旧轮径；当前公共距离系数为 2.15。
+ * 2026-11-02 更换 6.5 cm 轮后保留此系数和每圈计数 1560，均需按新轮重测。
+ * 此系数只在每计数轮程处乘一次，里程、反馈轮速和编码器估计航向共用。
  */
-#define ODOMETRY_DISTANCE_SCALE       2.15f
+#define ODOMETRY_DISTANCE_SCALE       3.05f
 /* 2026-10-29：本轮编码器估计97.59°，用户目测约75°，暂取75/97.59≈0.77。
  * 只修正轮差到航向的比例，不改直线距离/轮速；目测初值，非精确转角标定。
  * 主机理想几何回归可显式置1，生产固件仅使用本头文件默认值。 */
 #ifndef ODOMETRY_HEADING_SCALE
 #define ODOMETRY_HEADING_SCALE        0.77f
 #endif
-#define LEFT_WHEEL_DIAMETER_CM        4.8f /* 左轮有效直径，单位 cm。 */
-#define RIGHT_WHEEL_DIAMETER_CM       4.8f /* 右轮有效直径，单位 cm。 */
+#define LEFT_WHEEL_DIAMETER_CM        6.5f /* 左轮有效直径，单位 cm（2026-11-02 用户更新为 65mm）。 */
+#define RIGHT_WHEEL_DIAMETER_CM       6.5f /* 右轮有效直径，单位 cm（2026-11-02 用户更新为 65mm）。 */
 /* 用户提供 L150PRO 参数：电机轴单相 13 周期/圈、减速比 30，TI12 四倍频后
  * 每输出轮一圈为 13 × 30 × 4 = 1560；已含减速与四倍频，实物计数及方向待核对。 */
 #define LEFT_COUNTS_PER_WHEEL_REV  1560.0f /* 左输出轮完整一圈的最终四倍频计数。 */
 #define RIGHT_COUNTS_PER_WHEEL_REV 1560.0f /* 右输出轮完整一圈的最终四倍频计数。 */
-#define WHEEL_TRACK_CM              14.5f /* 用户于 2026-10-23 实测左右轮中心间距，单位 cm。 */
-/* 2026-10-25 实测输入：灰度排中心在轮轴中点前方 16 cm。
- * 90° 圆弧 R=L=16 cm，路口识别后从当前位置开始规划；须 R>track/2。
+#define WHEEL_TRACK_CM              14.0f /* 2026-11-02 用户更新两轮中心间距，单位 cm。 */
+/* 2026-11-02 用户更新：轮轴中心距离灰度传感器中心距离为 24 cm。
+ * 90° 圆弧 R=L=24 cm，路口识别后从当前位置开始规划；须 R>track/2。
  * 触发点与实际路口中心的偏差以及轮胎打滑需实车验证。
  */
-#define GRAY_FORWARD_OFFSET_CM       16.0f
-#define CORNER_RADIUS_CM             16.0f
+#define GRAY_FORWARD_OFFSET_CM       24.0f
+#define CORNER_RADIUS_CM             24.0f
 #define CORNER_MAX_HALF_RATIO         0.8f /* 圆弧航向修正有界，保证两轮目标均为正。 */
 #define CORNER_HEADING_KP            8.0f /* 编码器轨迹航向误差到轮速半差。 */
 #define ENCODER_LEFT_SIGN             1    /* 2026-10-29 电机极性反转后启动快照左原始计数 +1，旧 -1 触发反向停车；轮向待复测。 */
@@ -203,7 +203,7 @@
 #ifndef TURN_APPROACH_SLOWDOWN_ENABLED
 #define TURN_APPROACH_SLOWDOWN_ENABLED 1
 #endif
-#define JUNCTION_APPROACH_SPEED_CM_S 50.0f /* 最后一段全程限速；距离包络可进一步限制。 */
+#define JUNCTION_APPROACH_SPEED_CM_S 50.0f /* 未知长度末段总上限；转弯还受实际入弯慢速上限约束。 */
 #define BRAKING_ACCEL_FILTER_TAU_S 0.080f /* 轮速差分/IMU 纵向加速度低通。 */
 #define BRAKING_IMU_TILT_LIMIT_DEG 5.0f /* 相对静止基线超限则使用编码器差分。 */
 #define BRAKING_REVERSE_MAX_MS 250U /* 每段累计反向力矩时间上限。 */
@@ -259,6 +259,8 @@
  */
 #define JUNCTION_CONFIRM_SAMPLES       3U
 #define JUNCTION_CONFIRM_DISTANCE_CM   0.10f
+#define JUNCTION_EARLY_CONFIRM_SAMPLES  2U /* 仅目标普通左右转、同侧强中心分支提前确认。 */
+#define JUNCTION_EARLY_CONFIRM_CM       0.05f
 #define JUNCTION_EDGE_CONFIRM_SAMPLES    4U /* 弱证据：边缘L形或分离分支，不与强候选共用三帧门槛。 */
 #define JUNCTION_EDGE_CONFIRM_CM        0.15f
 #define JUNCTION_EDGE_MAX_WIDTH           3U
@@ -288,9 +290,9 @@
 #define JUNCTION_CAPTURE_CENTER_BIAS_CM_S 1.2f /* 仅居中且PID近零时补角；不覆盖非零位置纠偏。 */
 #define JUNCTION_CAPTURE_HEADING_KP    8.0f
 #define JUNCTION_TURN_TARGET_RAD       1.570796327f
-/* 未标定的转弯收敛初值：近目标角降低外轮目标，角速度阻尼不代表物理制动。 */
-#define JUNCTION_SETTLE_BAND_RAD       0.60f
-#define JUNCTION_SETTLE_SPEED_CM_S    16.0f
+/* 未标定的转弯初值：动作开始即限外轮目标，近目标角切换航向增益；阻尼不是物理制动。 */
+#define JUNCTION_SETTLE_BAND_RAD       0.60f /* 临近目标角时切换到收敛航向增益。 */
+#define JUNCTION_SETTLE_SPEED_CM_S    16.0f /* 非直行转弯从动作开始的外轮目标上限；待实车标定。 */
 #define JUNCTION_SETTLE_HEADING_KP    24.0f /* 近角度半差比例，受外轮上限约束。 */
 #define JUNCTION_YAW_DAMPING           2.5f /* (cm/s)/(rad/s)，输出轮速半差。 */
 #define JUNCTION_YAW_FILTER_TAU_S      0.030f
@@ -322,4 +324,24 @@
 #define JUNCTION_ADJACENT_EXIT_CM 0.30f
 #define OPPORTUNISTIC_FALLBACK_ENABLED 0
 
+/* ==================== HEXAGON: all values are uncalibrated bounds ====================
+ * Signed angle is net unwrapped yaw since action entry, NOT polygon vertex count.
+ * Entry/exit guides assume tangent straight exit with an opposite-side branch.
+ */
+#define HEXAGON_MAX_ANGLE_DEG          720.0f
+#define HEXAGON_SPEED_CM_S             16.0f
+#define HEXAGON_ENTRY_MIN_RAD           0.35f
+#define HEXAGON_ENTRY_TIMEOUT_MS     3000U
+#define HEXAGON_ENTRY_MAX_CM           30.0f
+#define HEXAGON_ACTION_TIMEOUT_MS    30000U /* Separate from ordinary 3000/4500 ms turns. */
+#define HEXAGON_ACTION_MAX_CM         400.0f
+#define HEXAGON_EXIT_TIMEOUT_MS       3000U
+#define HEXAGON_EXIT_MAX_CM            30.0f
+#define HEXAGON_OVERANGLE_RAD           2.0943951f /* at most 120 deg after minimum yaw */
+#define HEXAGON_EXIT_CONFIRM_MS        100U
+#define HEXAGON_EXIT_CONFIRM_CM          0.5f
+/* Entry may need to cross the branch before seeing the ring. Bounded blind guide. */
+#define HEXAGON_ENTRY_LOST_MS         1200U
+#define HEXAGON_ENTRY_LOST_CM           12.0f
+/* Once ring line is captured, use existing 400 ms/8 cm bounds plus one graphic recovery. */
 #endif

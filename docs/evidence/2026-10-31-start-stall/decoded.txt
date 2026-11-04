@@ -1,0 +1,14 @@
+
+warning: Couldn't find general-purpose registers in core file.
+
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = 18381
+$2 = 92435
+$3 = LINE_START_ACCEPTED
+$4 = 1
+$5 = 1
+$6 = 16 '\020'
+$7 = {valid = true, reason = LINE_STOP_ENCODER, state_before_stop = LINE_TRACKING, route_state = ROUTE_FOLLOW, route_state_before_update = ROUTE_FOLLOW, route_failure = ROUTE_FAILURE_NONE, speed_fault = SPEED_FAULT_STALL, speed_fault_wheel = 1 '\001', observation = {kind = GRAY_VALID, raw_mask = 16 '\020', line_mask = 16 '\020', selected_mask = 16 '\020', white_count = 1 '\001', region_count = 1 '\001', position = 1, prefilter_mask = 16 '\020', seam_mask = 0 '\000'}, counts = {left = 0, right = 0}, sample_ms = 3195, reliable_age_ms = 0, route_phase_age_ms = 3195, route_index = 0, junctions_seen = 0, final_segment_active = true, final_segment_progress_cm = 0, dt_s = 0.00499999989, base = 17.9124889, left_target_cm_s = 19.7124882, right_target_cm_s = 16.1124897, left_speed_cm_s = 0, right_speed_cm_s = 0, distance_cm = 0, route_progress_cm = 0, clear_progress_cm = 0, turn_rad = 0, actual_turn_rad = 0, exit_candidate_age_ms = 0, exit_candidate_progress_cm = 0, exit_candidate_pending = false, exit_confirm_samples = 0 '\000', handoff_early = false, segment_start_progress_cm = 0, turn_exit_branch = false, exit_line_mask = 0 '\000', exit_recovery_active = false, exit_lateral_error_cm = 0, component_recovery_age_ms = 0, component_recovery_progress_cm = 0, braking_accel_cm_s2 = 0, braking_required_cm_s2 = 0, braking_reverse_ms = 0, braking_imu_used = false, braking_reverse_active = false, heading_source = HEADING_ENCODER, heading_fallback_reason = HEADING_FALLBACK_STARTUP, heading_fallback_ms = 535}
+$8 = 83
+$9 = {calibration = {left_diameter_cm = 4.80000019, right_diameter_cm = 4.80000019, left_counts_per_rev = 1560, right_counts_per_rev = 1560, track_cm = 14.5, left_sign = 1, right_sign = -1, confirmed = true}, previous = {left = 0, right = 0}, ready = true, primed = true, left_cm_per_count = 0.020782847, right_cm_per_count = 0.020782847, distance_cm = 0, heading_rad = 0, left_speed_cm_s = 0, right_speed_cm_s = 0, left_distance_cm = 0, right_distance_cm = 0, x_cm = 0, y_cm = 0, sensor_x_cm = 16, sensor_y_cm = 0, sensor_distance_cm = 0, left_delta = 0, right_delta = 0}

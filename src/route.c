@@ -76,6 +76,7 @@ static void reset_evidence(RoutePlanner *p, uint32_t now)
     p->component_recovery_active=p->component_recovery_used=false;
     p->component_recovery_line_samples=0;
     p->last_sample_ms=now;
+    p->hexagon=(HexagonNavigation){0};
 }
 void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
                 RouteStopCallback callback, void *context)
@@ -86,13 +87,16 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
     p->valid=steps!=NULL && count>0;
     for(size_t i=0;p->valid && i<count;++i) {
         RouteStep s=steps[i];
-        p->valid=s.junction_count>0 && (unsigned)s.action<=(unsigned)CUSTOM_TURN &&
+        p->valid=s.junction_count>0 && (unsigned)s.action<=(unsigned)HEXAGON &&
             s.cruise_speed>0 && s.cruise_speed<=WHEEL_TARGET_MAX_CM_S &&
             isfinite(s.turn_speed) && s.turn_speed>0 && s.turn_speed<=s.cruise_speed &&
             isfinite(s.final_segment_length_cm) && s.final_segment_length_cm>=0 &&
             (s.final_segment_length_cm==0 || (BRAKING_CALIBRATION_CONFIRMED &&
              isfinite(BRAKING_SAFE_DECEL_CM_S2) && BRAKING_SAFE_DECEL_CM_S2>0)) &&
             (s.action!=CUSTOM_TURN || (isfinite(s.angle_deg) && s.angle_deg!=0 && fabsf(s.angle_deg)<=360)) &&
+            (s.action!=HEXAGON || (isfinite(s.angle_deg) &&
+             fabsf(s.angle_deg)>=60.0f && fabsf(s.angle_deg)<=HEXAGON_MAX_ANGLE_DEG &&
+             !s.corner_arc_enabled)) &&
             (s.action!=STOP || i==count-1) &&
             (!s.corner_arc_enabled || (isfinite(CORNER_RADIUS_CM) && CORNER_RADIUS_CM>WHEEL_TRACK_CM*.5f));
     }
@@ -125,14 +129,14 @@ Action route_current_action(const RoutePlanner *p)
 {
     if (p->passing_junction) return STRAIGHT;
     Action action = p->steps[p->index].action;
-    if (action == CUSTOM_TURN) return p->steps[p->index].angle_deg < 0.0f ? LEFT : RIGHT;
+    if (action == CUSTOM_TURN || action == HEXAGON) return p->steps[p->index].angle_deg < 0.0f ? LEFT : RIGHT;
     return action == STOP && (p->lap_boundary || another_lap(p)) ? p->repeat_action : action;
 }
 
 /* 普通左右转、闭合左右转及显式 ±90° 共用切角；其他自定义角度保持原策略。 */
 bool route_uses_corner_arc(const RoutePlanner *p)
 {
-    return p->steps[p->index].corner_arc_enabled &&
+    return p->steps[p->index].action!=HEXAGON && p->steps[p->index].corner_arc_enabled &&
         fabsf(fabsf(route_turn_target_rad(p)) - JUNCTION_TURN_TARGET_RAD) < 0.0001f;
 }
 
@@ -140,7 +144,7 @@ bool route_uses_corner_arc(const RoutePlanner *p)
 /* 编码器航向本身右转为正，不对 ±180°/360° 取模，以保留实际转动方向与圈数。 */
 float route_turn_target_rad(const RoutePlanner *p)
 {
-    if (p->steps[p->index].action == CUSTOM_TURN)
+    if (p->steps[p->index].action == CUSTOM_TURN || p->steps[p->index].action == HEXAGON)
         return p->steps[p->index].angle_deg * (JUNCTION_TURN_TARGET_RAD / 90.0f);
     Action action = route_current_action(p);
     return action == LEFT ? -JUNCTION_TURN_TARGET_RAD :
@@ -149,6 +153,8 @@ float route_turn_target_rad(const RoutePlanner *p)
 
 float route_turn_threshold_rad(const RoutePlanner *p, float threshold)
 {
+    if(p->steps[p->index].action==HEXAGON)
+        return fabsf(route_turn_target_rad(p))+HEXAGON_OVERANGLE_RAD;
     if (p->steps[p->index].action != CUSTOM_TURN) return threshold;
     float target = fabsf(route_turn_target_rad(p));
     /* 自定义角度正常退出须到达目标；慢扫/捕获/过转沿用直角参数的角度余量。
@@ -162,6 +168,7 @@ float route_turn_threshold_rad(const RoutePlanner *p, float threshold)
 
 uint32_t route_action_timeout_ms(const RoutePlanner *p)
 {
+    if(p->steps[p->index].action==HEXAGON && !p->passing_junction) return HEXAGON_ACTION_TIMEOUT_MS;
     if (route_current_action(p) == STRAIGHT) return JUNCTION_STRAIGHT_TIMEOUT_MS;
     float scale = fmaxf(1.0f, fabsf(route_turn_target_rad(p)) / JUNCTION_TURN_TARGET_RAD);
     return (uint32_t)ceilf((float)JUNCTION_ACTION_TIMEOUT_MS * scale);
@@ -177,10 +184,24 @@ static void begin_action(RoutePlanner *p,float d,float h,uint32_t now)
     p->entry_cm=d;
     p->entry_heading=p->action_start_heading=h;
     reset_evidence(p,now);
+    if(p->steps[p->index].action==HEXAGON && !p->passing_junction) {
+        p->hexagon=(HexagonNavigation){.state=HEXAGON_ENTERING,
+            .phase_ms=now,.action_ms=now,.line_ms=now,.phase_cm=d,.line_cm=d,
+            .hold_heading=h};
+    }
+}
+float route_entry_speed_limit(const RoutePlanner *p)
+{
+    Action a=p->steps[p->index].action;
+    bool turn=a==LEFT || a==RIGHT || a==CUSTOM_TURN || a==HEXAGON ||
+        (a==STOP && (p->lap_boundary || another_lap(p)) && p->repeat_action!=STRAIGHT);
+    float limit=p->steps[p->index].turn_speed;
+    if(a==HEXAGON) limit=fminf(limit,HEXAGON_SPEED_CM_S);
+    return turn?fminf(limit,JUNCTION_SETTLE_SPEED_CM_S):limit;
 }
 static bool entry_speed_ready(const RoutePlanner *p)
 {
-    float limit=p->steps[p->index].turn_speed;
+    float limit=route_entry_speed_limit(p);
     return fabsf(p->measured_left_cm_s)<=limit && fabsf(p->measured_right_cm_s)<=limit;
 }
 static void accept_target(RoutePlanner *p,float d,float h,uint32_t now)
@@ -250,6 +271,126 @@ static bool component_recovery(RoutePlanner *p,GrayObservation o,float d,float h
      * or changing the turn angle baseline. */
     return false;
 }
+static void hexagon_update(RoutePlanner *p,GrayObservation o,float d,float h,
+                           uint32_t now,bool adjacent)
+{
+    HexagonNavigation *x=&p->hexagon;
+    float sign=route_current_action(p)==LEFT?-1.0f:1.0f;
+    float turn=sign*(h-p->entry_heading),target=fabsf(route_turn_target_rad(p));
+    bool entering=x->state==HEXAGON_ENTERING;
+    bool exiting=x->state==HEXAGON_EXITING;
+    bool line=route_is_narrow_line(o) && o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH;
+    bool center=line && fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
+    x->use_line=false;
+    /* All deadlines precede evidence acceptance, including graphic recovery.
+     * Net yaw (not sum(abs(delta))) prevents oscillations from earning a lap. */
+    if(turn < -JUNCTION_WRONG_WAY_RAD || turn>target+HEXAGON_OVERANGLE_RAD) {
+        fail(p,turn<0?ROUTE_FAILURE_WRONG_WAY:ROUTE_FAILURE_TURN_LIMIT);return;
+    }
+    if((uint32_t)(now-x->action_ms)>=HEXAGON_ACTION_TIMEOUT_MS ||
+       fabsf(d-p->entry_cm)>=HEXAGON_ACTION_MAX_CM ||
+       (entering && ((uint32_t)(now-x->phase_ms)>=HEXAGON_ENTRY_TIMEOUT_MS ||
+                     fabsf(d-x->phase_cm)>=HEXAGON_ENTRY_MAX_CM)) ||
+       (exiting && ((uint32_t)(now-x->phase_ms)>=HEXAGON_EXIT_TIMEOUT_MS ||
+                    fabsf(d-x->phase_cm)>=HEXAGON_EXIT_MAX_CM))) {
+        fail(p,ROUTE_FAILURE_ACTION_TIMEOUT);return;
+    }
+    uint32_t loss_ms=entering?HEXAGON_ENTRY_LOST_MS:INTERFERENCE_TIMEOUT_MS;
+    float loss_cm=entering?HEXAGON_ENTRY_LOST_CM:INTERFERENCE_MAX_DISTANCE_CM;
+    if(!p->component_recovery_active &&
+       ((uint32_t)(now-x->line_ms)>=loss_ms || fabsf(d-x->line_cm)>=loss_cm)) {
+        fail(p,ROUTE_FAILURE_EXIT_LOST);return;
+    }
+    if(!adjacent) {
+        x->line_samples=x->branch_samples=x->center_samples=0;
+        x->center_pending=false;x->exit_armed=false;p->have_approach_center=false;
+        if(x->state==HEXAGON_EXIT_CANDIDATE) x->state=HEXAGON_FOLLOWING;
+    }
+    /* A fresh opposite-side branch AFTER the configured angle is necessary.
+     * The ordinary turn's early line-only completion is deliberately absent. */
+    uint8_t sides;
+    JunctionEvidence kind=junction_shape(o,&sides);
+    uint8_t exit_side=sign>0?1U:2U;
+    bool history=p->have_approach_center &&
+        (uint32_t)(now-p->approach_center_ms)<JUNCTION_CENTER_MEMORY_MS &&
+        d>=p->approach_center_cm && d-p->approach_center_cm<=JUNCTION_CENTER_MEMORY_CM;
+    if(turn<target || p->component_recovery_active) x->exit_armed=false;
+    bool branch=adjacent && turn>=target && sides==exit_side &&
+        kind!=JUNCTION_EVIDENCE_NONE && !p->component_recovery_active;
+    if(x->state==HEXAGON_FOLLOWING && x->exit_armed && branch && history) {
+        x->exit_armed=false;
+        x->state=HEXAGON_EXIT_CANDIDATE;x->branch_ms=now;x->branch_cm=d;
+        x->branch_samples=0;p->candidate_kind=kind;x->hold_heading=h;
+    }
+    if(x->state==HEXAGON_EXIT_CANDIDATE) {
+        if((uint32_t)(now-x->branch_ms)>=JUNCTION_CONFIRM_TIMEOUT_MS) {
+            fail(p,ROUTE_FAILURE_CONFIRM_TIMEOUT);return;
+        }
+        if(!branch) {
+            x->state=HEXAGON_FOLLOWING;x->branch_samples=0;
+        } else {
+            if(kind!=JUNCTION_EVIDENCE_CENTER_BRANCH) p->candidate_kind=kind;
+            bool weak=p->candidate_kind!=JUNCTION_EVIDENCE_CENTER_BRANCH;
+            unsigned samples=weak?JUNCTION_EDGE_CONFIRM_SAMPLES:JUNCTION_CONFIRM_SAMPLES;
+            float distance=weak?JUNCTION_EDGE_CONFIRM_CM:JUNCTION_CONFIRM_DISTANCE_CM;
+            if(x->branch_samples<samples) ++x->branch_samples;
+            if(x->branch_samples>=samples && d-x->branch_cm>=distance) {
+                x->state=HEXAGON_EXITING;x->phase_ms=now;x->phase_cm=d;
+                x->hold_heading=h;x->center_samples=0;x->center_pending=false;
+                x->line_samples=0;
+            }
+            /* Choose tangent continuation. Freeze position PID on the branch. */
+            return;
+        }
+    }
+    bool recovering=p->component_recovery_active;
+    if(component_recovery(p,o,d,h,now,adjacent,x->line_seen && !line)) {
+        x->line_samples=x->center_samples=0;x->center_pending=false;
+        p->have_approach_center=false;
+        return;
+    }
+    if(recovering) {
+        /* component_recovery proved three centered frames before returning. */
+        x->line_ms=now;x->line_cm=d;x->line_samples=LINE_CONFIRM_SAMPLES;
+    }
+    if(!line || !adjacent) x->line_samples=0;
+    if(line && adjacent && x->line_samples<LINE_CONFIRM_SAMPLES) ++x->line_samples;
+    bool stable=x->line_samples>=LINE_CONFIRM_SAMPLES;
+    if(stable && (!entering || turn>=HEXAGON_ENTRY_MIN_RAD)) {
+        x->line_seen=true;x->line_ms=now;x->line_cm=d;x->hold_heading=h;
+        p->capture_line_seen=true;p->capture_line_ms=now;p->capture_line_cm=d;
+    }
+    if(entering) {
+        if(stable && turn>=HEXAGON_ENTRY_MIN_RAD) {
+            x->state=HEXAGON_FOLLOWING;x->phase_ms=now;x->phase_cm=d;
+        } else return;
+    }
+    x->use_line=line && stable;
+    if(center && stable) {
+        p->have_approach_center=true;p->approach_center_ms=now;p->approach_center_cm=d;
+        /* Require a post-angle corridor before accepting a new branch.
+         * A branch already visible before the angle must not be banked. */
+        if(turn>=target && x->state==HEXAGON_FOLLOWING) x->exit_armed=true;
+    }
+    if(x->state!=HEXAGON_EXITING) return;
+    /* Angle must remain satisfied throughout outgoing-line confirmation.
+     * No 95% shortcut and no success on deadline. A single center frame,
+     * an edge, or lingering branch cannot complete HEXAGON. */
+    bool exit=center && stable && adjacent && turn>=target;
+    if(!exit) {x->center_samples=0;x->center_pending=false;}
+    if(exit && !x->center_pending) {
+        x->center_pending=true;x->center_ms=now;x->center_cm=d;
+    }
+    if(exit && x->center_samples<LINE_CONFIRM_SAMPLES) ++x->center_samples;
+    if(x->center_samples>=LINE_CONFIRM_SAMPLES &&
+       (uint32_t)(now-x->center_ms)>=HEXAGON_EXIT_CONFIRM_MS &&
+       d-x->center_cm>=HEXAGON_EXIT_CONFIRM_CM) {
+        x->state=HEXAGON_DONE;
+        p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+        enter_clear(p,d,now);
+    }
+}
+
 void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now)
 {
     if(p->state==ROUTE_FINISHED || p->state==ROUTE_FAILED || p->state==ROUTE_DISABLED) return;
@@ -317,6 +458,7 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
              * lend expired history to a different branch. */
             if(!recent_center) return;
         }
+        bool same_sides=p->state==ROUTE_CANDIDATE && p->candidate_sides==sides;
         if(p->state==ROUTE_FOLLOW) {
             p->state=ROUTE_CANDIDATE;p->phase_ms=now;p->entry_cm=d;p->candidate_count=0;
             p->candidate_kind=kind;p->candidate_sides=sides;
@@ -328,8 +470,16 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
             fail(p,ROUTE_FAILURE_CONFIRM_TIMEOUT);return;
         }
         bool weak=p->candidate_kind!=JUNCTION_EVIDENCE_CENTER_BRANCH && !p->candidate_separated;
-        unsigned samples=weak?JUNCTION_EDGE_CONFIRM_SAMPLES:JUNCTION_CONFIRM_SAMPLES;
-        float distance=weak?JUNCTION_EDGE_CONFIRM_CM:JUNCTION_CONFIRM_DISTANCE_CM;
+        /* Start a clear target-side turn earlier without provisional motion.
+         * Both-side bridge frames, weak graphics and non-target junctions
+         * keep the longer evidence; counting still follows real confirmation. */
+        bool early=same_sides && p->candidate_kind==JUNCTION_EVIDENCE_CENTER_BRANCH &&
+            (uint32_t)p->junctions_seen+1U==s.junction_count &&
+            ((s.action==LEFT && sides==1U) || (s.action==RIGHT && sides==2U));
+        unsigned samples=early?JUNCTION_EARLY_CONFIRM_SAMPLES:
+            weak?JUNCTION_EDGE_CONFIRM_SAMPLES:JUNCTION_CONFIRM_SAMPLES;
+        float distance=early?JUNCTION_EARLY_CONFIRM_CM:
+            weak?JUNCTION_EDGE_CONFIRM_CM:JUNCTION_CONFIRM_DISTANCE_CM;
         if(p->candidate_count<samples) ++p->candidate_count;
         if(p->candidate_count<samples || d-p->entry_cm<distance) return;
         p->last_confirmed_kind=p->candidate_kind;
@@ -351,6 +501,9 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         }
         if(entry_speed_ready(p) && o.line_mask!=0) accept_target(p,d,h,now);
         return;
+    }
+    if(s.action==HEXAGON && !p->passing_junction && p->state==ROUTE_EXECUTING) {
+        hexagon_update(p,o,d,h,now,adjacent);return;
     }
     Action action=route_current_action(p);
     float sign=action==LEFT?-1.0f:1.0f;

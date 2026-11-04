@@ -355,12 +355,16 @@ static void test_closed_turns(void)
   f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;f.route.entry_cm=f.odometry.distance_cm;
   f.route.entry_heading=f.route.action_start_heading=f.odometry.heading_rad;
   f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
-  float lc=0,rc=0;
+  float lc=0,rc=0;bool exit_visible=false;
   for(unsigned i=0;i<1100 && f.route.index==0;++i) {
    lc+=f.left_target_cm_s*.005f/.01f;rc+=f.right_target_cm_s*.005f/.01f;
    int dl=(int)lc,dr=(int)rc;lc-=dl;rc-=dr;
    float turn=fabsf(f.odometry.heading_rad-f.route.entry_heading);
-   tick(&f,&c,&t,dl,dr,turn>=JUNCTION_TURN_TARGET_RAD*.9f?0x18:0,false);
+   /* This FSM cooperation fixture supplies a persistent synthetic exit.
+    * A one-angle discontinuity falsely erases it on any damping correction;
+    * lateral sweeps/loss are covered independently by the handoff tests. */
+   if(turn>=JUNCTION_TURN_TARGET_RAD*.9f) exit_visible=true;
+   tick(&f,&c,&t,dl,dr,exit_visible?0x18:0,false);
     if(f.state==LINE_STOPPED)
      fprintf(stderr,"turn model stopped: arc=%u mirror=%u reason=%d failure=%d phase=%d turn=%f age=%u\n",
              arc,mirror,f.stop_reason,f.route.failure,f.stop_snapshot.route_state_before_update,

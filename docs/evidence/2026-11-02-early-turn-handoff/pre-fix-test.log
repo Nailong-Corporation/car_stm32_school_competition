@@ -1,0 +1,1 @@
+Assertion failed: (fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=16.0f+.001f), function test_approach_and_entry, file test_turn_handoff.c, line 12.

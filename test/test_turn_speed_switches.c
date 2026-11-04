@@ -69,7 +69,10 @@ static void test_diode_straight_clearance(void)
   CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=50);
 #endif
   for(unsigned i=0;i<3;++i) tick(&f,&c,&now,20,20,0xff,false);
-  CHECK(f.route.junctions_seen==2 && f.route.state==ROUTE_EXECUTING);
+  CHECK(f.route.junctions_seen==2 && f.route.state==ROUTE_BRAKING);
+  for(unsigned i=0;i<32 && f.route.state==ROUTE_BRAKING;++i)
+   tick(&f,&c,&now,4,4,0xff,false);
+  CHECK(f.route.state==ROUTE_EXECUTING);
   CHECK(route_current_action(&f.route)==LEFT);
  }
  /* Broad centered graphics, isolated center frames and side edges must not
@@ -119,9 +122,9 @@ static void test_fast_penultimate_junction(void)
  /* After clearance the very next confirmed junction must execute LEFT. */
  for(unsigned i=0;i<3;++i) tick(&f,&c,&now,25,25,0xff,false);
  CHECK(f.route.junctions_seen==2 && f.route.state==ROUTE_BRAKING);
- /* Filtered feedback is still slightly above 50: retain the speed gate. */
- for(unsigned i=0;i<5 && f.route.state==ROUTE_BRAKING;++i)
-  tick(&f,&c,&now,20,20,0xff,false);
+ /* Actual entry must drop below 16, even though table turn_speed is 50. */
+ for(unsigned i=0;i<32 && f.route.state==ROUTE_BRAKING;++i)
+  tick(&f,&c,&now,4,4,0xff,false);
  CHECK(f.route.junctions_seen==2 && f.route.state==ROUTE_EXECUTING);
  CHECK(route_current_action(&f.route)==LEFT);
 
@@ -150,8 +153,8 @@ static void test_final_segment_speed_cap(void)
   f.braking_active=false;
   tick(&f,&c,&now,0,0,0x18,false);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
-  NEAR(f.left_target_cm_s,length?200:50);
-  NEAR(f.right_target_cm_s,length?200:50);
+  NEAR(f.left_target_cm_s,length?200:JUNCTION_SETTLE_SPEED_CM_S);
+  NEAR(f.right_target_cm_s,length?200:JUNCTION_SETTLE_SPEED_CM_S);
 #else
   NEAR(f.left_target_cm_s,200);NEAR(f.right_target_cm_s,200);
 #endif
@@ -169,7 +172,7 @@ static void test_final_segment_speed_cap(void)
   f.base=f.left_target_cm_s=f.right_target_cm_s=200;
   tick(&f,&c,&now,0,0,0x18,false);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
-  NEAR(f.base,i==0?200:50);
+  NEAR(f.base,i==0?200:JUNCTION_SETTLE_SPEED_CM_S);
 #else
   NEAR(f.base,200);
 #endif
@@ -209,7 +212,13 @@ int main(void)
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  f.base=f.left_target_cm_s=f.right_target_cm_s=50;
  f.route.origin_cm=-10000;
- tick(&f,&c,&now,0,0,0x18,false);NEAR(f.base,50); /* No distance trigger. */
+ tick(&f,&c,&now,0,0,0x18,false);
+ CHECK(f.route.state==ROUTE_FOLLOW); /* No distance trigger, even with old huge progress. */
+#if TURN_APPROACH_SLOWDOWN_ENABLED
+ NEAR(f.base,6);
+#else
+ NEAR(f.base,50);
+#endif
  f.route.state=ROUTE_EXECUTING;f.route.phase_ms=now;f.route.entry_heading=f.odometry.heading_rad;
  tick(&f,&c,&now,0,0,0,false);
  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=steps[0].turn_speed);

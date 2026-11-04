@@ -117,15 +117,20 @@ static void test_one_count_start(void)
     counts.right = 1;
     now += 5;
     line_follow_update_heading(&f, obs, counts, now, .005f, false, true, 0);
-    assert(fabsf(f.odometry.right_speed_cm_s + .5937956f) < .0001f);
+    float cm_per_count = 3.14159265359f * RIGHT_WHEEL_DIAMETER_CM /
+        RIGHT_COUNTS_PER_WHEEL_REV * ODOMETRY_DISTANCE_SCALE;
+    float expected_speed = -cm_per_count / (.005f + SPEED_FILTER_TAU_S);
+    assert(fabsf(f.odometry.right_speed_cm_s - expected_speed) < .0001f);
     assert(f.state == LINE_TRACKING && f.stop_reason == LINE_STOP_NONE);
     disabled(f.command);
-    now += 5;
-    line_follow_update_heading(&f, obs, counts, now, .005f, false, true, 0);
-    /* One-count impulse decays .594 -> .509 -> .436 with the 30 ms filter. */
-    disabled(f.command);
-    now += 5;
-    line_follow_update_heading(&f, obs, counts, now, .005f, false, true, 0);
+    /* Count impulse decays below the reverse threshold without latching a fault. */
+    for (unsigned i = 0; i < 10 &&
+         fabsf(f.odometry.right_speed_cm_s) >= SPEED_REVERSE_THRESHOLD_CM_S; ++i) {
+        disabled(f.command);
+        now += 5;
+        line_follow_update_heading(&f, obs, counts, now, .005f, false, true, 0);
+    }
+    assert(fabsf(f.odometry.right_speed_cm_s) < SPEED_REVERSE_THRESHOLD_CM_S);
     assert(f.command.enabled && !f.stop_snapshot.valid);
     /* Repeated actual reverse counts must still lock, even at zero target. */
     for (unsigned i = 0; i < 100 && f.state != LINE_STOPPED; ++i) {
