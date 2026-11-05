@@ -1,0 +1,3 @@
+recovery stop=4 speed_fault=4 age=460
+Assertion failed: (f.state!=LINE_STOPPED && f.route.state==ROUTE_RECOVERING), function test_loss_ready, file test_entry_loss.c, line 49.
+docs/evidence/2026-11-05-entry-loss/run_regression.sh: line 8: 27358 Abort trap: 6           "$test_dir/test" "$@"

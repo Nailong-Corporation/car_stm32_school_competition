@@ -1,10 +1,10 @@
 # STM32 八路数字灰度巡线小车
 
-STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度。固件使用 C / STM32Cube HAL，系统时钟 HSI/2 × 16 = 64 MHz。当前 `new` 分支按[校赛计划](https://app.notion.com/p/3f8c2c8fcde6800783fee3745c60f292)重构为路口计数导航；本文中的当前规则取代历史证据文件内的距离窗口方案。
+STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度。固件使用 C / STM32Cube HAL，系统时钟 HSI/2 × 16 = 64 MHz。当前 `main` 使用编码器总段距离 + 最多路口数导航；2026-11-04 规则取代历史的仅计数/末段长度方案。
 
 ## 当前状态与边界
 
-先更新 `AGENTS.md`，再修改路径、转向和测试。路口计数决定动作，MPU6050 相对航向决定转角，灰度确认出口，编码器提供速度反馈和短期里程。预估距离只影响速度，不能触发动作、跳过路口或宣告终点。
+总段距离或最多路口数任一先到，等待真实灰度节点确认后执行表内动作；距离本身不盲转、不补计、不宣告终点。MPU6050（失效锁定降级编码器）提供航向，灰度确认出口，编码器负责速度闭环与总段里程。入口冲出后的预算交接与有界恢复修正见 [2026-11-05证据](docs/evidence/2026-11-05-entry-loss/README.md)，此前独立审查和精确停车清单见 [2026-11-04证据](docs/evidence/2026-11-04-navigation-review/README.md)，以下带旧日期的现场记录保留历史背景，以本节及当前状态图为准。
 
 | 项目 | 当前状态 |
 |---|---|
@@ -13,16 +13,34 @@ STM32F103C8T6 + TB6612FNG + 八路 GPIO 数字灰度。固件使用 C / STM32Cub
 | 机械尺寸 | 双轮直径均 6.5 cm（65 mm），轮中心距 14 cm，轮轴中心到灰度传感器中心 24 cm；圆弧规划半径同步为 24 cm |
 | 编码器换算 | 1560 计数/圈，公共距离系数 2.15、航向修正 0.77 沿用旧配置；新轮径下里程、轮速和编码器降级转角须实车重标 |
 | 目标线极性 | `control_config.h` 当前 `GRAY_INVERT_ENABLED=0` 巡黑线 |
-| 路径表 | 当前本地表为 LEFT×3、RIGHT、LEFT、STOP，均计数 1、表内巡航/转弯上限 50 cm/s；实际转弯及入弯限速还受 16 cm/s 慢速上限约束，路过路口上限初值 60 cm/s |
-| 最后一段长度 | 当前启用项均为 0 cm，距离规划未启用；需测量离口确认点到目标灰度触发点的长度，不能直接使用旧中心间距离 |
+| 路径表 | 用户当前四项 LEFT、LEFT、LEFT、STOP；最多计数 1/4/2/3、总段 65/219/70/219 cm，turn_speed 均50、表速50/200/200/200；启用提前减速时，短段转弯全段外轮目标不超16 cm/s，长段继续距离包络 |
+| 总段长度 | `segment_length_cm` 从 START / 上次动作完成点起测；中间节点不重建基准。0 表示未知，计数也为0则拒绝启动 |
 | 安全减速度 | 当前本地配置 `BRAKING_CALIBRATION_CONFIRMED=1`、`BRAKING_SAFE_DECEL_CM_S2=120`；标志置 1 不代表本次已实测，200→16 按此模型需 165.6 cm（不含余量），短段可能无法及时降速 |
 | 反向减速 | 末段实时评估所需减速度；有界反向力矩与双轮速度 PID 已接入，但 `BRAKING_REVERSE_HARDWARE_CONFIRMED=0`、`MOTOR_REVERSE_BRAKE_ENABLED=0`，当前固件不输出反向 PWM；需确认电流、供电、轮向与实测制动力后开启 |
 | 短路制动 | 独立 `motor_short_brake()` 接口和 HAL 模拟测试；导航不自动调用，效果/电流/温升待测 |
-| 停车 / 重启 | 上电 IDLE，显式 START 且连续有效线才启动；停车后保持，人工 START 重置路径计数；自动续跑已停用 |
-| 丢线保护 | 路径模式始终执行 400 ms / 8 cm 保护；仅巡线实验才服从 `LOST_LINE_STOP_ENABLED` |
+| 导航退路 / 重启 | 动作超时、错向/过转、入口降速超限等转低速有界 RECOVERING，不推进项；稳定回线后保持当前总进度重新等新节点。实际 STOPPED 不自动恢复，显式 START 重置路径 |
+| 丢线保护 | 普通FOLLOW/未确认候选400 ms / 8 cm；普通EXECUTING/CLEARING由阶段时距限界转RECOVERING，恢复持续失线1200 ms / 12 cm仍停车；HEXAGON保持独立失线保护 |
 | 机会式巡线 | `OPPORTUNISTIC_FALLBACK_ENABLED=0`，仅记录后续边界，尚未实现 |
 
 200 cm/s 是未验证的目标值。2026-10-30 用户信息小车最高可能达到 5 m/s：`WHEEL_TARGET_MAX_CM_S`、`ODOMETRY_MAX_SPEED_CM_S`（650）与速度前馈已按 500 cm/s 满量程修正，但 5 m/s 本身未经实测，前馈/增益仍需台架重标。当前未获得新规则下的赛道计数、最后一段测距或减速度标定，不能把构建或主机回归当成高速上车许可。未烧录、未运行电机、未进行新方案实车验证。
+
+## 2026-11-05 普通路口动作不因失线立即停车（当前规则优先）
+
+用户确认：LEFT/RIGHT/STRAIGHT/CUSTOM_TURN的EXECUTING及随后CLEARING（含普通非目标节点直行离口）不因灰度全丢线、宽线或多区域直接产生LINE_STOP_LOST、EXIT_LOST、CLEAR_LINE_LOST。转弯捕过出口后再次失线也继续原角度控制；当前航向源为健康IMU，失效仍按原规则锁定降级编码器。到角无线不自动成功，位置PID不接收无效观测；转弯仍须原出口线证据及自定义角门禁。STRAIGHT目标也须连续3帧居中窄出口才从EXECUTING进入CLEARING，并在该完成点建立下一段原点；离口去重仍需连续窄线3帧/50 ms/2 cm，不据失线推进索引。
+
+始终找不到出口或无法离口时，由现有阶段界限中止进入RECOVERING。当前普通转弯配置为3000 ms，自定义角按比例延长（135°为4500 ms），STRAIGHT保留独立时限；CLEARING仍1500 ms/20 cm，未放宽。RECOVERING仍在最后连续可靠线之后持续失线1200 ms/12 cm停车。普通动作内的一次图形航向保持耗尽1200 ms/12 cm时，只退出该保持、回原转角/离口控制，不再以故障8直接停车，也不重新开启机会或重置阶段期限。
+
+普通失线截止改在route FSM更新后判定：只有真实节点证据在同帧确认并交给普通BRAKING/EXECUTING/CLEARING时才允许预算交接；未确认CANDIDATE/FOLLOW的400 ms/8 cm和孤立线不续时规则保留。阶段离开当帧也不会被残留abnormal抢先停车。BRAKING仍须实测入口轮速合格且当前有线才开始动作；零目标、1200 ms/10 cm/航向界限及速度合格无线转RECOVERING均保留。
+
+HEXAGON不在本轮范围：其ENTERING的1200 ms/12 cm、沿环/出口的400 ms/8 cm及一次图形恢复超限8仍可停车，公共离口也沿原规则。非路径模式及LOST_LINE_STOP_ENABLED=0行为保持。编码器/IMU降级/堵转/反向/速度反馈/俯仰/任务硬保护、非负轮目标、全部表值和刹车门禁保持。以下带旧日期的出口失效11/12/8立即停车说明，凡涉及普通EXECUTING/CLEARING均由本节取代；详见[本轮证据](docs/evidence/2026-11-05-maneuver-loss/README.md)。未访问硬件、未烧录，实车效果待验证。
+
+## 2026-11-05 LEFT 入口与非目标过口限速（当前规则优先）
+
+本次现场第二项索引1，已计数2、段内约190 cm，均未达到用户当前配置4个节点或219 cm，因此按非目标节点直行通过。轨迹显示无线期间轮目标约77 cm/s，离口累计20 cm后进入RECOVERING；恢复短窄线回FOLLOW，随后持续失线400 ms停车。这证实了软件的高速无出口通过路径，不能由此认定实际路口计数错误或赛道物理拓扑。第一LEFT“短停后直行再停”没有本次快照；BRAKING零目标后无线中止动作的源码路径与现象相符，但不能认定为该次真实根因。现场与验证见[本轮证据](docs/evidence/2026-11-05-left-fail/README.md)。
+
+`TURN_APPROACH_SLOWDOWN_ENABLED=1`时，总段长度≤100 cm（含未知0）的LEFT/RIGHT/CUSTOM_TURN/HEXAGON，从START或上次动作完成点即将基础及最终外轮目标限制到`min(turn_speed,16 cm/s)`；STOP/STRAIGHT保留原速度策略。长段有可靠居中线时继续原距离包络。非目标CANDIDATE在非单一区域窄线或不居中时、非目标CLEARING尚未连续3帧取得合格居中出口时，以及其图形恢复期间，基础及最终轮目标均不超16 cm/s；合格出口恢复后再按原规划及上升斜率提速。混合后按同一比例缩放两轮目标，保留差速方向和比例，避免航向保持的外轮突破上限。
+
+BRAKING速度合格但无线不转、RECOVERING保留索引/计数/总段起点、动作/离口/恢复全部时距界限与反馈保护不变；不改用户路径表、标定或刹车门禁。总段定义为START/上次动作完成点至灰度触发点，不再因传感器前置24 cm重复扣减。低目标不能保证低实测轮速，本轮为源码机制修复和首弯预防，未烧录、未实车验证。下文带旧日期的“短段统一60”及“非目标无条件保速”描述以本节为准。
 
 ## 控制模式
 
@@ -209,24 +227,24 @@ right_pwm = base_pwm - correction_pwm
 
 ```c
 {junction_count, turn_speed, action, cruise_speed,
- angle_deg, corner_arc_enabled, final_segment_length_cm}
-// 示例：上个动作离口后第 2 个路口左转；最后一段未测量故为 0。
+ angle_deg, corner_arc_enabled, segment_length_cm}
+// 示例：最多第2个节点左转；未知总段长度，仅用计数。启用提前减速时受短段转弯入口上限约束。
 {2, 12.0f, LEFT, 40, 0.0f, false, 0.0f}
 ```
 
-`junction_count` 至少为 1，`turn_speed` 单位 cm/s，为动作入口及轮目标的表内上限。转弯（含自定义角与循环闭合转弯）的有效入弯速度为 `v_entry=min(turn_speed,JUNCTION_SETTLE_SPEED_CM_S)`，当前不高于 16 cm/s；入弯前规划、候选、实测速度门禁与动作限速共用它。`cruise_speed` 是巡航目标。CUSTOM_TURN 的 `angle_deg` 顺时针正、逆时针负，范围 [-360,0) 或 (0,360]。最后一项必须 STOP，中途不得 STOP；表速、转向速度、角度和可选长度均须通过校验。表内计数是待实车确认的配置，并非从旧距离推算的事实。
+`junction_count` 为最多节点数，0 忽略计数（此时总段长度必须大于0），`turn_speed` 单位 cm/s，为动作入口及轮目标的表内上限。转弯（含自定义角与循环闭合转弯）的有效入弯速度为 `v_entry=min(turn_speed,JUNCTION_SETTLE_SPEED_CM_S)`，当前不高于 16 cm/s；入弯前规划、候选、实测速度门禁与动作限速共用它。`cruise_speed` 仅用于总段长度 >100 cm 的巡航目标；<=100 cm（含未知长度）以默认60 cm/s为基础；当`TURN_APPROACH_SLOWDOWN_ENABLED=1`时，LEFT/RIGHT/CUSTOM_TURN/HEXAGON全段另受`min(turn_speed,16 cm/s)`上限，STOP/STRAIGHT保留原策略，仍受启动、位置曲线和闭环限制。CUSTOM_TURN 的 `angle_deg` 顺时针正、逆时针负，范围 [-360,0) 或 (0,360]。最后一项必须 STOP，中途不得 STOP；表速、转向速度、角度和可选长度均须通过校验。表内计数是待实车确认的配置，并非从旧距离推算的事实。
 
 HEXAGON 是显式六边形环岛动作，完整调用及字段对照见 [HEXAGON 文档](docs/hexagon.md#路径调用)，现有实际路径表未替换。`angle_deg` 右正左负，绝对值60～720°，从目标路口速度门禁通过、真正进入动作时累计净航向（包括入环引导）；`corner_arc_enabled` 必须为 false。正常沿环用灰度位置 PID 与双轮速度闭环；到角后先有稳定中心窄线，再凭新出现的绕行反侧分支及连续居中出口线100 ms/0.5 cm确认出环。单纯到角或持续单线不完成，环内分支不追加路径计数，出环后仍走公共离口去重。入口及动作速度不超过 `min(turn_speed,HEXAGON_SPEED_CM_S,JUNCTION_SETTLE_SPEED_CM_S)`，当前16 cm/s；普通动作的完成条件保持。入口3000 ms/30 cm、入口未捕线1200 ms/12 cm、总动作30000 ms/400 cm、出口3000 ms/30 cm均为有界初值；已捕线后仍有400 ms/8 cm及单次图形恢复保护。出口假设为切线直行延续加绕行反侧分支；图中右侧接线只有满足此相对拓扑才适用，尚未实测。
 
 通用检测与动作方向解耦，所有方向均参与计数。最近连续中心线开启候选，按证据分型：中心通道与同侧至少两路分支构成强候选，通常连续至少3帧、前进至少0.1 cm。仅当前目标项为 LEFT/RIGHT、连续两帧均为同一单侧强中心分支且侧别与目标一致时，采用2帧/0.05 cm 提前确认；5 ms周期下理想可少等一周期，仍须真实前进，不能在传感器看到路口前盲转。双侧帧不用于提前确认，STOP/STRAIGHT/自定义角、非目标路口保持原门槛。只有侧边的单一区域2～3路L形，以及中心组至少2路加独立外侧区域的分离分支，属于弱候选，仍须4帧/0.15 cm。候选最长100 ms，静止不能确认。强弱混合沿用较严格门槛，不把弱帧充作强证据。
 
-候选左右分支位取连续交集，左→双侧→右不能拼成同一路口；侧别不相容时从当前帧重新累计并记录原因。三个及以上分离区域、全丢线、单个边缘噪点与孤立骤变不计数；采样间隔超过15 ms中断候选。重叠单一区域窄线以每帧不超过2权重逐步移向边缘，锁存为横移证据，该侧边缘不单独计数，直到连续中心线重新建立；突然出现的L形边缘仍可按弱候选确认。该规则可能漏掉与平滑曲线观测相同的L形弯，4帧/0.15 cm及2权重均为未实测初值，须使用真实赛道回放验证。
+候选左右分支位取连续交集，左→双侧→右不能拼成同一路口；侧别不相容时从当前帧重新累计并记录原因。多个分离区域且目标通道至少3路的图案也按弱节点证据确认；全丢线、单个边缘噪点与孤立骤变不计数；采样间隔超过15 ms中断候选。重叠单一区域窄线以每帧不超过2权重逐步移向边缘，锁存为横移证据，该侧边缘不单独计数，直到连续中心线重新建立；突然出现的L形边缘仍可按弱候选确认。该规则可能漏掉与平滑曲线观测相同的L形弯，4帧/0.15 cm及2权重均为未实测初值，须使用真实赛道回放验证。
 
-未知长度的目标转弯末段从入段即按 `min(cruise_speed,50,v_entry)` 请求低速，当前转弯不高于16 cm/s；直行和最终 STOP 的原上限保持，已测长度末段按同一 v_entry 的距离包络提前减速。5 ms周期下，200 cm/s每帧走1 cm，500 cm/s每帧走2.5 cm；三帧首尾就分别跨2/5 cm，还未计入多数滤波和采样相位，不能靠增加帧数保证高速短分支识别。未取得最短纵向特征长度和实际识别速度数据前，已测长度模式下的高速识别风险仍需单独验证。IMU/编码器连续航向作为回放辅助信息记录，不引入未经验证的角速度否决门禁。相同的八路时间序列仍不可可靠区分元件、曲线和路口，距离永不补计。
+总段起点为 START 或上次目标动作完成点，中间节点通过不会清零距离。计数和总段距离采用 OR：达到任一阈值后，当前/下一次满足连续帧和位移证据的灰度节点执行动作；没有节点时继续巡线，不按距离强转。非目标图案候选及直行通过冻结位置 PID 并保持入口航向：候选不居中或非窄线、离口尚未连续3帧取得合格居中出口或图形恢复期间，基础及最终轮目标限16 cm/s；可靠居中出口后才交回位置 PID 和原规划速度。低目标不能宣称实测轮速已降低。目标节点仍降速并等待实测入口轮速合格。图案和真实路口使用相同八路证据，仍可能误判，不能称为语义识别。
 
 `follow.navigation_trace`在路径运行期间每个控制周期记录原始GPIO、滤波前后掩码、编码器、实际dt、当前航向/来源、双轮反馈、里程及路口前后状态、候选类型/侧别/拒绝原因。128帧在5 ms下覆盖640 ms；包含触发停车当帧，停车后冻结，拒绝START不清空，接受人工START才清空。它与原20 ms转弯trace并存。窗口不含完整起步状态，回放传感器滤波时需要窗口之前的历史或舍弃前两帧暖机结果；不能声称由短窗口恢复整圈所有控制历史。调试器还可读`route_candidate_kind`、`route_last_confirmed_kind`、`route_candidate_reject`、`route_candidate_sides`及重启/横移拒绝计数。
 
-确认即累计一次并锁定，直到合格离口线连续至少 50 ms、至少 2 cm 且至少 3 帧才重新允许计数。**转弯后的 CLEARING** 已经确认出口，继续允许单区域窄线横向移动，不要求每帧居中；转角和连续中心出口门禁不因此豁免。**直行过口的 CLEARING**（非目标路口、STRAIGHT 及直行闭合）尚未确认出口，要求单一区域、`|position|≤2`、至多 `JUNCTION_STRAIGHT_EXIT_MAX_WIDTH=3` 路，侧边线与中心宽图形不能作为离口线。直行阶段先保持入口航向，连续 3 帧合格居中出口线后才启用位置 PID；任一不合格观测或采样中断清空去重证据。过路速度受 cruise、过路速度参数及倒数第二口离口的 50 cm/s 限速共同约束，使用外轮上限混合，航向/位置修正不会令外轮超过限速。
+确认即累计一次并锁定，直到合格离口线连续至少 50 ms、至少 2 cm 且至少 3 帧才重新允许计数。**转弯后的 CLEARING** 已经确认出口，继续允许单区域窄线横向移动，不要求每帧居中；转角和连续中心出口门禁不因此豁免。**直行过口的 CLEARING**（非目标路口、STRAIGHT 及直行闭合）尚未确认出口，要求单一区域、`|position|≤2`、至多 `JUNCTION_STRAIGHT_EXIT_MAX_WIDTH=3` 路，侧边线与中心宽图形不能作为离口线。直行阶段先保持入口航向，连续 3 帧合格居中出口线后才启用位置 PID；任一不合格观测或采样中断清空去重证据。非目标候选非居中/非窄线、直行通过未取得连续3帧合格出口或图形恢复期间均限16 cm/s；可靠居中线恢复后继续当前段规划速度，原启动、长段减速和硬反馈保护仍有效。
 
 直行离口从进入 CLEARING 或最近连续合格出口线起，400 ms / 8 cm 任一达到即 `ROUTE_FAILURE_CLEAR_LINE_LOST=12` 停车；先检查期限再接受恢复，孤立线不能续时。
 
@@ -239,7 +257,9 @@ HEXAGON 是显式六边形环岛动作，完整调用及字段对照见 [HEXAGON
 
 2026-10-30 首弯后在线停车读取：锁存快照为索引 0、CLEARING，离口 480 ms / 20.0658 cm，`LINE_STOP_ROUTE / ACTION_TIMEOUT` 实际由 20 cm 超距触发；停车时仍为单一区域窄线 `0x04`、position=-3，无速度故障、IMU 未降级。首弯已经确认出口，但旧规则要求持续居中，横向回线反复清空离口证据，尚未推进到第二项。此次仅修正离口去重的中心限制，保留所有限界及路径表；未检查固件一致性、未烧录，实车效果待复测。证据见 `docs/evidence/2026-10-30-post-left-clearance/README.md`。
 
-目标路口确认时，转弯任一轮实测速度超过 `v_entry=min(turn_speed,16)` 就先进入 BRAKING；最终 STOP 保留表内入口上限，STRAIGHT 不设该门禁。双轮目标为零、撤去驱动输出，1200 ms、继续前进10 cm或航向变化超限任一触发则停车。只有实测速度合格且当前仍有目标线才开始动作，不重新计数。当前双轮 PWM 同时为零会由 motor_apply 进入 STBY 低待机滑行，不能把它当作主动短刹；因此候选、未知长度末段及已测距离包络均提前请求同一低速，避免到了口上才降目标、继续滑行到过晚位置才产生有效差速。真实制动力和响应仍须实测，无法及时降速仍停车。
+目标路口确认时，转弯任一轮实测速度超过 `v_entry=min(turn_speed,16)` 就先进入 BRAKING；最终 STOP 保留表内入口上限，STRAIGHT 不设该门禁。双轮目标为零、撤去驱动输出；1200 ms、继续前进10 cm或航向变化超限触发导航软恢复，不强行入弯。只有实测速度合格且当前仍有目标线才开始动作，不重新计数。当前双轮 PWM 同时为零会由 motor_apply 进入 STBY 低待机滑行，不能把它当作主动短刹；因此候选、未知长度末段及已测距离包络均提前请求同一低速，避免到了口上才降目标、继续滑行到过晚位置才产生有效差速。真实制动力和响应仍须实测；软恢复保留速度闭环与堵转/反向保护。
+
+**2026-11-05 入口冲出后的证据交接：** 已连续确认目标节点进入 BRAKING 时，清除 CANDIDATE 遗留的普通歧义标志，由入口原有1200 ms / 10 cm / 航向限界负责中止，不让旧400 ms / 8 cm普通丢线预算抢先跳过软恢复。入口阶段仍为零目标；轮速合格但本帧全无线时，立即以 ENTRY_SPEED 中止本次动作并进入既有 RECOVERING，不在零目标下等待线重新出现，也不凭旧路口证据盲转。RECOVERING保持索引、计数、总段原点；恢复单线只返回FOLLOW，之后仍需新的灰度节点确认。其持续失线1200 ms / 12 cm、截止优先、堵转/反向/计数及任务硬保护继续生效；尚未确认节点的普通失线仍为400 ms / 8 cm。历史首段65 cm曾请求60 cm/s；本轮预防修复在启用提前减速时将短段转弯全段基础及外轮目标限制到16 cm/s，已知长度减速包络、目标候选限速与实际入口轮速门禁仍生效。本次没有改表值、速度或刹车接口，目标减速不能证明物理减速已完成。两处旧源码失败回归说明软件机制可复现，没有现场日志不能认定就是此次实车根因，详见[调查和验证](docs/evidence/2026-11-05-entry-loss/README.md)。
 
 LEFT/RIGHT 目标 ±90°；CUSTOM_TURN 使用指定有符号角度。默认 MPU6050 航向正向为右转，不对 ±180°取模。非圆弧先同向差速，达到捕线角度且出现有效窄线后，立即由低速位置 PID 接管纠偏；不再把剩余航向误差叠加到非零位置纠偏上。圆弧按 `CORNER_RADIUS_CM`、前置灰度距离和轴中点行程规划相对航向并反馈当前航向源；只对 ±90°且该项开关开启时使用。双轮目标始终非负且限幅。
 
@@ -274,27 +294,21 @@ CUSTOM_TURN保留原角度门禁：满目标角且连续3帧居中出口线，�
 
 `ROUTE_REPEAT_COUNT=0` 无限循环、1 单轮、N 共 N 轮。非末轮 STOP 确认后累计圈数，执行 `ROUTE_REPEAT_ACTION` 并离口后回首项；最终 STOP 确认后先停车，再由主任务分派一次回调。要求真实赛道闭合，不能据此保证每轮计数正确。
 
-## 最后一段动态速度规划
+## 总段动态速度与导航退路（2026-11-04）
 
-**二极管后未降速的补充修复（2026-10-30）：** 200 cm/s 时每个 5 ms 周期约前进 1 cm，原检测器在每帧候选上重新要求距最后中心线不超过 1.5 cm，导致连续三帧尚未确认就丢弃候选。现在中心历史仅用于开启候选，后续连续合格分支帧保持该证据，仍须满足三帧、最小位移和 100 ms 时限；无线、形状或采样中断立即清除候选，不补计路口。倒数第二个路口确认进入 CLEARING 时便开始 50 cm/s 上限，离口去重期间不再等待 `final_segment_active` 才降速；最后一段的距离起点仍在离口确认点。新增端到端回归使用 `{2,50,LEFT,200,0,false,50}`，验证首口计数、去重期限速、末段限速和下一口左转，同时验证中断不能保留候选。主机复现说明软件存在此漏计机制，不代表已经取得本次实车状态证据；未烧录、未实车复测。
+`segment_length_cm` 是 START / 上次目标动作完成点至目标灰度触发点的总长，包含中间图案/路口；通过中间节点不重建 `origin_cm` 或规划起点。计数是上限，距离是另一触发资格；二者都不能省略灰度确认。计数0忽略计数；长度0未知且禁用距离包络，二者同时0为非法配置。
 
-**末段速度策略（2026-11-02 更新）：** `TURN_APPROACH_SLOWDOWN_ENABLED=1` 时，未知长度末段的 FOLLOW/CANDIDATE 全程按 `min(cruise_speed,JUNCTION_APPROACH_SPEED_CM_S,v_entry)` 请求目标；当前转弯不高于16 cm/s，直行/最终STOP保留原上限。未测距离无法知道何时开始刹车，所以可能牺牲整段速度，以便发现路口时已经具备慢速转弯条件。填写并校验非零实测长度后，按 `sqrt(v_entry²+2*a_safe*s)` 提前减速，远处可保留巡航，不凭距离触发转向。倒数第二路口去重期间已开始该入弯限速；目标候选、距离耗尽和实际入口门禁也采用 v_entry。关闭入弯减速开关不关闭实测入口门禁，可能因来不及减速而停车。新识别阈值、制动距离和实际入弯效果仍待实车验证。
+长度<=100 cm（含0）使用 `ROUTE_SHORT_SPEED_CM_S=60` 的默认巡航；>100 cm 使用表内 `cruise_speed`。所有已知正长度段在减速开关打开且标定合法时按 `min(cruise,sqrt(v_entry²+2*a_safe*max(0,L-d-margin)))` 规划。安全余量2 cm、减速度120 cm/s²仍是配置，实际制动力未在本轮测量。规划上升有加速度/jerk限制，下降即时钳低，双轮速度PID负责反馈；位置曲线、启动包络与转弯上限仍独立有效，60并非恒定实测速度。
 
-`braking_planner.c/.h` 为纯速度规划模块，不产生任何路口或动作事件。长度 L 必须测量自上一个路口的离口确认点到目标路口灰度触发点；首项 count=1 从 START 起点量。count>1 时，仅在第 count-1 个路口确认并离口后，才开始最终一段里程 d。中间路段不依赖长度。
+距离耗尽后等待真实灰度节点，长段保持入口低速，不设旧搜口2000 ms/12 cm停车。若余量耗尽仍超速，记录 `navigation_warning=BRAKE_DISTANCE`、继续减速，不凭距离停车。目标节点确认后仍先检查实测入弯轮速；入口BRAKING使用零目标撤去驱动力，不能及时到位则中止该次入弯转软恢复。导航不会绕过轮速门禁高速强转。
 
-每个周期计算 `s=max(0,L-d-margin)`，`v_allowed=min(cruise,sqrt(v_entry²+2*a_safe*s))`；所需减速度 `max(0,(v²-v_entry²)/(2*s))`，s=0 且仍超速返回无穷诊断值。输入非法或未标定时拒绝规划。当前安全余量初值 2 cm，必须覆盖检测误差、控制延迟、电压与抓地变化，不能当作已验证安全距离。
+现有刹车实现保留：默认 `MOTOR_REVERSE_BRAKE_ENABLED=0`、`BRAKING_REVERSE_HARDWARE_CONFIRMED=0`；只有原硬件确认/可靠线/正向轮速门禁均满足时才允许有界反向力矩（累计250 ms、60 PWM），本轮未开启。`motor_stop()` 是 STBY低待机；独立 `motor_short_brake()` 接口仍在，导航不自动调用，不把滑行称作短刹。
 
-每 5 ms 以双轮较高滤波轮速 `v` 及末段剩余距离评估 `a_required=(v²-v_entry²)/(2·max(0,s-3cm))`；真实减速响应优先使用经静止重力基线扣除、倾斜门禁和轴向确认的 IMU X 轴加速度，其余时间使用编码器轮速差分，经 80 ms 低通。观测只允许降低已标定 `a_safe`，不能凭单次较大负加速度提高安全界限。`BRAKING_IMU_ACCEL_SIGN_CONFIRMED=0` 时生产配置始终回退编码器；IMU 断线/降级也回退。重力基线无法消除动态俯仰与振动误差，速度差分亦受 30 ms 轮速滤波和打滑影响。
+**动作完成基准与去重分离：** 普通/自定义转弯在原出口条件通过并进入CLEARING时锁存下一段起点；HEXAGON仍需原净转角、新出口分支及连续出口证据才建立起点；STRAIGHT目标在首次连续3帧居中窄出口时建立。随后的50 ms/2 cm只管理计数解锁，已沿出口走过的行程全部保留。目标CLEARING内即预看下一表项的长度、速度、入口上限和同一里程起点，切段不再将基准改为当前里程。非目标CLEARING/图案恢复持续当前段减速包络，跨长度阈值立即建立search_pending，保速不意味着恢复巡航。
 
-当 `a_required` 超过可用减速度且尚有距离时，已确认反向硬件并开启 `MOTOR_REVERSE_BRAKE_ENABLED` 才在连续可靠窄线、双轮正向速度都高于 8 cm/s、尚未确认路口的末段 FOLLOW 请求反向力矩。左右轮各用原速度 PID 的目标减实测误差、实际 dt 和抗饱和，负 PWM 限 60/255，累计至多 250 ms；低速、无线/歧义、候选/路口、距离耗尽或 STOPPED 立即取消。反向是对正向滚动施加制动力矩，不请求倒车速度；若距离余量耗尽仍高于入口速度 3 cm/s，锁定 `ROUTE_FAILURE_BRAKE_DISTANCE=13` 停车。入口过速的独立 BRAKING 1200 ms/10 cm 门禁仍在。反向电流/温升、车轮打滑、轮向、实际停止距离尚无实测，因此生产硬件确认门禁保持 0；当前代码仅进行被动降速并在距离余量耗尽仍过速或入口门禁超限时停车。路径表本地未提交修改中的启用项长度均为 0，需填实测末段距离才能启动距离规划。主机回归只验证逻辑，不证明反向制动力。
+候选超时、动作/离口超时、错向、过转、入口降速超限转换为 `ROUTE_RECOVERING`：记录最近警告和恢复次数，保持16 cm/s上限，用可靠窄线位置PID或进入恢复时航向直行。连续窄线至少3帧、50 ms、前进2 cm后返回 FOLLOW；不宣称原动作成功、不推进索引、不清零已计数或总段基准，后续新节点重新取得动作资格。恢复位置PID只在进入阶段或失去可靠线时复位，连续可靠线保持微分/积分历史。1200 ms/12 cm失线预算从最近连续3帧可靠窄线起计算，持续可靠线会刷新失线基准，即使尚未完成50 ms/2 cm解锁，也不因恢复阶段年龄/总行程停车。无线、宽线、多区域、采样中断清空连续证据，孤立一两帧不续预算；持续失线截止优先于到期帧。
 
-规划目标上升使用加速度和 jerk 初值限制，再交给原双环。速度安全包络下降时直接钳低，不为平滑延迟必要减速；这不意味着物理轮速能瞬间下降。原启动 1 s 包络和出口加速限制仍存在。
-
-**斜坡状态只跟踪速度包络（2026-10-30 修正）：** 早期实现把 `braking_slew.speed` 每周期钳到实际轮目标，而实际目标又含位置曲线降速 `(1-0.35·|pos|/7)`，两者相扣形成衰减反馈，速度收敛到 `上升率/(曲线损失)`：`pos=1` 仅约 15 cm/s、`pos=2` 约 8、`pos=3` 约 5，车辆无法加速、PWM 太低甚至触发堵转保护。现已删除该钳位：包络下降仍即时生效，CANDIDATE/搜口/离口限速仍走独立 `fminf`，上升仍受 `rise*dt` 限制不会跳变。该机制由现场快照（START 后 1195 ms 堵转停车、斜坡 15.07 与理论值吻合）与回归 `test_final_leg_ramp` 证实；未烧录实车复测。
-
-L 走完而没有路口时继续按入口低速搜口；独立 2000 ms 或 12 cm 上限任一触发停车，绝不补计或自动转弯。目标路口提前出现时仍执行实测入口速度门禁。当前本地表启用项 L 均为 0，填入实测 L 前距离规划不生效；标定确认配置已为 1，校验允许启动，但本次未获得真实减速度标定证据；必须核实实际减速能力，不能把配置标志当成实测证明。所需减速度参与逐周期可行性判断；未实测的安全减速度和反向力矩仍不能保证实际能在路口前降速。形状确认、入口门禁、丢线和动作保护仍独立生效。
-
-制动实施顺序为降低正向输出→测量可用减速度→必要时验证短路制动→全程测试。`motor_stop()` 为 STBY 低待机；`motor_short_brake()` 为 STBY 高、双轮方向端高、PWM 低的独立接口。导航当前不自动调用短刹，不能把 HAL 模拟的引脚状态当成实际制动力证明。反向制动默认禁用，已在软件加入 250 ms 累计、60 PWM、8 cm/s 零交叉前禁用和双轮速度/线证据门禁；电气限流与双轮一致性硬件效果仍须架空实测。
+仍停车的路径包含：持续丢线/无法确认出口（通常400 ms或8 cm，专门恢复1200 ms或12 cm）、非法路径/反馈/规划、编码器计数跳变/堵转/确认反向/速度PID故障、任务时序/控制输入异常、可用IMU俯仰锁存、初始化/看门狗故障、人工STOP及最终轮STOP。IMU失效仍锁定降级编码器；STOPPED不自动续跑。精确故障编号、边界与验证见 [证据说明](docs/evidence/2026-11-04-navigation-review/README.md)。此前带日期的出口/现场段落中“动作超时或过转停车”描述是历史策略，当前改走此软恢复；持续出口失效停车保留。
 
 ## 总体架构与运行状态
 
@@ -328,7 +342,7 @@ flowchart LR
     GRAY --> POS[可靠单线位置 PID]
     GRAY --> COUNT[中心历史 / 强弱候选分型 / 侧别连续 / 横移抑制 / 计数去重]
     GRAY --> REPLAY[每周期原始输入与候选记录 / 停车冻结128帧]
-    TABLE[计数 / 动作 / 转角 / 速度表] --> COUNT
+    TABLE[最多计数 / 总段距离 / 动作 / 转角 / 速度表] --> COUNT
     ENC[双轮编码器] --> ODO[里程 / 双轮实测速度]
     IMU[MPU6050 静止校准 / 相对航向] --> SELECT[优先 IMU / 失败锁定编码器 / 连续航向]
     ENC --> SELECT
@@ -336,20 +350,33 @@ flowchart LR
     GRAY --> CAPTURE[有效出口窄线 / 限16 / 连续位置PID接管]
     POS --> CAPTURE
     CAPTURE --> TURN
+    CAPTURE --> NEXTANCHOR[目标动作完成时锁存下一段基准 / 直行需三帧窄出口 / HEXAGON保留完整出口契约]
+    NEXTANCHOR --> PLAN
+    CLEAR --> NEXTANCHOR
     CAPTURE --> MIX
-    CAPTURE --> EXITLOSS[未进入元件恢复的失线400 ms或8 cm / 独立停车]
+    CAPTURE --> EXITLOSS[普通动作失线继续角度或离口控制 / 出口证据不豁免]
     CAPTURE --> RECOVER[近出口或离口遇图形 / 单次低速保持航向 / 12 cm或1200 ms]
     CLEAR --> RECOVER
     PASS --> RECOVER
     SELECT --> RECOVER
     RECOVER --> MIX
     RECOVER --> CLEAR
-    RECOVER --> STOP
-    EXITLOSS --> STOP
+    RECOVER -->|HEXAGON恢复超限或硬故障| STOP
+    RECOVER -->|普通图形保持耗尽回原控制| TURN
+    EXITLOSS --> MIX
     SELECT --> ODO
     SELECT --> REPLAY
-    COUNT --> TURN
-    COUNT --> HEX[HEXAGON 入环 / 灰度沿环 / 到角后新出口分支 / 出环确认]
+    ODO --> READY[距离或计数先到 / 仍需灰度节点确认]
+    COUNT --> READY
+    READY --> ENTRY[已确认目标节点 / 实测入口轮速门禁]
+    ENTRY -->|速度合格且当前有线| TURN
+    ENTRY --> BRAKEENTRY[超速零目标 / 接管旧候选异常 / 原1200ms与10cm及航向边界]
+    ODO --> ENTRY
+    GRAY --> BRAKEENTRY
+    BRAKEENTRY -->|速度合格且当前有线| TURN
+    BRAKEENTRY -->|速度合格但无线或入口超限| NAVRETREAT
+    ENTRY -->|HEXAGON入口速度合格且有线| HEX[HEXAGON 入环 / 灰度沿环 / 到角后新出口分支 / 出环确认]
+    BRAKEENTRY -->|HEXAGON速度合格且有线| HEX
     TABLE --> HEX
     SELECT --> HEX
     POS --> HEX
@@ -361,26 +388,32 @@ flowchart LR
     HEX --> MIX
     HEX --> CLEAR
     HEX --> HEXGUARD[入口及总动作时距 / 出口证据 / 失线 / 错向过转保护]
-    HEXGUARD --> STOP
+    HEXGUARD -->|导航错误| NAVRETREAT[导航错误中止动作 / 16低速回线保留PID历史 / 保留计数及总进度]
+    HEXGUARD -->|持续失线或硬故障| STOP
+    TURN -->|动作时限或转角错误| NAVRETREAT
+    CLEAR -->|离口时限超距| NAVRETREAT
+    NAVRETREAT --> MIX
+    NAVRETREAT -->|可靠线及去重证据恢复| COUNT
+    NAVRETREAT -->|持续失线1200ms或12cm| STOP
     TURN --> CLEAR[已确认出口 / 保留PID历史和阻尼 / 低速离口去重]
     CLEAR --> ADJ[短中心走廊加连续新分支 / 有界确认 / 保持出口航向]
     ADJ --> COUNT
-    COUNT --> PASS[直行图形 / 保持入口航向 / 居中窄出口三帧后PID]
+    COUNT --> PASS[非目标图形无可靠中心出口限16 / 保持入口航向 / 三帧合格出口后PID及原规划]
     GRAY --> PASS
     PASS --> MIX
     PASS --> COUNT
-    PASS --> PASSLOSS[直行离口无可靠出口400 ms或8 cm]
-    PASSLOSS --> STOP
+    PASS --> PASSLOSS[普通直行无出口 / 阶段1500ms或20cm限界]
+    PASSLOSS --> NAVRETREAT
     POS --> CLEAR
     GRAY --> CLEAR
     CLEAR --> COUNT
-    ODO --> PLAN[未知长度转弯末段限16 / 已测长度提前减速 / 实测低速入弯]
+    ODO --> PLAN[启用提前减速时短段转弯全段限16 / 其他短段默认60 / 正长度动态包络]
     COUNT --> PLAN
     TABLE --> PLAN
     IMU --> ACCEL[纵向基线补偿加速度 / 已确认轴向时优先]
     ODO --> ACCEL[轮速差分回退]
     ACCEL --> PLAN[实测减速 / 需求减速度比较]
-    PLAN --> MIX[非负双轮目标 / 距离速度上限]
+    PLAN --> MIX[非负双轮目标 / 最终比例限速保留差速 / 距离速度上限]
     PLAN --> BRAKETORQUE[仅硬件确认后 / 有界反向力矩请求]
     BRAKETORQUE --> SPEED
     POS --> MIX
@@ -395,7 +428,7 @@ flowchart LR
     INHIBIT --> MOTOR
     REVERSE --> STOP
     SPEED --> MOTOR[TB6612 PWM]
-    GUARD[丢线 / 超时 / 编码器反馈 / 可用时俯仰 / 调度故障] --> STOP[锁存快照 / STBY 低停车]
+    GUARD[FOLLOW或RECOVERING或HEXAGON失线 / 编码器反馈 / 可用时俯仰 / 非法输入与调度故障] --> STOP[锁存快照 / STBY 低停车]
 ```
 
 ```mermaid
@@ -406,10 +439,10 @@ stateDiagram-v2
     FOLLOW --> CANDIDATE: 中心历史加分型分支 / 平滑边缘不计数
     CANDIDATE --> CANDIDATE: 目标同侧强分支2帧0.05cm / 其余强3帧弱4帧
     CANDIDATE --> FOLLOW: 形状或采样中断 / 侧别不相容重新累计
-    CANDIDATE --> CLEARING: 非目标路口确认 / 计数一次 / 倒数第二口按目标入弯限速
+    CANDIDATE --> CLEARING: 非目标节点确认 / 计数一次 / 未证实居中出口限16
     CANDIDATE --> BRAKING: 目标路口确认但实测轮速高于有效入口上限
     CANDIDATE --> EXECUTING: 普通目标动作确认且直行或入口速度合格
-    BRAKING --> EXECUTING: 普通动作速度合格且仍有目标线
+    BRAKING --> EXECUTING: 普通动作实测速度合格且当前仍有目标线
     CANDIDATE --> HEXAGON_EXECUTING: HEXAGON目标确认且入口速度合格
     BRAKING --> HEXAGON_EXECUTING: HEXAGON速度合格且仍有目标线
     state HEXAGON_EXECUTING {
@@ -426,18 +459,22 @@ stateDiagram-v2
         图形单次恢复保留子状态和角度基准
     end note
     HEX_DONE --> CLEARING: 确认出环 / 公共低速巡线及去重
-    HEXAGON_EXECUTING --> STOPPED: 独立时距或失线 / 错向过转 / 安全故障
-    FOLLOW --> STOPPED: 末段距离余量耗尽仍过速 / 快照原因13
+    HEXAGON_EXECUTING --> RECOVERING: 导航阶段超时或错向过转
+    HEXAGON_EXECUTING --> STOPPED: 持续失线或硬故障
+    FOLLOW --> FOLLOW: 短段转弯启用提前减速则全段限16 / 长段可靠中心线按包络 / 到距等节点
     EXECUTING --> EXECUTING: 有效出口线低速位置PID / 无线低速补角
     EXECUTING --> COMPONENT_HOLD: 已捕线且近目标角遇超宽或多区域
     CLEARING --> COMPONENT_HOLD: 无可证实的新路口交接 / 遇元件图形
     COMPONENT_HOLD --> EXECUTING: 原阶段为转弯 / 三帧中心窄线 / 原出口门禁
     COMPONENT_HOLD --> CLEARING: 原阶段为离口 / 三帧中心窄线 / 原离口门禁
-    COMPONENT_HOLD --> STOPPED: 12cm或1200ms / 原动作时限与故障保护
-    EXECUTING --> STOPPED: 已捕获出口后失线400 ms或8 cm
-    EXECUTING --> CLEARING: 三帧居中窄出口 / 自定义角门禁 / 保留PID历史和阻尼
-    CLEARING --> GAP_HOLD: 出口短暂失线 / 朝已确认出口回正 / 原400ms与8cm限界
-    CLEARING --> FOLLOW: 合格出口50 ms与2 cm / 直行须居中且至多3路 / 按下一段包络
+    COMPONENT_HOLD --> STOPPED: HEXAGON恢复超限 / 独立硬故障
+    COMPONENT_HOLD --> EXECUTING: 普通转弯图形保持耗尽 / 回原控制及原阶段期限
+    COMPONENT_HOLD --> CLEARING: 普通离口图形保持耗尽 / 回原控制及原阶段期限
+    COMPONENT_HOLD --> RECOVERING: 原动作时限
+    EXECUTING --> EXECUTING: 普通动作捕线后失线继续角度控制 / 不以失线成功退出
+    EXECUTING --> CLEARING: 三帧居中窄出口 / STRAIGHT也确认出口 / 自定义角门禁保留
+    CLEARING --> GAP_HOLD: 普通离口失线朝已确认出口回正 / 原阶段时距界限接管
+    CLEARING --> FOLLOW: 合格出口50 ms与2 cm仅解锁计数 / 保留动作完成后行程及预看包络
     CLEARING --> CANDIDATE: 已确认转弯出口 / 短中心走廊与新分支联合证据 / 下一项真实候选
     FOLLOW --> GAP_HOLD: 无线或歧义
     FOLLOW --> REVERSE_PENDING: 轻微反向 / 双轮待机但路径不重置
@@ -446,11 +483,20 @@ stateDiagram-v2
     GAP_HOLD --> FOLLOW: 原路径为FOLLOW且截止前连续有效线恢复
     GAP_HOLD --> CLEARING: 原路径仍在离口且截止前连续有效线恢复
     CANDIDATE --> STOPPED: 最终 STOP 确认
-    FOLLOW --> STOPPED: 搜口或独立安全故障
+    FOLLOW --> STOPPED: 非法路径或反馈 / 独立硬故障
     GAP_HOLD --> STOPPED: 丢线限时或限距
-    BRAKING --> STOPPED: 超时 / 超距 / 航向异常
-    EXECUTING --> STOPPED: 错向 / 过转 / 动作超时
-    CLEARING --> STOPPED: 总离口边界 / 直行无可靠出口400 ms或8 cm
+    BRAKING --> RECOVERING: 实测速度合格但无线 / 超时 / 超距 / 航向异常
+    note right of BRAKING
+        确认节点后接管旧候选异常
+        零目标及原1200ms与10cm限界
+        不凭旧节点无线起转
+    end note
+    EXECUTING --> RECOVERING: 错向 / 过转 / 动作超时
+    CLEARING --> RECOVERING: 总离口时距边界
+    CANDIDATE --> RECOVERING: 候选确认超时
+    RECOVERING --> RECOVERING: 连续可靠线刷新失线基准 / 保留位置PID历史
+    RECOVERING --> FOLLOW: 连续窄线3帧50ms且2cm / 保留表项计数总里程
+    RECOVERING --> STOPPED: 最后可靠线后持续失线1200ms或12cm / 硬故障
     STOPPED --> FOLLOW: 人工重新 START
 ```
 

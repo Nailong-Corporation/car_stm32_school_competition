@@ -1,0 +1,8 @@
+maneuver-loss configuration: IMU=0 GRAY_INVERT=0
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9236 checks)
+maneuver-loss configuration: IMU=0 GRAY_INVERT=1
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9236 checks)
+maneuver-loss configuration: IMU=1 GRAY_INVERT=0
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9240 checks)
+maneuver-loss configuration: IMU=1 GRAY_INVERT=1
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9240 checks)

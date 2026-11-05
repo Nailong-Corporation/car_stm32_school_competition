@@ -1,0 +1,3 @@
+maneuver-loss configuration: IMU=0 GRAY_INVERT=0
+Assertion failed: (f.state!=LINE_STOPPED && f.route.state==ROUTE_CLEARING), function clearing_loss, file test_maneuver_loss.c, line 60.
+test/run_maneuver_loss_tests.sh: line 8: 41373 Abort trap: 6           "$test_dir/test" "$@"

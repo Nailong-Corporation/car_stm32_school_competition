@@ -1,0 +1,10 @@
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9141 checks)
+HEXAGON FSM: 9141 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9145 checks)
+HEXAGON FSM: 9145 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9141 checks)
+HEXAGON FSM: 9141 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9145 checks)
+HEXAGON FSM: 9145 checks PASS
+Assertion failed: (p.failure==ROUTE_FAILURE_EXIT_RECAPTURE), function test_recovery_limits, file test_component_recovery.c, line 29.
+test/run_host_tests.sh: line 21: 42113 Abort trap: 6           "$test_binary"

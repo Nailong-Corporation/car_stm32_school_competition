@@ -344,4 +344,15 @@
 #define HEXAGON_ENTRY_LOST_MS         1200U
 #define HEXAGON_ENTRY_LOST_CM           12.0f
 /* Once ring line is captured, use existing 400 ms/8 cm bounds plus one graphic recovery. */
+
+/* 2026-11-04: total-segment planning; table cruise applies only above 100 cm. */
+#ifndef ROUTE_SHORT_SPEED_CM_S
+#define ROUTE_SHORT_SPEED_CM_S 60.0f
+#endif
+#define ROUTE_LONG_SEGMENT_CM 100.0f
+/* RECOVERING: sustained loss since last confirmed narrow line, not phase duration. */
+#define NAVIGATION_RECOVERY_MS 1200U
+#define NAVIGATION_RECOVERY_CM 12.0f
+#define NAVIGATION_RECOVERY_SPEED_CM_S 16.0f
+
 #endif

@@ -1,0 +1,16 @@
+PASS: all four user table rows exactly match task-entry values
+PASS: production ROUTE_REPEAT_COUNT remains 0
+PASS: Markdown fence balance and both Mermaid entry/recovery edges; renderer not run
+PASS: firmware-fix.patch isolates the two additions from pre-existing workspace changes
+6af68d64287e1615bbfcc736a47fce26eeb449987aad3c9c0000364d703df5e1 src/route.c
+8df2fd4efa48257c2155a2ce70a3381b12a222c978c1e45875ba3020a89b306f src/line_follow.c
+03f8e29c341b8998a6e8e5866d76f10ccbd98ab2e12fd28c6ec8bf47f1d10d44 src/route_table.c
+7a755d88ecd4840e25335948b0e3790ac534d499c0cb0d5ff8aa91bd24cb188e src/braking_planner.c
+501d336113a452b9c4b4158ee98e0f324d3aafe6242ab58914f3968132afe4b0 src/speed_control.c
+9552f0b923f1e4adf017c16995d6210b03634948a6baef045f130e4db2669686 src/motor.c
+33fe5e8051ad67fea89183b50423524e860db63dd90a8da803110aa1eb9dd398 include/motion_config.h
+8f79a1932e2d00e2c1d1cd0cad6bd9dd02cebbfb6878752c6b49dadeec493a6f include/control_config.h
+5f17ad06c4f423a8e88f78a311db74d07398edfe7bdf735aea05e20c2a5d5d76 test/test_entry_loss.c
+Final host test PASS lines: 81
+PASS: successful project-core build and original global permission failure both archived
+PASS: git diff --check

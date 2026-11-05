@@ -1,0 +1,1 @@
+Assertion failed: (f.route.state==ROUTE_CLEARING), function test_clearance_envelope, file test_navigation_review.c, line 61.

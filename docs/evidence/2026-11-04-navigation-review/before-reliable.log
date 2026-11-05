@@ -1,0 +1,1 @@
+Assertion failed: (p.state==ROUTE_RECOVERING && p.failure==ROUTE_FAILURE_NONE), function test_reliable_recovery, file test_navigation_review.c, line 85.

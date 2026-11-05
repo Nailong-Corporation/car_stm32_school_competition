@@ -87,8 +87,11 @@ static void test_continuous_handoff(void)
   for(unsigned i=0;i<2;++i) tick(&f,&c,&t,0,0,0x18,false);
   CHECK(f.abnormal); /* no single-frame automatic recovery */
   tick(&f,&c,&t,0,0,0x18,false);CHECK(!f.abnormal && f.state==LINE_TRACKING);
-  for(unsigned i=0;i<100 && f.state!=LINE_STOPPED;++i) tick(&f,&c,&t,0,0,0,false);
-  CHECK(f.state==LINE_STOPPED && f.stop_reason==LINE_STOP_LOST);
+  for(unsigned i=0;i<100;++i) tick(&f,&c,&t,4,4,0,false);
+  CHECK(f.state!=LINE_STOPPED && f.route.state==ROUTE_CLEARING);
+  for(unsigned i=0;i<600 && f.state!=LINE_STOPPED;++i) tick(&f,&c,&t,4,4,0,false);
+  CHECK(f.state==LINE_STOPPED && f.stop_reason==LINE_STOP_ROUTE);
+  CHECK(f.route.navigation_warning==ROUTE_FAILURE_ACTION_TIMEOUT && f.route.failure==ROUTE_FAILURE_EXIT_LOST);
  }
 }
 static void test_planned_entry_limits(void)

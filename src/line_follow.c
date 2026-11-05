@@ -8,6 +8,17 @@
 /**
  * @brief 判断停止原因是否属于必须复位才能解除的任务或编码器故障。
  */
+#if PRESET_ROUTE_ENABLED
+/* Ordinary maneuvers own gray loss until their existing phase bounds abort.
+ * HEXAGON retains its independent gray-loss contract. */
+static bool route_owns_gray_loss(const RoutePlanner *p)
+{
+    return p->state==ROUTE_BRAKING || p->state==ROUTE_RECOVERING ||
+        ((p->state==ROUTE_EXECUTING || p->state==ROUTE_CLEARING) &&
+         p->index<p->count && p->steps[p->index].action!=HEXAGON);
+}
+#endif
+
 static bool locked(LineStopReason reason)
 {
     return reason == LINE_STOP_FAULT || reason == LINE_STOP_ENCODER ||
@@ -445,13 +456,14 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         pid_reset(&f->pid);
         speed_control_reset(&f->speed);
     }
-    /* Deadline precedes recovery/junction confirmation; isolated noise cannot extend it. */
-    if ((LOST_LINE_STOP_ENABLED || PRESET_ROUTE_ENABLED) && f->abnormal && ((uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS ||
-        fabsf(f->odometry.distance_cm - f->abnormal_origin_cm) >= INTERFERENCE_MAX_DISTANCE_CM)) {
-        line_follow_stop(f, LINE_STOP_LOST);
-        return;
-    }
+    bool gray_loss_expired=(LOST_LINE_STOP_ENABLED || PRESET_ROUTE_ENABLED) && f->abnormal &&
+        ((uint32_t)(now_ms-f->last_reliable_ms)>=INTERFERENCE_TIMEOUT_MS ||
+         fabsf(f->odometry.distance_cm-f->abnormal_origin_cm)>=INTERFERENCE_MAX_DISTANCE_CM);
+#if !PRESET_ROUTE_ENABLED
+    if(gray_loss_expired) {line_follow_stop(f,LINE_STOP_LOST);return;}
+#endif
 #if PRESET_ROUTE_ENABLED
+    bool route_owned_gray_loss=route_owns_gray_loss(&f->route);
     RouteState previous_route = f->route.state;
     size_t previous_index = f->route.index;
     bool completing_turn=previous_route==ROUTE_CLEARING &&
@@ -463,6 +475,11 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             f->turn_exit[previous_index].minimum_turn_rad,previous_turn);
     route_set_speed(&f->route, f->odometry.left_speed_cm_s, f->odometry.right_speed_cm_s);
     route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
+    /* Let real same-frame node confirmation transfer the budget. Unconfirmed
+     * candidates/FOLLOW still expire before normal line recovery can renew it. */
+    if(gray_loss_expired && !route_owned_gray_loss && !route_owns_gray_loss(&f->route)) {
+        line_follow_stop(f,LINE_STOP_LOST);return;
+    }
     f->exit_recovery_active=f->route.component_recovery_active;
     if (completing_turn && f->route.state==ROUTE_FOLLOW)
         f->exit_accelerating=TURN_EXIT_ACCEL_ENABLED;
@@ -496,7 +513,13 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         f->turn_exit[previous_index].handoff_turn_rad=previous_turn;
         f->turn_exit[previous_index].handoff_mask=obs.line_mask;
     }
-    if (f->route.state == ROUTE_FAILED) { line_follow_stop(f, LINE_STOP_ROUTE); return; }
+    if (f->route.state == ROUTE_FAILED &&
+        !route_recover_navigation(&f->route,f->odometry.distance_cm,f->odometry.heading_rad,now_ms)) {
+        line_follow_stop(f, LINE_STOP_ROUTE); return;
+    }
+    if(f->route.state==ROUTE_RECOVERING && previous_route!=ROUTE_RECOVERING) {
+        pid_reset(&f->pid);f->abnormal=false;
+    }
     if (f->route.state == ROUTE_FINISHED) { line_follow_stop(f, LINE_STOP_ROUTE_COMPLETE); return; }
     if (previous_route == ROUTE_EXECUTING && f->route.state == ROUTE_CLEARING) {
         f->exit_accelerating = false; /* 离口完成才开启下一段加速。 */
@@ -508,19 +531,44 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     }
     RouteStep step = f->route.steps[f->route.index];
     float entry_speed_limit = route_entry_speed_limit(&f->route);
-    float base_speed = (float)step.cruise_speed;
-    if (TURN_EXIT_ACCEL_ENABLED && f->route.state == ROUTE_CLEARING && !f->route.passing_junction) {
-        size_t next = f->route.lap_boundary ? 0U : f->route.index + 1U;
-        if (next < f->route.count) base_speed = (float)f->route.steps[next].cruise_speed;
+    float base_speed = route_cruise_speed(&f->route);
+    RouteStep planning_step=f->route.steps[route_planning_index(&f->route)];
+    float planning_origin=route_planning_origin(&f->route);
+    float planning_entry_speed=route_planning_entry_speed_limit(&f->route);
+    float navigation_wheel_cap=WHEEL_TARGET_MAX_CM_S;
+    /* Short turns cannot rely on a late coast-down at the front sensor.
+     * Keep their whole approach slow, including the next segment preview.
+     * The measured entry gate still decides whether a turn may start. */
+    bool short_turn=planning_step.segment_length_cm<=ROUTE_LONG_SEGMENT_CM &&
+        (planning_step.action==LEFT || planning_step.action==RIGHT ||
+         planning_step.action==CUSTOM_TURN || planning_step.action==HEXAGON);
+    if(TURN_APPROACH_SLOWDOWN_ENABLED && short_turn &&
+       (f->route.state==ROUTE_FOLLOW || f->route.state==ROUTE_CANDIDATE ||
+        f->route.state==ROUTE_CLEARING)) {
+        base_speed=fminf(base_speed,planning_entry_speed);
+        navigation_wheel_cap=planning_entry_speed;
     }
-    /* 已确认出口不等于已稳定离口：先低速位置巡线，完成去重后再恢复巡航。 */
-    if (f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
-        base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
-    if (TURN_APPROACH_SLOWDOWN_ENABLED && step.final_segment_length_cm>0 && f->route.final_segment_active &&
-        (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE)) {
-        if(!f->braking_active || f->braking_origin_cm!=f->route.final_segment_origin_cm) {
+    /* A graphic cannot authorize segment-speed blind passage. Only reliable
+     * centered exit evidence restores the unchanged distance envelope. */
+    bool passing_without_exit=(f->route.passing_junction &&
+        f->route.state==ROUTE_CLEARING &&
+        (f->route.component_recovery_active || !stable ||
+         !route_is_clear_line(&f->route,obs) || f->route.exit_count<LINE_CONFIRM_SAMPLES)) ||
+        (f->route.state==ROUTE_CANDIDATE &&
+         !route_target_ready(&f->route,f->odometry.distance_cm,true) &&
+         (!narrow || fabsf(obs.position)>JUNCTION_CENTER_LIMIT));
+    if(passing_without_exit) {
+        base_speed=fminf(base_speed,COMPONENT_RECOVERY_SPEED_CM_S);
+        navigation_wheel_cap=fminf(navigation_wheel_cap,COMPONENT_RECOVERY_SPEED_CM_S);
+    }
+    /* Segment length selects cruise speed; every known length needs the same
+     * entry-speed envelope, including short segments and clearance previews. */
+    if (TURN_APPROACH_SLOWDOWN_ENABLED && planning_step.segment_length_cm>0 &&
+        f->route.final_segment_active && (f->route.state==ROUTE_FOLLOW ||
+        f->route.state==ROUTE_CANDIDATE || f->route.state==ROUTE_CLEARING)) {
+        if(!f->braking_active || f->braking_origin_cm!=planning_origin) {
             f->braking_slew=(BrakingSlew){fmaxf(f->left_target_cm_s,f->right_target_cm_s),0};
-            f->braking_origin_cm=f->route.final_segment_origin_cm;
+            f->braking_origin_cm=planning_origin;
             f->braking_active=true;
             f->braking_speed_primed=false;
             f->braking_reverse_ms=0;
@@ -537,19 +585,21 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         else f->braking_accel_cm_s2+=dt/(BRAKING_ACCEL_FILTER_TAU_S+dt)*
             (raw_accel-f->braking_accel_cm_s2);
         f->braking_speed_primed=true;
-        BrakingPlan plan = braking_plan(base_speed, entry_speed_limit,
-            step.final_segment_length_cm, f->odometry.distance_cm-f->route.final_segment_origin_cm,
+        BrakingPlan plan = braking_plan(base_speed, fminf(base_speed,planning_entry_speed),
+            planning_step.segment_length_cm, f->odometry.distance_cm-planning_origin,
             fmaxf(fabsf(f->odometry.left_speed_cm_s),fabsf(f->odometry.right_speed_cm_s)),
             BRAKING_SAFE_DECEL_CM_S2, BRAKING_DISTANCE_MARGIN_CM, BRAKING_CALIBRATION_CONFIRMED);
         if (!plan.valid) { line_follow_stop(f,LINE_STOP_ROUTE); return; }
-        BrakingDecision decision=braking_decide(speed,entry_speed_limit,plan.remaining_cm,
+        navigation_wheel_cap=fminf(navigation_wheel_cap,plan.allowed_speed);
+        BrakingDecision decision=braking_decide(speed,planning_entry_speed,plan.remaining_cm,
             -f->braking_accel_cm_s2,BRAKING_SAFE_DECEL_CM_S2,BRAKING_REVERSE_GUARD_CM);
         f->braking_required_cm_s2=decision.required_decel;
         f->braking_reverse_active=false;
-        if(decision.distance_exhausted && speed>entry_speed_limit+REVERSE_BRAKE_MARGIN_CM_S) {
-            f->route.failure=ROUTE_FAILURE_BRAKE_DISTANCE;
-            f->route.state=ROUTE_FAILED;
-            line_follow_stop(f,LINE_STOP_ROUTE);return;
+        if(decision.distance_exhausted && speed>planning_entry_speed+REVERSE_BRAKE_MARGIN_CM_S) {
+            /* Distance is an arming threshold, not a physical stopping boundary.
+             * Keep braking toward the entry cap; the next real junction still
+             * requires measured entry-speed readiness before any turn. */
+            f->route.navigation_warning=ROUTE_FAILURE_BRAKE_DISTANCE;
         }
 #if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
         if(decision.reverse_needed && !decision.distance_exhausted && narrow && stable &&
@@ -570,23 +620,19 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
                                    TARGET_RISE_CM_S2,BRAKING_TARGET_JERK_CM_S3);
     }
     else {f->braking_active=false;f->braking_reverse_active=false;}
-    /* 未测量末段长度时整段低速搜口；有测量值则在离口确认后
-     * 按距离包络减速。倒数第二口尚未离口时保持低速去重。 */
-    bool clearing_penultimate=f->route.state==ROUTE_CLEARING && f->route.passing_junction &&
-        (uint32_t)f->route.junctions_seen+1U==step.junction_count;
-    if (TURN_APPROACH_SLOWDOWN_ENABLED &&
-        ((f->route.final_segment_active && step.final_segment_length_cm==0 &&
-          (f->route.state == ROUTE_FOLLOW || f->route.state == ROUTE_CANDIDATE)) ||
-         clearing_penultimate))
-        base_speed=fminf(base_speed,fminf(JUNCTION_APPROACH_SPEED_CM_S,entry_speed_limit));
-    if (f->route.search_pending) base_speed=fminf(base_speed,entry_speed_limit);
-    if (f->route.state == ROUTE_CANDIDATE) {
-        /* 候选阶段就请求真实入弯低速；预计路过的路口保持过路速度。 */
-        bool target_junction = (uint32_t)f->route.junctions_seen + 1U >= step.junction_count;
-        base_speed = fminf(base_speed, target_junction ? entry_speed_limit :
-                           fmaxf(step.turn_speed, JUNCTION_PASS_SPEED_CM_S));
-    }
+    if (f->route.search_pending && planning_step.segment_length_cm>0)
+        base_speed=fminf(base_speed,planning_entry_speed);
+    /* Exit handoff stays slow even while previewing the next distance envelope. */
+    if(f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
+        base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
+    if (f->route.state==ROUTE_CANDIDATE &&
+        route_target_ready(&f->route,f->odometry.distance_cm,true))
+        base_speed=fminf(base_speed,entry_speed_limit);
     if (f->route.state == ROUTE_BRAKING) {
+        /* A confirmed node transferred loss ownership to the bounded entry
+         * phase (zero targets, time/distance/yaw guards). Do not let a stale
+         * CANDIDATE ambiguity preempt its abort into navigation recovery. */
+        f->abnormal=false;
         pid_reset(&f->pid);
         targets(f,0,0,dt);
         f->state=LINE_JUNCTION;
@@ -599,10 +645,31 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     float base_speed = LINE_FOLLOW_SPEED_CM_S;
 #endif
 #if PRESET_ROUTE_ENABLED
-    if(f->route.component_recovery_active) {
+    if(f->route.state==ROUTE_CANDIDATE &&
+       !route_target_ready(&f->route,f->odometry.distance_cm,true)) {
+        /* Intermediate graphics are nodes to pass, not a reason to slow down.
+         * Candidate and clearance deadlines still bound missing exit evidence. */
+        f->state=LINE_JUNCTION;f->abnormal=false;pid_reset(&f->pid);
+        outer_targets(f,base_speed,HEADING_KP_CM_S_PER_RAD*
+            (f->route.entry_heading-f->odometry.heading_rad),dt);
+    } else if(f->route.state==ROUTE_RECOVERING) {
+        f->state=LINE_JUNCTION;f->abnormal=false;
+        if(narrow && stable) {
+            float correction;
+            if(!pid_update(&f->pid,obs.position,dt,NAVIGATION_RECOVERY_SPEED_CM_S*.5f,&correction)) {
+                line_follow_stop(f,LINE_STOP_FAULT);return;
+            }
+            outer_targets(f,NAVIGATION_RECOVERY_SPEED_CM_S,correction,dt);
+        } else {
+            pid_reset(&f->pid);
+            outer_targets(f,NAVIGATION_RECOVERY_SPEED_CM_S,
+                HEADING_KP_CM_S_PER_RAD*(f->route.entry_heading-f->odometry.heading_rad)-
+                    JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s,dt);
+        }
+    } else if(f->route.component_recovery_active) {
         f->state=LINE_JUNCTION;f->abnormal=false;f->exit_accelerating=false;
         pid_reset(&f->pid);
-        outer_targets(f,fminf(step.turn_speed,COMPONENT_RECOVERY_SPEED_CM_S),
+        outer_targets(f,f->route.passing_junction?base_speed:fminf(step.turn_speed,COMPONENT_RECOVERY_SPEED_CM_S),
             HEADING_KP_CM_S_PER_RAD*(f->route.component_recovery_heading-f->odometry.heading_rad)-
                 JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s,dt);
     } else if(f->route.state==ROUTE_EXECUTING && step.action==HEXAGON) {
@@ -693,7 +760,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         /* Side edges inside a component graphic are not a straight exit.
          * Route owns the separate no-exit deadline while counting is locked. */
         f->abnormal=false;
-        float pass=fminf(base_speed,fmaxf(step.turn_speed,JUNCTION_PASS_SPEED_CM_S));
+        float pass=base_speed;
         if (route_is_clear_line(&f->route,obs) && stable &&
             f->route.exit_count>=LINE_CONFIRM_SAMPLES) {
             /* Only a confirmed centered exit may resume position steering. */
@@ -767,6 +834,15 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             targets(f,base,correction,dt);
     }
 #if PRESET_ROUTE_ENABLED
+    /* Apply approach/passage caps after every mixer, including GAP_HOLD's
+     * additive heading correction. Scale both wheels to retain steering. */
+    float peak_target=fmaxf(f->left_target_cm_s,f->right_target_cm_s);
+    if(peak_target>navigation_wheel_cap) {
+        float ratio=navigation_wheel_cap/peak_target;
+        f->left_target_cm_s*=ratio;f->right_target_cm_s*=ratio;
+        f->base=.5f*(f->left_target_cm_s+f->right_target_cm_s);
+        f->correction=.5f*(f->left_target_cm_s-f->right_target_cm_s);
+    }
     if ((f->route.state == ROUTE_EXECUTING || f->route.state == ROUTE_CLEARING) &&
         (f->turn_trace.count == 0 || (uint32_t)(now_ms-f->turn_trace.last_ms) >= 20U)) {
         TurnTrace *trace = &f->turn_trace;

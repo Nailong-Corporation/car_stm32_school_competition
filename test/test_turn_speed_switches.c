@@ -66,7 +66,7 @@ static void test_diode_straight_clearance(void)
   CHECK(f.route.state==ROUTE_FOLLOW && f.route.final_segment_active);
   CHECK(f.route.junctions_seen==1 && f.route.index==0);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
-  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=50);
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=ROUTE_SHORT_SPEED_CM_S);
 #endif
   for(unsigned i=0;i<3;++i) tick(&f,&c,&now,20,20,0xff,false);
   CHECK(f.route.junctions_seen==2 && f.route.state==ROUTE_BRAKING);
@@ -87,14 +87,16 @@ static void test_diode_straight_clearance(void)
    update(&p,&d,&t,m,0,1);
    CHECK(p.junctions_seen==1);
   }
-  CHECK(p.failure==(condition==0?ROUTE_FAILURE_EXIT_RECAPTURE:ROUTE_FAILURE_CLEAR_LINE_LOST) && p.index==0);
+  CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0);
  }
  RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
  RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0x0f,0);
  d=p.capture_line_cm+INTERFERENCE_MAX_DISTANCE_CM;
- route_update(&p,mask(0x18),d,0,t+5); /* A recovery at the distance deadline is too late. */
- CHECK(p.failure==ROUTE_FAILURE_CLEAR_LINE_LOST);
+ route_update(&p,mask(0x18),d,0,t+5); /* The old 8cm loss limit no longer ends clearance. */
+ CHECK(p.failure==ROUTE_FAILURE_NONE && p.state==ROUTE_CLEARING);
+ route_update(&p,mask(0),p.clear_cm+JUNCTION_CLEAR_MAX_CM+1,0,t+10);
+ CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
 }
 static void test_fast_penultimate_junction(void)
 {
@@ -106,9 +108,9 @@ static void test_fast_penultimate_junction(void)
   * seed a continuous candidate, rather than expire before frame three. */
  for(unsigned i=0;i<3;++i) tick(&f,&c,&now,100,100,0xff,false);
  CHECK(f.route.junctions_seen==1 && f.route.state==ROUTE_CLEARING);
- CHECK(!f.route.final_segment_active); /* Distance origin still awaits clearance. */
+ CHECK(f.route.final_segment_active); /* Total distance spans intermediate clearance. */
 #if TURN_APPROACH_SLOWDOWN_ENABLED
- CHECK(f.left_target_cm_s<=50 && f.right_target_cm_s<=50);
+ CHECK(f.left_target_cm_s<=ROUTE_SHORT_SPEED_CM_S && f.right_target_cm_s<=ROUTE_SHORT_SPEED_CM_S);
 #endif
  /* Remaining over the same graphic must never increment the count. */
  for(unsigned i=0;i<4;++i) tick(&f,&c,&now,25,25,0xff,false);
@@ -117,7 +119,7 @@ static void test_fast_penultimate_junction(void)
  CHECK(f.route.state==ROUTE_FOLLOW && f.route.final_segment_active);
  CHECK(f.route.junctions_seen==1 && f.route.index==0);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
- CHECK(f.left_target_cm_s<=50 && f.right_target_cm_s<=50);
+ CHECK(f.left_target_cm_s<=ROUTE_SHORT_SPEED_CM_S && f.right_target_cm_s<=ROUTE_SHORT_SPEED_CM_S);
 #endif
  /* After clearance the very next confirmed junction must execute LEFT. */
  for(unsigned i=0;i<3;++i) tick(&f,&c,&now,25,25,0xff,false);
@@ -156,7 +158,7 @@ static void test_final_segment_speed_cap(void)
   NEAR(f.left_target_cm_s,length?200:JUNCTION_SETTLE_SPEED_CM_S);
   NEAR(f.right_target_cm_s,length?200:JUNCTION_SETTLE_SPEED_CM_S);
 #else
-  NEAR(f.left_target_cm_s,200);NEAR(f.right_target_cm_s,200);
+  NEAR(f.left_target_cm_s,length?200:ROUTE_SHORT_SPEED_CM_S);NEAR(f.right_target_cm_s,length?200:ROUTE_SHORT_SPEED_CM_S);
 #endif
   CHECK(f.route.final_segment_active && f.route.junctions_seen==0);
  }
@@ -164,7 +166,12 @@ static void test_final_segment_speed_cap(void)
  LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  f.base=f.left_target_cm_s=f.right_target_cm_s=200;
- tick(&f,&c,&now,0,0,0x18,false);NEAR(f.base,200);
+ tick(&f,&c,&now,0,0,0x18,false);
+#if TURN_APPROACH_SLOWDOWN_ENABLED
+ NEAR(f.base,JUNCTION_SETTLE_SPEED_CM_S);
+#else
+ NEAR(f.base,ROUTE_SHORT_SPEED_CM_S);
+#endif
  float d=0;
  for(unsigned i=0;i<2;++i) {
   junction(&f.route,&d,&now,0xff,0);clear(&f.route,&d,&now,0);
@@ -172,9 +179,9 @@ static void test_final_segment_speed_cap(void)
   f.base=f.left_target_cm_s=f.right_target_cm_s=200;
   tick(&f,&c,&now,0,0,0x18,false);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
-  NEAR(f.base,i==0?200:JUNCTION_SETTLE_SPEED_CM_S);
+  NEAR(f.base,JUNCTION_SETTLE_SPEED_CM_S);
 #else
-  NEAR(f.base,200);
+  NEAR(f.base,ROUTE_SHORT_SPEED_CM_S);
 #endif
  }
  /* A completed turn hands off directly to the next count=1 low-speed leg. */
@@ -186,9 +193,9 @@ static void test_final_segment_speed_cap(void)
  f.base=f.left_target_cm_s=f.right_target_cm_s=200;
  tick(&f,&c,&now,0,0,0x18,false);
 #if TURN_APPROACH_SLOWDOWN_ENABLED
- NEAR(f.base,50);
+ NEAR(f.base,ROUTE_SHORT_SPEED_CM_S);
 #else
- NEAR(f.base,200);
+ NEAR(f.base,ROUTE_SHORT_SPEED_CM_S);
 #endif
 }
 int main(void)
@@ -215,9 +222,9 @@ int main(void)
  tick(&f,&c,&now,0,0,0x18,false);
  CHECK(f.route.state==ROUTE_FOLLOW); /* No distance trigger, even with old huge progress. */
 #if TURN_APPROACH_SLOWDOWN_ENABLED
- NEAR(f.base,6);
+ NEAR(f.base,steps[0].turn_speed);
 #else
- NEAR(f.base,50);
+ CHECK(f.base>50 && f.base<=ROUTE_SHORT_SPEED_CM_S);
 #endif
  f.route.state=ROUTE_EXECUTING;f.route.phase_ms=now;f.route.entry_heading=f.odometry.heading_rad;
  tick(&f,&c,&now,0,0,0,false);

@@ -26,12 +26,12 @@ static void test_recovery_limits(void)
   }
   route_update(&p,mask(0x18),bound?COMPONENT_RECOVERY_MAX_CM:2,1.6f,
       bound?600:105+COMPONENT_RECOVERY_TIMEOUT_MS);
-  CHECK(p.failure==ROUTE_FAILURE_EXIT_RECAPTURE); /* deadline before recovery */
-  route_update(&p,mask(0x18),2,1.6f,1400);CHECK(p.state==ROUTE_FAILED);
+  CHECK(p.failure==ROUTE_FAILURE_NONE && !p.component_recovery_active && p.component_recovery_used); /* resume phase, never claim exit */
+  route_update(&p,mask(0x18),2,1.6f,1400);CHECK(p.state==ROUTE_EXECUTING);
  }
  RoutePlanner p;prepare(&p);
  route_update(&p,mask(0),0,1.6f,105);CHECK(!p.component_recovery_active);
- route_update(&p,mask(0x3b),0,1.6f,500);CHECK(p.failure==ROUTE_FAILURE_EXIT_LOST);
+ route_update(&p,mask(0x3b),0,1.6f,500);CHECK(p.failure==ROUTE_FAILURE_NONE && p.state==ROUTE_EXECUTING);
  prepare(&p);p.capture_line_seen=false;
  route_update(&p,mask(0xff),0,1.6f,105);CHECK(!p.component_recovery_active);
  prepare(&p);route_update(&p,mask(0xff),0,1.0f,105);

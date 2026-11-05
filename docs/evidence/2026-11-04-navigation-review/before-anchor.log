@@ -1,0 +1,1 @@
+Assertion failed: (fabsf((p.origin_cm)-(anchor))<.001f), function test_action_anchor, file test_navigation_review.c, line 24.

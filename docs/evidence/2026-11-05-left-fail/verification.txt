@@ -1,0 +1,9 @@
+warning: Couldn't find general-purpose registers in core file.
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = 148
+$2 = (LineStopSnapshot *) 0x200003c0 <follow+656>
+$3 = (LineStopSnapshot *) 0x20002624 <g_diagnostics+140>
+$4 = {valid = true, reason = LINE_STOP_LOST, state_before_stop = LINE_GAP_HOLD, route_state = ROUTE_FOLLOW, route_state_before_update = ROUTE_FOLLOW, route_failure = ROUTE_FAILURE_NONE, speed_fault = SPEED_FAULT_NONE, speed_fault_wheel = 0 '\000', observation = {kind = GRAY_NONE, raw_mask = 0 '\000', line_mask = 0 '\000', selected_mask = 0 '\000', white_count = 0 '\000', region_count = 0 '\000', position = 0, prefilter_mask = 0 '\000', seam_mask = 0 '\000'}, counts = {left = 9450, right = 55517}, sample_ms = 31128, reliable_age_ms = 400, route_phase_age_ms = 680, route_index = 1, junctions_seen = 2, final_segment_active = true, final_segment_progress_cm = 222.577255, dt_s = 0.00499999989, base = 16, left_target_cm_s = 15.8418999, right_target_cm_s = 16.1581001, left_speed_cm_s = 14.2556648, right_speed_cm_s = 12.7868834, distance_cm = 388.641327, route_progress_cm = 222.577255, clear_progress_cm = 12.4555359, turn_rad = 0, actual_turn_rad = -0.00878334045, exit_candidate_age_ms = 0, exit_candidate_progress_cm = 0, exit_candidate_pending = false, exit_confirm_samples = 0 '\000', handoff_early = false, segment_start_progress_cm = 0, turn_exit_branch = false, exit_line_mask = 0 '\000', exit_recovery_active = false, exit_lateral_error_cm = 0, component_recovery_age_ms = 0, component_recovery_progress_cm = 0, braking_accel_cm_s2 = 18.2684479, braking_required_cm_s2 = 0, braking_reverse_ms = 0, braking_imu_used = false, braking_reverse_active = false, heading_source = HEADING_ENCODER, heading_fallback_reason = HEADING_FALLBACK_STARTUP, heading_fallback_ms = 913}
+$5 = LINE_START_ACCEPTED
+$6 = HEADING_ENCODER

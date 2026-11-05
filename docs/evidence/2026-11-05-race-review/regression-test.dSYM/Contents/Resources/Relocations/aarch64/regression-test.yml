@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     'docs/evidence/2026-11-05-race-review/regression-test'
+relocations:     []
+...

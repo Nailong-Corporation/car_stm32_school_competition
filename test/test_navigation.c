@@ -70,7 +70,8 @@ static void test_noise_and_straight(void)
  CHECK(p.junctions_seen==0);
  d=10000;update(&p,&d,&t,0x18,0,1);CHECK(p.state==ROUTE_FOLLOW && p.index==0);
  junction(&p,&d,&t,0xff,0);CHECK(p.state==ROUTE_EXECUTING);
- update(&p,&d,&t,0xff,0,1);CHECK(p.state==ROUTE_CLEARING);
+ update(&p,&d,&t,0xff,0,1);CHECK(p.state==ROUTE_EXECUTING);
+ update(&p,&d,&t,0x18,0,3);CHECK(p.state==ROUTE_CLEARING);
  clear(&p,&d,&t,0);CHECK(p.index==1);
  /* A gap in sampling breaks candidate continuity. */
  update(&p,&d,&t,0x18,0,4);update(&p,&d,&t,0xff,0,1);
@@ -251,22 +252,20 @@ static void test_search_and_slew(void)
  NEAR(v,.01f);NEAR(slew.acceleration,1);
  CHECK(braking_slew(&slew,0,.01f,20,100)==0 && slew.acceleration==0);
 #if BRAKING_CALIBRATION_CONFIRMED
- RouteStep s[]={{2,6,LEFT,40,0,false,1},{1,6,STOP,40,0,false,0}};
+ RouteStep s[]={{2,6,LEFT,200,0,false,1000},{1,6,STOP,40,0,false,0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
- d=500;update(&p,&d,&t,0x18,0,4);CHECK(!p.final_segment_active && !p.search_pending);
+ d=500;update(&p,&d,&t,0x18,0,4);CHECK(p.final_segment_active && !p.search_pending);
  junction(&p,&d,&t,0xff,0);clear(&p,&d,&t,0);
  CHECK(p.final_segment_active && p.junctions_seen==1);
- d=p.final_segment_origin_cm+2;update(&p,&d,&t,0x18,0,1);
+ NEAR(p.origin_cm,0);NEAR(p.final_segment_origin_cm,0);
+ d=1001;update(&p,&d,&t,0x18,0,1);
  CHECK(p.search_pending && p.state==ROUTE_FOLLOW && p.junctions_seen==1);
- t+=JUNCTION_SEARCH_TIMEOUT_MS;route_update(&p,mask(0x18),d,0,t);
- CHECK(p.failure==ROUTE_FAILURE_SEARCH && p.index==0);
- init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);clear(&p,&d,&t,0);
- d=p.final_segment_origin_cm+2;update(&p,&d,&t,0x18,0,1);
- d+=JUNCTION_SEARCH_MAX_CM;update(&p,&d,&t,0x18,0,1);
- CHECK(p.failure==ROUTE_FAILURE_SEARCH);
+ /* Valid line after distance exhaustion never creates an action or search stop. */
+ for(unsigned i=0;i<600;++i) update(&p,&d,&t,0x18,0,1);
+ CHECK(p.failure==ROUTE_FAILURE_NONE && p.index==0 && p.state==ROUTE_FOLLOW);
  #if TURN_APPROACH_SLOWDOWN_ENABLED
  /* Production integration: entering a measured final leg seeds the ramp from current targets. */
- s[0].junction_count=1;s[0].final_segment_length_cm=100;
+ s[0].junction_count=1;s[0].segment_length_cm=101;
  LineFollow f;EncoderCounts counts;uint32_t now;start(&f,&counts,&now,s,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  f.base=f.left_target_cm_s=f.right_target_cm_s=20;f.braking_active=false;
@@ -275,18 +274,18 @@ static void test_search_and_slew(void)
  f.route.final_segment_origin_cm=f.odometry.distance_cm-101;
  tick(&f,&counts,&now,0,0,0x18,false);
  CHECK(f.base<=s[0].turn_speed && f.route.state==ROUTE_FOLLOW && f.route.junctions_seen==0);
- /* Synthetic high wheel feedback at exhausted distance locks a route stop. */
+ /* Distance exhaustion keeps braking and warns; it cannot force a stop/turn. */
  f.odometry.left_speed_cm_s=f.odometry.right_speed_cm_s=80;
  tick(&f,&counts,&now,0,0,0x18,false);
- CHECK(f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_BRAKE_DISTANCE);
- CHECK(f.stop_snapshot.braking_required_cm_s2>0 && !f.command.enabled);
+ CHECK(f.state!=LINE_STOPPED && f.route.navigation_warning==ROUTE_FAILURE_BRAKE_DISTANCE);
+ CHECK(f.braking_required_cm_s2>0 && f.route.state==ROUTE_FOLLOW);
  #endif
 #endif
 }
 #if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
 static void test_bounded_approach_reverse(void)
 {
- RouteStep steps[]={{1,50,LEFT,200,0,false,100},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{1,50,LEFT,200,0,false,101},{1,50,STOP,200,0,false,0}};
  LineFollow f;EncoderCounts counts;uint32_t now;
  start(&f,&counts,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;

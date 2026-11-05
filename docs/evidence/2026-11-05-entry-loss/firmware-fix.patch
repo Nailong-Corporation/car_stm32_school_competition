@@ -1,0 +1,31 @@
+--- before-this-fix/src/line_follow.c
++++ after-this-fix/src/line_follow.c
+@@ -583,6 +583,10 @@
+         route_target_ready(&f->route,f->odometry.distance_cm,true))
+         base_speed=fminf(base_speed,entry_speed_limit);
+     if (f->route.state == ROUTE_BRAKING) {
++        /* A confirmed node transferred loss ownership to the bounded entry
++         * phase (zero targets, time/distance/yaw guards). Do not let a stale
++         * CANDIDATE ambiguity preempt its abort into navigation recovery. */
++        f->abnormal=false;
+         pid_reset(&f->pid);
+         targets(f,0,0,dt);
+         f->state=LINE_JUNCTION;
+--- before-this-fix/src/route.c
++++ after-this-fix/src/route.c
+@@ -601,7 +601,14 @@
+            fabsf(h-p->entry_heading)>JUNCTION_WRONG_WAY_RAD) {
+             fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;
+         }
+-        if(entry_speed_ready(p) && o.line_mask!=0) accept_target(p,d,h,now);
++        if(entry_speed_ready(p)) {
++            /* The confirmed node may have passed under the front sensor while
++             * coasting. Zero targets cannot find it again once speed is low.
++             * Abort into the existing bounded recovery, never turn on loss or
++             * treat recovered plain line as completion of this maneuver. */
++            if(o.line_mask==0) {fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;}
++            accept_target(p,d,h,now);
++        }
+         return;
+     }
+     if(s.action==HEXAGON && !p->passing_junction && p->state==ROUTE_EXECUTING) {

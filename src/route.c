@@ -48,9 +48,14 @@ static uint8_t separated_sides(GrayObservation o)
 static JunctionEvidence junction_shape(GrayObservation o,uint8_t *sides)
 {
     *sides=0;
-    if(o.region_count>2) return JUNCTION_EVIDENCE_NONE;
     uint8_t separated=separated_sides(o);
     if(separated) {*sides=separated;return JUNCTION_EVIDENCE_SEPARATED;}
+    /* Graphics use the same temporal/motion proof and clearance lock. */
+    if(o.region_count>1 && o.white_count>=3) {
+        *sides=(uint8_t)(((o.line_mask&0x07U)?1U:0U)|((o.line_mask&0xe0U)?2U:0U));
+        if(!*sides) *sides=3U;
+        return JUNCTION_EVIDENCE_SEPARATED;
+    }
     if(o.region_count!=1) return JUNCTION_EVIDENCE_NONE;
     *sides=branch_sides(o);
     if(*sides && (o.line_mask&0x18U) && o.white_count>=3)
@@ -62,6 +67,7 @@ static JunctionEvidence junction_shape(GrayObservation o,uint8_t *sides)
 }
 static void reset_evidence(RoutePlanner *p, uint32_t now)
 {
+    p->next_segment_origin_valid=false;
     p->candidate_count=p->exit_count=p->approach_center_count=0;
     p->have_approach_center=p->exit_candidate_pending=false;
     p->turn_capturing=p->corner_arc_complete=false;
@@ -87,11 +93,11 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
     p->valid=steps!=NULL && count>0;
     for(size_t i=0;p->valid && i<count;++i) {
         RouteStep s=steps[i];
-        p->valid=s.junction_count>0 && (unsigned)s.action<=(unsigned)HEXAGON &&
+        p->valid=(s.junction_count>0 || s.segment_length_cm>0) && (unsigned)s.action<=(unsigned)HEXAGON &&
             s.cruise_speed>0 && s.cruise_speed<=WHEEL_TARGET_MAX_CM_S &&
             isfinite(s.turn_speed) && s.turn_speed>0 && s.turn_speed<=s.cruise_speed &&
-            isfinite(s.final_segment_length_cm) && s.final_segment_length_cm>=0 &&
-            (s.final_segment_length_cm==0 || (BRAKING_CALIBRATION_CONFIRMED &&
+            isfinite(s.segment_length_cm) && s.segment_length_cm>=0 &&
+            (s.segment_length_cm==0 || (BRAKING_CALIBRATION_CONFIRMED &&
              isfinite(BRAKING_SAFE_DECEL_CM_S2) && BRAKING_SAFE_DECEL_CM_S2>0)) &&
             (s.action!=CUSTOM_TURN || (isfinite(s.angle_deg) && s.angle_deg!=0 && fabsf(s.angle_deg)<=360)) &&
             (s.action!=HEXAGON || (isfinite(s.angle_deg) &&
@@ -110,7 +116,8 @@ void route_start(RoutePlanner *p,float d,uint32_t now)
     p->origin_cm=p->final_segment_origin_cm=d;
     p->segment_ms=now; p->passing_junction=p->lap_boundary=false;
     p->search_pending=p->stop_pending=p->callback_dispatched=false;
-    p->final_segment_active=p->valid && p->steps[0].junction_count==1;
+    p->final_segment_active=p->valid;
+    p->navigation_warning=ROUTE_FAILURE_NONE;p->navigation_recoveries=0;
     p->failure=ROUTE_FAILURE_NONE;
     p->last_confirmed_kind=JUNCTION_EVIDENCE_NONE;
     p->candidate_restarts=p->smooth_edge_rejections=0;
@@ -190,15 +197,17 @@ static void begin_action(RoutePlanner *p,float d,float h,uint32_t now)
             .hold_heading=h};
     }
 }
-float route_entry_speed_limit(const RoutePlanner *p)
+static float entry_speed_limit_at(const RoutePlanner *p,size_t index,bool active_action)
 {
-    Action a=p->steps[p->index].action;
+    Action a=p->steps[index].action;
     bool turn=a==LEFT || a==RIGHT || a==CUSTOM_TURN || a==HEXAGON ||
-        (a==STOP && (p->lap_boundary || another_lap(p)) && p->repeat_action!=STRAIGHT);
-    float limit=p->steps[p->index].turn_speed;
+        (a==STOP && ((active_action && p->lap_boundary) || another_lap(p)) && p->repeat_action!=STRAIGHT);
+    float limit=p->steps[index].turn_speed;
     if(a==HEXAGON) limit=fminf(limit,HEXAGON_SPEED_CM_S);
     return turn?fminf(limit,JUNCTION_SETTLE_SPEED_CM_S):limit;
 }
+float route_entry_speed_limit(const RoutePlanner *p)
+{ return entry_speed_limit_at(p,p->index,true); }
 static bool entry_speed_ready(const RoutePlanner *p)
 {
     float limit=route_entry_speed_limit(p);
@@ -214,26 +223,41 @@ static void accept_target(RoutePlanner *p,float d,float h,uint32_t now)
     }
     begin_action(p,d,h,now);
 }
+static void anchor_next_segment(RoutePlanner *p,float d,uint32_t now)
+{
+    p->next_segment_origin_cm=d;p->next_segment_ms=now;
+    p->next_segment_origin_valid=true;p->search_pending=false;
+}
 static void enter_clear(RoutePlanner *p,float d,uint32_t now)
 {
     p->state=ROUTE_CLEARING;p->phase_ms=now;p->clear_cm=d;
     p->exit_count=0;p->exit_candidate_pending=false;
     p->turn_capturing=false;p->turn_ended_on_line=true;
+    if(!p->passing_junction && route_current_action(p)!=STRAIGHT)
+        anchor_next_segment(p,d,now);
     if(route_current_action(p)==STRAIGHT) {
         p->capture_line_ms=now;p->capture_line_cm=d;
     }
 }
 static bool complete_clear(RoutePlanner *p,float d,uint32_t now)
 {
-    if(p->passing_junction) p->passing_junction=false;
+    bool passed=p->passing_junction;
+    if(passed) p->passing_junction=false;
     else {
         p->index=p->lap_boundary?0:p->index+1;p->lap_boundary=false;
         if(p->index>=p->count) {fail(p,ROUTE_FAILURE_INVALID);return false;}
         p->junctions_seen=0;
     }
-    p->origin_cm=d;p->segment_ms=now;
-    p->final_segment_active=p->junctions_seen+1U==p->steps[p->index].junction_count;
-    p->final_segment_origin_cm=d;p->search_pending=false;
+    /* Passing an intermediate junction must not reset total segment progress. */
+    if(!passed) {
+        p->origin_cm=p->next_segment_origin_valid?p->next_segment_origin_cm:p->clear_cm;
+        p->segment_ms=p->next_segment_origin_valid?p->next_segment_ms:p->phase_ms;
+        p->final_segment_origin_cm=p->origin_cm;
+        p->search_pending=p->steps[p->index].segment_length_cm>0 &&
+            d-p->origin_cm>=p->steps[p->index].segment_length_cm;
+        if(p->search_pending) {p->search_ms=now;p->search_origin_cm=d;}
+    }
+    p->final_segment_active=true;
     p->state=ROUTE_FOLLOW;reset_evidence(p,now);
     return true;
 }
@@ -256,7 +280,13 @@ static bool component_recovery(RoutePlanner *p,GrayObservation o,float d,float h
      * the limits before accepting a recovered line on the same frame. */
     if((uint32_t)(now-p->component_recovery_ms)>=COMPONENT_RECOVERY_TIMEOUT_MS ||
        fabsf(d-p->component_recovery_cm)>=COMPONENT_RECOVERY_MAX_CM) {
-        fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);return true;
+        if(p->steps[p->index].action==HEXAGON) {
+            fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);return true;
+        }
+        /* This one-shot graphic hold has ended. Ordinary maneuvers resume
+         * their angle/clearance control under the unchanged phase deadline. */
+        p->component_recovery_active=false;
+        return false;
     }
     bool line=route_is_narrow_line(o) && o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH &&
         fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
@@ -391,6 +421,61 @@ static void hexagon_update(RoutePlanner *p,GrayObservation o,float d,float h,
     }
 }
 
+size_t route_planning_index(const RoutePlanner *p)
+{
+    if(p->state==ROUTE_CLEARING && !p->passing_junction && p->next_segment_origin_valid) {
+        size_t next=p->lap_boundary?0U:p->index+1U;
+        if(next<p->count) return next;
+    }
+    return p->index;
+}
+float route_planning_origin(const RoutePlanner *p)
+{
+    return p->state==ROUTE_CLEARING && !p->passing_junction && p->next_segment_origin_valid?
+        p->next_segment_origin_cm:p->final_segment_origin_cm;
+}
+float route_planning_entry_speed_limit(const RoutePlanner *p)
+{
+    bool preview=p->state==ROUTE_CLEARING && !p->passing_junction && p->next_segment_origin_valid;
+    return entry_speed_limit_at(p,route_planning_index(p),!preview);
+}
+static void refresh_distance(RoutePlanner *p,float d,uint32_t now)
+{
+    RouteStep s=p->steps[route_planning_index(p)];
+    if(s.segment_length_cm>0 && d-route_planning_origin(p)>=s.segment_length_cm &&
+       !p->search_pending) {
+        p->search_pending=true;p->search_ms=now;p->search_origin_cm=d;
+    }
+}
+float route_cruise_speed(const RoutePlanner *p)
+{
+    RouteStep s=p->steps[route_planning_index(p)];
+    return s.segment_length_cm>ROUTE_LONG_SEGMENT_CM?(float)s.cruise_speed:ROUTE_SHORT_SPEED_CM_S;
+}
+bool route_target_ready(const RoutePlanner *p,float d,bool next)
+{
+    RouteStep s=p->steps[p->index];
+    return (s.junction_count>0 && (uint32_t)p->junctions_seen+(next?1U:0U)>=s.junction_count) ||
+        (s.segment_length_cm>0 && d-p->origin_cm>=s.segment_length_cm);
+}
+bool route_recover_navigation(RoutePlanner *p,float d,float h,uint32_t now)
+{
+    if(p->state!=ROUTE_FAILED) return false;
+    switch(p->failure) {
+    case ROUTE_FAILURE_CONFIRM_TIMEOUT: case ROUTE_FAILURE_ACTION_TIMEOUT:
+    case ROUTE_FAILURE_TURN_LIMIT: case ROUTE_FAILURE_WRONG_WAY:
+    case ROUTE_FAILURE_SEARCH: case ROUTE_FAILURE_WINDOW: case ROUTE_FAILURE_ENTRY_SPEED:
+        break;
+    default: return false; /* Invalid feedback/config and sustained loss remain stops. */
+    }
+    p->navigation_warning=p->failure;
+    if(p->navigation_recoveries<UINT32_MAX) ++p->navigation_recoveries;
+    p->failure=ROUTE_FAILURE_NONE;
+    reset_evidence(p,now);
+    p->state=ROUTE_RECOVERING;p->phase_ms=now;p->clear_cm=d;p->entry_heading=h;
+    p->capture_line_ms=now;p->capture_line_cm=d;
+    return true;
+}
 void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now)
 {
     if(p->state==ROUTE_FINISHED || p->state==ROUTE_FAILED || p->state==ROUTE_DISABLED) return;
@@ -399,15 +484,38 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         fail(p,ROUTE_FAILURE_INVALID);return;
     }
     RouteStep s=p->steps[p->index];
+    if(p->state==ROUTE_RECOVERING) {
+        /* Only sustained loss expires recovery, never time spent on reliable line.
+         * Deadline precedes any late recovery sample; isolated frames cannot renew it. */
+        if((uint32_t)(now-p->capture_line_ms)>=NAVIGATION_RECOVERY_MS ||
+           fabsf(d-p->capture_line_cm)>=NAVIGATION_RECOVERY_CM) {
+            fail(p,ROUTE_FAILURE_EXIT_LOST);return;
+        }
+        bool narrow=route_is_narrow_line(o);
+        bool continuous=(uint32_t)(now-p->last_sample_ms)<=CONTROL_MAX_INTERVAL_MS;
+        p->last_sample_ms=now;
+        if(!narrow || !continuous) {p->exit_count=0;p->exit_candidate_pending=false;}
+        if(narrow && !p->exit_candidate_pending) {
+            p->exit_candidate_pending=true;p->exit_candidate_ms=now;p->exit_candidate_cm=d;
+        }
+        if(narrow && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
+        if(narrow && p->exit_count>=LINE_CONFIRM_SAMPLES) {
+            p->capture_line_ms=now;p->capture_line_cm=d;
+        }
+        if(p->exit_count>=LINE_CONFIRM_SAMPLES &&
+           (uint32_t)(now-p->exit_candidate_ms)>=JUNCTION_COUNT_CLEAR_MS &&
+           d-p->exit_candidate_cm>=JUNCTION_COUNT_CLEAR_CM) {
+            /* Abort maneuver without claiming success or advancing the table.
+             * Keep total progress/count, retry only at a fresh junction. */
+            p->passing_junction=false;p->state=ROUTE_FOLLOW;reset_evidence(p,now);return;
+        }
+        return;
+    }
     bool adjacent=(uint32_t)(now-p->last_sample_ms)<=CONTROL_MAX_INTERVAL_MS;
     p->last_sample_ms=now;
+    if(p->state==ROUTE_FOLLOW || p->state==ROUTE_CANDIDATE || p->state==ROUTE_CLEARING)
+        refresh_distance(p,d,now);
     if(p->state==ROUTE_FOLLOW || p->state==ROUTE_CANDIDATE) {
-        if(p->final_segment_active && s.final_segment_length_cm>0 &&
-           d-p->final_segment_origin_cm>=s.final_segment_length_cm) {
-            if(!p->search_pending) {p->search_pending=true;p->search_ms=now;p->search_origin_cm=d;}
-            if((uint32_t)(now-p->search_ms)>=JUNCTION_SEARCH_TIMEOUT_MS ||
-               d-p->search_origin_cm>=JUNCTION_SEARCH_MAX_CM) {fail(p,ROUTE_FAILURE_SEARCH);return;}
-        }
         bool narrow=route_is_narrow_line(o);
         bool center=narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
         /* A continuous overlapping narrow line sliding to one edge is curve
@@ -460,7 +568,7 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         }
         bool same_sides=p->state==ROUTE_CANDIDATE && p->candidate_sides==sides;
         if(p->state==ROUTE_FOLLOW) {
-            p->state=ROUTE_CANDIDATE;p->phase_ms=now;p->entry_cm=d;p->candidate_count=0;
+            p->state=ROUTE_CANDIDATE;p->phase_ms=now;p->entry_cm=d;p->entry_heading=h;p->candidate_count=0;
             p->candidate_kind=kind;p->candidate_sides=sides;
         } else {
             p->candidate_sides&=sides; /* L -> both -> R cannot accumulate as one branch. */
@@ -474,7 +582,7 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
          * Both-side bridge frames, weak graphics and non-target junctions
          * keep the longer evidence; counting still follows real confirmation. */
         bool early=same_sides && p->candidate_kind==JUNCTION_EVIDENCE_CENTER_BRANCH &&
-            (uint32_t)p->junctions_seen+1U==s.junction_count &&
+            route_target_ready(p,d,true) &&
             ((s.action==LEFT && sides==1U) || (s.action==RIGHT && sides==2U));
         unsigned samples=early?JUNCTION_EARLY_CONFIRM_SAMPLES:
             weak?JUNCTION_EDGE_CONFIRM_SAMPLES:JUNCTION_CONFIRM_SAMPLES;
@@ -483,8 +591,8 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         if(p->candidate_count<samples) ++p->candidate_count;
         if(p->candidate_count<samples || d-p->entry_cm<distance) return;
         p->last_confirmed_kind=p->candidate_kind;
-        ++p->junctions_seen; /* Lock immediately: no recount until clearance. */
-        p->passing_junction=p->junctions_seen<s.junction_count;
+        if(p->junctions_seen<UINT16_MAX) ++p->junctions_seen; /* Saturate; lock until clearance. */
+        p->passing_junction=!route_target_ready(p,d,false);
         p->search_pending=false;
         if(p->passing_junction) { begin_action(p,d,h,now);enter_clear(p,d,now);return; }
         /* 直行过口无强转风险，不设入口轮速门禁；转弯/STOP 仍先降速到位。 */
@@ -499,7 +607,14 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
            fabsf(h-p->entry_heading)>JUNCTION_WRONG_WAY_RAD) {
             fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;
         }
-        if(entry_speed_ready(p) && o.line_mask!=0) accept_target(p,d,h,now);
+        if(entry_speed_ready(p)) {
+            /* The confirmed node may have passed under the front sensor while
+             * coasting. Zero targets cannot find it again once speed is low.
+             * Abort into the existing bounded recovery, never turn on loss or
+             * treat recovered plain line as completion of this maneuver. */
+            if(o.line_mask==0) {fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;}
+            accept_target(p,d,h,now);
+        }
         return;
     }
     if(s.action==HEXAGON && !p->passing_junction && p->state==ROUTE_EXECUTING) {
@@ -517,15 +632,22 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         if((uint32_t)(now-p->phase_ms)>=route_action_timeout_ms(p)) {
             fail(p,ROUTE_FAILURE_ACTION_TIMEOUT);return;
         }
-        if(action==STRAIGHT) {enter_clear(p,d,now);return;}
-        bool narrow=route_is_narrow_line(o);
-        /* Once a real exit has been captured, do not drive blind until the
-         * full maneuver timeout. Check the deadline before accepting recovery. */
-        if(!p->component_recovery_active && p->capture_line_seen &&
-           ((uint32_t)(now-p->capture_line_ms)>=INTERFERENCE_TIMEOUT_MS ||
-            fabsf(d-p->capture_line_cm)>=INTERFERENCE_MAX_DISTANCE_CM)) {
-            fail(p,ROUTE_FAILURE_EXIT_LOST);return;
+        if(action==STRAIGHT) {
+            /* A target straight action also needs a real narrow exit before
+             * entering clearance; loss/graphics cannot complete the action. */
+            bool exit=route_is_clear_line(p,o);
+            if(!exit || !adjacent) p->exit_count=0;
+            if(exit && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
+            if(p->exit_count>=LINE_CONFIRM_SAMPLES) {
+                p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+                enter_clear(p,d,now);
+                if(!p->passing_junction) anchor_next_segment(p,d,now);
+            }
+            return;
         }
+        bool narrow=route_is_narrow_line(o);
+        /* Ordinary turns keep their angle/exit contract through gray loss.
+         * Only the action bound aborts to RECOVERING; HEXAGON is separate. */
         if(component_recovery(p,o,d,h,now,adjacent,!narrow && p->capture_line_seen &&
            turn>=target*(1.0f-JUNCTION_EXIT_ANGLE_MARGIN_RATIO))) return;
         p->turn_capturing=narrow && turn>=route_turn_threshold_rad(p,JUNCTION_CAPTURE_MIN_RAD);
@@ -564,11 +686,6 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
      * Straight passage must first prove a centered exit: a diode's side edge
      * is a valid sensor region but is not the intended straight line. */
     bool straight=route_current_action(p)==STRAIGHT;
-    if(straight && !p->component_recovery_active &&
-       ((uint32_t)(now-p->capture_line_ms)>=INTERFERENCE_TIMEOUT_MS ||
-        fabsf(d-p->capture_line_cm)>=INTERFERENCE_MAX_DISTANCE_CM)) {
-        fail(p,ROUTE_FAILURE_CLEAR_LINE_LOST);return;
-    }
     /* A new graphic can start before 2 cm of plain line after a turn.
      * Require a confirmed turn exit, a short continuous center corridor, then
      * three new separated-branch frames and real forward displacement.
@@ -623,6 +740,11 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
     if(clear && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
     if(straight && clear && p->exit_count>=LINE_CONFIRM_SAMPLES) {
         p->capture_line_ms=now;p->capture_line_cm=d;
+        /* A straight target completes at its first confirmed narrow exit.
+         * The following 50 ms/2 cm only unlock counting, not segment distance. */
+        if(!p->passing_junction && !p->next_segment_origin_valid) {
+            anchor_next_segment(p,d,now);refresh_distance(p,d,now);
+        }
     }
     if(p->exit_count<LINE_CONFIRM_SAMPLES ||
        (uint32_t)(now-p->exit_candidate_ms)<JUNCTION_COUNT_CLEAR_MS ||

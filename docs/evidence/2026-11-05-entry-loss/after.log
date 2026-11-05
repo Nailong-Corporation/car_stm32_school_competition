@@ -1,0 +1,8 @@
+entry-loss configuration: IMU=0 GRAY_INVERT=0
+PASS: confirmed entry loss/budget/reacquisition/guards (2439 checks)
+entry-loss configuration: IMU=0 GRAY_INVERT=1
+PASS: confirmed entry loss/budget/reacquisition/guards (2439 checks)
+entry-loss configuration: IMU=1 GRAY_INVERT=0
+PASS: confirmed entry loss/budget/reacquisition/guards (2439 checks)
+entry-loss configuration: IMU=1 GRAY_INVERT=1
+PASS: confirmed entry loss/budget/reacquisition/guards (2439 checks)

@@ -3,6 +3,21 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 test_binary=$(mktemp "${TMPDIR:-/tmp}/car_stm32_test.XXXXXX")
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
+# Short-turn approach and intermediate-node loss caps, both polarities/headings.
+for invert in 0 1; do
+    for imu in 0 1; do
+        "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I"$project_dir/include" -DGRAY_INVERT_ENABLED="$invert" \
+            -DMPU6050_ENABLED="$imu" -DODOMETRY_HEADING_SCALE=1.0f \
+            "$project_dir/test/test_left_fail.c" "$project_dir/src/gray_sensor.c" \
+            "$project_dir/src/pid.c" "$project_dir/src/odometry.c" "$project_dir/src/braking_planner.c" \
+            "$project_dir/src/route.c" "$project_dir/src/speed_control.c" \
+            "$project_dir/src/line_follow.c" -lm -o "$test_binary"
+        "$test_binary"
+    done
+done
+
 # HEXAGON uses the same sensor polarities and sticky heading-source fallback.
 for invert in 0 1; do
     for imu in 0 1; do
@@ -258,3 +273,12 @@ done
     "$project_dir/src/speed_control.c" "$project_dir/src/odometry.c" "$project_dir/src/pid.c" \
     -lm -o "$test_binary"
 "$test_binary"
+
+# Total-distance/count hybrid contract, both polarities and heading configurations.
+sh "$project_dir/test/run_total_distance_tests.sh"
+
+# Confirmed entry braking/loss ownership, real table and four sensor/IMU configurations.
+sh "$project_dir/docs/evidence/2026-11-05-entry-loss/run_regression.sh"
+
+# Ordinary maneuver gray-loss ownership; HEXAGON keeps its separate loss contract.
+sh "$project_dir/test/run_maneuver_loss_tests.sh"

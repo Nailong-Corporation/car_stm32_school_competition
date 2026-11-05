@@ -59,8 +59,9 @@ static void test_settling(void)
 #endif
 
   prepare_turn(&f,&c,&now,steps,sign,target);
-  for(unsigned i=0;i<1000 && f.state!=LINE_STOPPED;++i) tick(&f,&c,&now,4,4,0,false);
-  CHECK(f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_ACTION_TIMEOUT);
+  for(unsigned i=0;i<1500 && f.state!=LINE_STOPPED;++i) tick(&f,&c,&now,4,4,0,false);
+  CHECK(f.route.navigation_warning==ROUTE_FAILURE_ACTION_TIMEOUT);
+  CHECK(f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_EXIT_LOST);
   CHECK(!f.command.enabled && !f.route.line_exit_confirmed);
  }
 }
@@ -87,21 +88,21 @@ static void test_line_controls_capture(void)
   tick(&f,&c,&now,0,0,0x18,false);
   CHECK(sign*f.correction>=0 && fabsf(f.correction)<=JUNCTION_CAPTURE_CENTER_BIAS_CM_S+.001f);
   CHECK(f.route.state==ROUTE_EXECUTING && !f.route.line_exit_confirmed);
-  /* A lost captured exit is bounded independently of the action timeout. */
+  /* Lost capture remains in the maneuver until its phase limit. */
   for(unsigned i=0;i<INTERFERENCE_TIMEOUT_MS/5U+1U && f.state!=LINE_STOPPED;++i)
    tick(&f,&c,&now,8,8,i%20U==19U?0x18:0,false); /* isolated noise cannot renew loss budget */
-  CHECK(f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_EXIT_LOST);
-  CHECK(!f.command.enabled);
+  CHECK(f.state!=LINE_STOPPED && f.route.state==ROUTE_EXECUTING);
+  CHECK(!f.route.line_exit_confirmed);
   prepare_turn(&f,&c,&now,steps,sign,target-.30f);
   tick(&f,&c,&now,0,0,0x18,false);
   float d=f.route.capture_line_cm+INTERFERENCE_MAX_DISTANCE_CM;
   route_update(&f.route,mask(0),d,f.odometry.heading_rad,now+5);
-  CHECK(f.route.failure==ROUTE_FAILURE_EXIT_LOST);
+  CHECK(f.route.failure==ROUTE_FAILURE_NONE && f.route.state==ROUTE_EXECUTING);
   prepare_turn(&f,&c,&now,steps,sign,target-.30f);
   tick(&f,&c,&now,0,0,0x18,false);
   route_update(&f.route,mask(0x18),f.odometry.distance_cm,f.odometry.heading_rad,
                now+INTERFERENCE_TIMEOUT_MS);
-  CHECK(f.route.failure==ROUTE_FAILURE_EXIT_LOST); /* Deadline precedes recovery. */
+  CHECK(f.route.failure==ROUTE_FAILURE_NONE && f.route.state==ROUTE_EXECUTING); /* Old 400ms deadline does not govern maneuvers. */
  }
 }
 #if MPU6050_ENABLED

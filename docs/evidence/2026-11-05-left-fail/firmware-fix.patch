@@ -1,0 +1,59 @@
+--- a/src/line_follow.c
++++ b/src/line_follow.c
+@@ -535,6 +535,32 @@
+     RouteStep planning_step=f->route.steps[route_planning_index(&f->route)];
+     float planning_origin=route_planning_origin(&f->route);
+     float planning_entry_speed=route_planning_entry_speed_limit(&f->route);
++    float navigation_wheel_cap=WHEEL_TARGET_MAX_CM_S;
++    /* Short turns cannot rely on a late coast-down at the front sensor.
++     * Keep their whole approach slow, including the next segment preview.
++     * The measured entry gate still decides whether a turn may start. */
++    bool short_turn=planning_step.segment_length_cm<=ROUTE_LONG_SEGMENT_CM &&
++        (planning_step.action==LEFT || planning_step.action==RIGHT ||
++         planning_step.action==CUSTOM_TURN || planning_step.action==HEXAGON);
++    if(TURN_APPROACH_SLOWDOWN_ENABLED && short_turn &&
++       (f->route.state==ROUTE_FOLLOW || f->route.state==ROUTE_CANDIDATE ||
++        f->route.state==ROUTE_CLEARING)) {
++        base_speed=fminf(base_speed,planning_entry_speed);
++        navigation_wheel_cap=planning_entry_speed;
++    }
++    /* A graphic cannot authorize segment-speed blind passage. Only reliable
++     * centered exit evidence restores the unchanged distance envelope. */
++    bool passing_without_exit=(f->route.passing_junction &&
++        f->route.state==ROUTE_CLEARING &&
++        (f->route.component_recovery_active || !stable ||
++         !route_is_clear_line(&f->route,obs) || f->route.exit_count<LINE_CONFIRM_SAMPLES)) ||
++        (f->route.state==ROUTE_CANDIDATE &&
++         !route_target_ready(&f->route,f->odometry.distance_cm,true) &&
++         (!narrow || fabsf(obs.position)>JUNCTION_CENTER_LIMIT));
++    if(passing_without_exit) {
++        base_speed=fminf(base_speed,COMPONENT_RECOVERY_SPEED_CM_S);
++        navigation_wheel_cap=fminf(navigation_wheel_cap,COMPONENT_RECOVERY_SPEED_CM_S);
++    }
+     /* Segment length selects cruise speed; every known length needs the same
+      * entry-speed envelope, including short segments and clearance previews. */
+     if (TURN_APPROACH_SLOWDOWN_ENABLED && planning_step.segment_length_cm>0 &&
+@@ -564,6 +590,7 @@
+             fmaxf(fabsf(f->odometry.left_speed_cm_s),fabsf(f->odometry.right_speed_cm_s)),
+             BRAKING_SAFE_DECEL_CM_S2, BRAKING_DISTANCE_MARGIN_CM, BRAKING_CALIBRATION_CONFIRMED);
+         if (!plan.valid) { line_follow_stop(f,LINE_STOP_ROUTE); return; }
++        navigation_wheel_cap=fminf(navigation_wheel_cap,plan.allowed_speed);
+         BrakingDecision decision=braking_decide(speed,planning_entry_speed,plan.remaining_cm,
+             -f->braking_accel_cm_s2,BRAKING_SAFE_DECEL_CM_S2,BRAKING_REVERSE_GUARD_CM);
+         f->braking_required_cm_s2=decision.required_decel;
+@@ -807,6 +834,15 @@
+             targets(f,base,correction,dt);
+     }
+ #if PRESET_ROUTE_ENABLED
++    /* Apply approach/passage caps after every mixer, including GAP_HOLD's
++     * additive heading correction. Scale both wheels to retain steering. */
++    float peak_target=fmaxf(f->left_target_cm_s,f->right_target_cm_s);
++    if(peak_target>navigation_wheel_cap) {
++        float ratio=navigation_wheel_cap/peak_target;
++        f->left_target_cm_s*=ratio;f->right_target_cm_s*=ratio;
++        f->base=.5f*(f->left_target_cm_s+f->right_target_cm_s);
++        f->correction=.5f*(f->left_target_cm_s-f->right_target_cm_s);
++    }
+     if ((f->route.state == ROUTE_EXECUTING || f->route.state == ROUTE_CLEARING) &&
+         (f->turn_trace.count == 0 || (uint32_t)(now_ms-f->turn_trace.last_ms) >= 20U)) {
+         TurnTrace *trace = &f->turn_trace;

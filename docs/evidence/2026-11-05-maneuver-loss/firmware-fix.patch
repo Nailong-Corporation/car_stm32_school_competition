@@ -1,0 +1,114 @@
+--- before-this-task/src/route.c
++++ after-this-task/src/route.c
+@@ -280,7 +280,13 @@
+      * the limits before accepting a recovered line on the same frame. */
+     if((uint32_t)(now-p->component_recovery_ms)>=COMPONENT_RECOVERY_TIMEOUT_MS ||
+        fabsf(d-p->component_recovery_cm)>=COMPONENT_RECOVERY_MAX_CM) {
+-        fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);return true;
++        if(p->steps[p->index].action==HEXAGON) {
++            fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);return true;
++        }
++        /* This one-shot graphic hold has ended. Ordinary maneuvers resume
++         * their angle/clearance control under the unchanged phase deadline. */
++        p->component_recovery_active=false;
++        return false;
+     }
+     bool line=route_is_narrow_line(o) && o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH &&
+         fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
+@@ -626,15 +632,22 @@
+         if((uint32_t)(now-p->phase_ms)>=route_action_timeout_ms(p)) {
+             fail(p,ROUTE_FAILURE_ACTION_TIMEOUT);return;
+         }
+-        if(action==STRAIGHT) {enter_clear(p,d,now);return;}
++        if(action==STRAIGHT) {
++            /* A target straight action also needs a real narrow exit before
++             * entering clearance; loss/graphics cannot complete the action. */
++            bool exit=route_is_clear_line(p,o);
++            if(!exit || !adjacent) p->exit_count=0;
++            if(exit && p->exit_count<LINE_CONFIRM_SAMPLES) ++p->exit_count;
++            if(p->exit_count>=LINE_CONFIRM_SAMPLES) {
++                p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
++                enter_clear(p,d,now);
++                if(!p->passing_junction) anchor_next_segment(p,d,now);
++            }
++            return;
++        }
+         bool narrow=route_is_narrow_line(o);
+-        /* Once a real exit has been captured, do not drive blind until the
+-         * full maneuver timeout. Check the deadline before accepting recovery. */
+-        if(!p->component_recovery_active && p->capture_line_seen &&
+-           ((uint32_t)(now-p->capture_line_ms)>=INTERFERENCE_TIMEOUT_MS ||
+-            fabsf(d-p->capture_line_cm)>=INTERFERENCE_MAX_DISTANCE_CM)) {
+-            fail(p,ROUTE_FAILURE_EXIT_LOST);return;
+-        }
++        /* Ordinary turns keep their angle/exit contract through gray loss.
++         * Only the action bound aborts to RECOVERING; HEXAGON is separate. */
+         if(component_recovery(p,o,d,h,now,adjacent,!narrow && p->capture_line_seen &&
+            turn>=target*(1.0f-JUNCTION_EXIT_ANGLE_MARGIN_RATIO))) return;
+         p->turn_capturing=narrow && turn>=route_turn_threshold_rad(p,JUNCTION_CAPTURE_MIN_RAD);
+@@ -673,11 +686,6 @@
+      * Straight passage must first prove a centered exit: a diode's side edge
+      * is a valid sensor region but is not the intended straight line. */
+     bool straight=route_current_action(p)==STRAIGHT;
+-    if(straight && !p->component_recovery_active &&
+-       ((uint32_t)(now-p->capture_line_ms)>=INTERFERENCE_TIMEOUT_MS ||
+-        fabsf(d-p->capture_line_cm)>=INTERFERENCE_MAX_DISTANCE_CM)) {
+-        fail(p,ROUTE_FAILURE_CLEAR_LINE_LOST);return;
+-    }
+     /* A new graphic can start before 2 cm of plain line after a turn.
+      * Require a confirmed turn exit, a short continuous center corridor, then
+      * three new separated-branch frames and real forward displacement.
+--- before-this-task/src/line_follow.c
++++ after-this-task/src/line_follow.c
+@@ -8,6 +8,17 @@
+ /**
+  * @brief 判断停止原因是否属于必须复位才能解除的任务或编码器故障。
+  */
++#if PRESET_ROUTE_ENABLED
++/* Ordinary maneuvers own gray loss until their existing phase bounds abort.
++ * HEXAGON retains its independent gray-loss contract. */
++static bool route_owns_gray_loss(const RoutePlanner *p)
++{
++    return p->state==ROUTE_BRAKING || p->state==ROUTE_RECOVERING ||
++        ((p->state==ROUTE_EXECUTING || p->state==ROUTE_CLEARING) &&
++         p->index<p->count && p->steps[p->index].action!=HEXAGON);
++}
++#endif
++
+ static bool locked(LineStopReason reason)
+ {
+     return reason == LINE_STOP_FAULT || reason == LINE_STOP_ENCODER ||
+@@ -445,13 +456,14 @@
+         pid_reset(&f->pid);
+         speed_control_reset(&f->speed);
+     }
+-    /* Deadline precedes recovery/junction confirmation; isolated noise cannot extend it. */
+-    if ((LOST_LINE_STOP_ENABLED || PRESET_ROUTE_ENABLED) && f->abnormal && ((uint32_t)(now_ms - f->last_reliable_ms) >= INTERFERENCE_TIMEOUT_MS ||
+-        fabsf(f->odometry.distance_cm - f->abnormal_origin_cm) >= INTERFERENCE_MAX_DISTANCE_CM)) {
+-        line_follow_stop(f, LINE_STOP_LOST);
+-        return;
+-    }
+-#if PRESET_ROUTE_ENABLED
++    bool gray_loss_expired=(LOST_LINE_STOP_ENABLED || PRESET_ROUTE_ENABLED) && f->abnormal &&
++        ((uint32_t)(now_ms-f->last_reliable_ms)>=INTERFERENCE_TIMEOUT_MS ||
++         fabsf(f->odometry.distance_cm-f->abnormal_origin_cm)>=INTERFERENCE_MAX_DISTANCE_CM);
++#if !PRESET_ROUTE_ENABLED
++    if(gray_loss_expired) {line_follow_stop(f,LINE_STOP_LOST);return;}
++#endif
++#if PRESET_ROUTE_ENABLED
++    bool route_owned_gray_loss=route_owns_gray_loss(&f->route);
+     RouteState previous_route = f->route.state;
+     size_t previous_index = f->route.index;
+     bool completing_turn=previous_route==ROUTE_CLEARING &&
+@@ -463,6 +475,11 @@
+             f->turn_exit[previous_index].minimum_turn_rad,previous_turn);
+     route_set_speed(&f->route, f->odometry.left_speed_cm_s, f->odometry.right_speed_cm_s);
+     route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
++    /* Let real same-frame node confirmation transfer the budget. Unconfirmed
++     * candidates/FOLLOW still expire before normal line recovery can renew it. */
++    if(gray_loss_expired && !route_owned_gray_loss && !route_owns_gray_loss(&f->route)) {
++        line_follow_stop(f,LINE_STOP_LOST);return;
++    }
+     f->exit_recovery_active=f->route.component_recovery_active;
+     if (completing_turn && f->route.state==ROUTE_FOLLOW)
+         f->exit_accelerating=TURN_EXIT_ACCEL_ENABLED;

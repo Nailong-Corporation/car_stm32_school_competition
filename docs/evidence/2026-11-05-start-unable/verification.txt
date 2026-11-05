@@ -1,0 +1,17 @@
+warning: Couldn't find general-purpose registers in core file.
+warning: Couldn't find general-purpose registers in core file.
+#0  <unavailable> in ?? ()
+$1 = LINE_IDLE
+$2 = LINE_START_REJECTED_LINE
+$3 = 0 '\000'
+$4 = {kind = GRAY_AMBIGUOUS, raw_mask = 0 '\000', line_mask = 255 '\377', selected_mask = 0 '\000', white_count = 8 '\b', region_count = 1 '\001', position = 0, prefilter_mask = 255 '\377', seam_mask = 0 '\000'}
+$5 = HEADING_ENCODER
+$6 = HEADING_FALLBACK_STARTUP
+$7 = 913
+$8 = true
+$9 = true
+$10 = {left = 0, right = 0, enabled = false}
+$11 = HEADING_ENCODER
+$12 = HEADING_FALLBACK_STARTUP
+$13 = 913
+$14 = false

@@ -23,7 +23,7 @@ static void test_branch_identity(void)
  }
  RoutePlanner p;float d=0;uint32_t t=0;init(&p,evidence_steps,2);
  update(&p,&d,&t,0x18,0,4);update(&p,&d,&t,0x9b,0,5);
- CHECK(p.junctions_seen==0); /* three regions including a center and side pair */
+ CHECK(p.junctions_seen==1); /* component graphic now counts after sustained proof */
  init(&p,evidence_steps,2);d=0;t=0;update(&p,&d,&t,0x18,0,4);
  d+=1;t+=5;route_update(&p,mask(0x1f),d,0,t);
  d+=2;t+=5;route_update(&p,mask(0xf8),d,0,t);
@@ -161,7 +161,7 @@ static void test_captured_component_stop(const char *path)
  CHECK(p.index==0 && p.junctions_seen==0 && !p.line_exit_confirmed);
  route_update(&p,mask(0x18),232.4f,p.entry_heading-1.716f,
               p.component_recovery_ms+COMPONENT_RECOVERY_TIMEOUT_MS);
- CHECK(p.failure==ROUTE_FAILURE_EXIT_RECAPTURE && p.state==ROUTE_FAILED);
+ CHECK(p.failure==ROUTE_FAILURE_NONE && p.state==ROUTE_EXECUTING && !p.component_recovery_active);
  /* The user now authorizes a one-shot straight recovery through the graphic.
   * It still cannot complete a turn without line evidence or run forever. */
 }

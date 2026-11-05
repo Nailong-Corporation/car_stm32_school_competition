@@ -5,17 +5,17 @@
 
 typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN, HEXAGON } Action;
 typedef struct {
-    uint16_t junction_count; /* Confirmed physical junctions since last action clearance. */
+    uint16_t junction_count; /* Maximum junctions before action; 0 ignores count. */
     float turn_speed;        /* Maximum measured wheel speed before entering a turn, cm/s. */
     Action action;
     int cruise_speed;        /* cm/s, not PWM. */
     float angle_deg;         /* CUSTOM_TURN / HEXAGON: clockwise positive, unwrapped. */
     bool corner_arc_enabled;
-    float final_segment_length_cm; /* clearance -> target detection; 0 disables planning. */
+    float segment_length_cm; /* START / previous action completion -> target; 0 means unknown. */
 } RouteStep;
 typedef enum {
     ROUTE_FOLLOW, ROUTE_CANDIDATE, ROUTE_EXECUTING, ROUTE_CLEARING,
-    ROUTE_FINISHED, ROUTE_FAILED, ROUTE_DISABLED, ROUTE_BRAKING
+    ROUTE_FINISHED, ROUTE_FAILED, ROUTE_DISABLED, ROUTE_BRAKING, ROUTE_RECOVERING
 } RouteState;
 /* 保留首个失败原因，区分可重启的路径停车与编码器/任务锁定故障。 */
 typedef enum {
@@ -52,6 +52,12 @@ typedef struct {
 } HexagonNavigation;
 typedef struct {
     HexagonNavigation hexagon;
+    RouteFailure navigation_warning;
+    uint32_t navigation_recoveries;
+    /* Action completion anchors the next segment before clearance unlocks counting. */
+    float next_segment_origin_cm;
+    uint32_t next_segment_ms;
+    bool next_segment_origin_valid;
     uint16_t junctions_seen;
     bool passing_junction, final_segment_active, search_pending;
     float final_segment_origin_cm, search_origin_cm;
@@ -103,6 +109,13 @@ typedef struct {
 
 /* Speed feedback must be updated before route_update in production. */
 void route_set_speed(RoutePlanner *planner, float left_cm_s, float right_cm_s);
+bool route_target_ready(const RoutePlanner *planner, float distance_cm, bool next_junction);
+/* Start a bounded soft recovery; false means a hard safety/loss fault. */
+bool route_recover_navigation(RoutePlanner *planner, float distance_cm, float heading_rad, uint32_t now_ms);
+size_t route_planning_index(const RoutePlanner *planner);
+float route_planning_origin(const RoutePlanner *planner);
+float route_planning_entry_speed_limit(const RoutePlanner *planner);
+float route_cruise_speed(const RoutePlanner *planner);
 /* Target maneuver's measured entry cap, also used before the target junction. */
 float route_entry_speed_limit(const RoutePlanner *planner);
 extern const RouteStep route[];

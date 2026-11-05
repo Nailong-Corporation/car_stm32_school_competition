@@ -1,0 +1,2 @@
+Assertion failed: (f.route.state==ROUTE_EXECUTING && f.route.junctions_seen==1), function test_gap_and_entry, file test_left_fail.c, line 138.
+test/run_host_tests.sh: line 8: 93167 Abort trap: 6           "$test_binary"

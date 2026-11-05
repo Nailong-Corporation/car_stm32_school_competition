@@ -1,0 +1,14 @@
+PASS: byte-identical to previous verified stage: src/route_table.c
+PASS: byte-identical to previous verified stage: src/braking_planner.c
+PASS: byte-identical to previous verified stage: src/speed_control.c
+PASS: byte-identical to previous verified stage: src/motor.c
+PASS: byte-identical to previous verified stage: include/motion_config.h
+PASS: byte-identical to previous verified stage: include/control_config.h
+PASS: HEXAGON sub-FSM byte-identical to before this task
+PASS: candidate evidence/count and BRAKING actual-speed/time/distance/yaw gates unchanged
+PASS: README fence balance and both diagrams show ordinary phase recovery, HEXAGON protection; renderer not run
+PASS: AGENTS explicit user-authorized rule precedence recorded
+PASS: isolated firmware diff generated from saved task-entry source
+PASS: git diff --check
+Final host PASS lines: 85
+PASS: successful cross-build archived; source unchanged since that build

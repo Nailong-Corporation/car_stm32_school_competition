@@ -1,0 +1,36 @@
+PASS: low-speed outside-wheel regression (22414 checks)
+PASS: low-speed outside-wheel regression (22414 checks)
+PASS: low-speed outside-wheel regression (22414 checks)
+PASS: low-speed outside-wheel regression (22414 checks)
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9142 checks)
+HEXAGON FSM: 9142 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9146 checks)
+HEXAGON FSM: 9146 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9142 checks)
+HEXAGON FSM: 9142 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9146 checks)
+HEXAGON FSM: 9146 checks PASS
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1536 checks)
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1542 checks)
+PASS: junction identity, mirrored curve/L/separated evidence, raw filter replay, frozen trace and captured EXIT_LOST (492 checks)
+PASS: junction identity, mirrored curve/L/separated evidence, raw filter replay, frozen trace and captured EXIT_LOST (492 checks)
+PASS: approach=0 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: mirrored pre-capture cap, angle settling, yaw damping, clearance, custom angles and no-exit timeout
+PASS: mirrored pre-capture cap, angle settling, yaw damping, clearance, custom angles and no-exit timeout
+Assertion failed: (fmaxf(f.left_target_cm_s,f.right_target_cm_s)>16.0f), function test_approach_and_entry, file test_turn_handoff.c, line 13.
+test/run_host_tests.sh: line 95: 88408 Abort trap: 6           "$test_binary"

@@ -4,7 +4,7 @@
 /* 原始 GPIO 白色=0、黑色=1：1 巡白线（反相），0 巡黑线（不反相）。
  * 转换后统一以 1 表示目标线；修改后须重新编译，可通过 -D 覆盖。 */
 #ifndef GRAY_INVERT_ENABLED
-#define GRAY_INVERT_ENABLED         1
+#define GRAY_INVERT_ENABLED         0
 #endif
 #if GRAY_INVERT_ENABLED != 0 && GRAY_INVERT_ENABLED != 1
 #error "GRAY_INVERT_ENABLED must be 0 or 1"

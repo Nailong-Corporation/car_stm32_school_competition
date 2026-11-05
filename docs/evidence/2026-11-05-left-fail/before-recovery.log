@@ -1,0 +1,2 @@
+exit_code=-6
+Assertion failed: (outer_speed(f)<=16.001f), function capped, file test_left_fail.c, line 12.

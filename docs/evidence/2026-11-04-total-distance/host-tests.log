@@ -1,0 +1,30 @@
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9141 checks)
+HEXAGON FSM: 9141 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9145 checks)
+HEXAGON FSM: 9145 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9141 checks)
+HEXAGON FSM: 9141 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9145 checks)
+HEXAGON FSM: 9145 checks PASS
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1536 checks)
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1542 checks)
+PASS: junction identity, mirrored curve/L/separated evidence, raw filter replay, frozen trace and captured EXIT_LOST (492 checks)
+PASS: junction identity, mirrored curve/L/separated evidence, raw filter replay, frozen trace and captured EXIT_LOST (492 checks)
+PASS: approach=0 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=0 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=0 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=0
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: approach=1 exit=1 reverse=1
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.state==LINE_STOPPED && f.route.failure==ROUTE_FAILURE_ACTION_TIMEOUT), function test_settling, file test_turn_settling.c, line 63.
+test/run_host_tests.sh: line 68: 44078 Abort trap: 6           "$test_binary"

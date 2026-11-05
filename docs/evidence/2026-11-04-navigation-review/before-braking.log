@@ -1,0 +1,1 @@
+Assertion failed: (f.route.component_recovery_active && f.braking_active), function test_clearance_envelope, file test_navigation_review.c, line 43.

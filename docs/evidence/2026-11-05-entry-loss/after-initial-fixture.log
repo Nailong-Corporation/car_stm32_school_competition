@@ -1,0 +1,2 @@
+Assertion failed: (f.state!=LINE_STOPPED && f.route.state==ROUTE_RECOVERING), function test_loss_ready, file test_entry_loss.c, line 48.
+docs/evidence/2026-11-05-entry-loss/run_regression.sh: line 8: 25920 Abort trap: 6           "$test_dir/test" "$@"
