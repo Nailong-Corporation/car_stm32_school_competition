@@ -12,8 +12,16 @@ static void test_distance_or_count(void)
  CHECK(p.state==ROUTE_FOLLOW && p.search_pending && p.index==0);
  update(&p,&d,&t,0xff,0,1);CHECK(p.state==ROUTE_CANDIDATE);
  update(&p,&d,&t,0x18,0,4);CHECK(p.state==ROUTE_FOLLOW);
+ /* Distance exhaustion selects the slow search envelope only. It must not
+  * authorize the next detected junction: this step still needs four nodes. */
  junction(&p,&d,&t,0xff,0);
- CHECK(p.state==ROUTE_EXECUTING && p.junctions_seen==2 && !p.passing_junction);
+ CHECK(p.passing_junction && p.junctions_seen==2 && p.state==ROUTE_CLEARING);
+ clear(&p,&d,&t,0);
+ junction(&p,&d,&t,0xff,0);
+ CHECK(p.passing_junction && p.junctions_seen==3 && p.state==ROUTE_CLEARING);
+ clear(&p,&d,&t,0);
+ junction(&p,&d,&t,0xff,0);
+ CHECK(!p.passing_junction && p.state==ROUTE_EXECUTING && p.junctions_seen==4);
  /* Count wins before distance, while distance alone never acts. */
  s[0].junction_count=1;s[0].segment_length_cm=200;
  init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);

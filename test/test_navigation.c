@@ -421,8 +421,15 @@ static void test_line_exit_guards(void)
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
   junction(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x08,custom?-.736f:-.6f,4);
-  CHECK(p.state==ROUTE_EXECUTING); /* Custom angle / pre-capture angle stay gated. */
+  if(custom) CHECK(p.state==ROUTE_CLEARING && p.line_exit_confirmed);
+  else CHECK(p.state==ROUTE_EXECUTING); /* Pre-capture angle stays gated. */
  }
+ /* Non-90 custom angles keep the exact-angle exit contract. */
+ RouteStep c135[]={{1,50,CUSTOM_TURN,50,-135.0f,false,0},{1,50,STOP,50,0,false,0}};
+ RoutePlanner q;float qd=0;uint32_t qt=0;init(&q,c135,2);
+ junction(&q,&qd,&qt,0xff,0);
+ update(&q,&qd,&qt,0x08,-1.8f,4);
+ CHECK(q.state==ROUTE_EXECUTING && !q.line_exit_confirmed);
  RouteStep s[]={{1,50,LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0xff,0);update(&p,&d,&t,0x08,-.736f,2);

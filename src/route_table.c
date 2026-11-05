@@ -8,10 +8,10 @@
  * 制动、速度反馈与可靠出口线门禁独立保留；配置不等于实测标定。 */
 const RouteStep route[] = {
     /* 赛道 1 */
-    {1, 50.0f, LEFT, 50, 0.0f, false, 65.0f},
-    {4, 50.0f, LEFT, 200, 0.0f, false, 219.0f},
-    {2, 50.0f, LEFT, 200, 0.0f, false, 70.0f},
-    {3, 50.0f, STOP, 200, 0.0f, false, 219.0f},
+    {1, 50.0f, CUSTOM_TURN, 50, -90.0f, false, 60.0f},
+    {4, 50.0f, CUSTOM_TURN, 200, -90.0f, false, 180.0f},
+    {2, 50.0f, CUSTOM_TURN, 200, -90.0f, false, 60.0f},
+    {3, 50.0f, STOP, 200, 0.0f, false, 200.0f},
 
 
 };

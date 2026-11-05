@@ -455,8 +455,12 @@ float route_cruise_speed(const RoutePlanner *p)
 bool route_target_ready(const RoutePlanner *p,float d,bool next)
 {
     RouteStep s=p->steps[p->index];
-    return (s.junction_count>0 && (uint32_t)p->junctions_seen+(next?1U:0U)>=s.junction_count) ||
-        (s.segment_length_cm>0 && d-p->origin_cm>=s.segment_length_cm);
+    /* 计数表项只由路口计数授权动作。总段长度用于限速/减速包络，
+     * 不能因距离耗尽就把下一个检测到的路口提前当目标，否则计数4的
+     * 路段会在第一个路口直接转弯。计数0的旧表项仍允许仅按长度搜口。 */
+    if(s.junction_count>0)
+        return (uint32_t)p->junctions_seen+(next?1U:0U)>=s.junction_count;
+    return s.segment_length_cm>0 && d-p->origin_cm>=s.segment_length_cm;
 }
 bool route_recover_navigation(RoutePlanner *p,float d,float h,uint32_t now)
 {
@@ -660,9 +664,13 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
             p->capture_line_seen=true;
         } else p->capture_line_samples=0;
         if(turn>=target) p->corner_arc_complete=true;
-        /* 普通转弯找到连续居中窄出口即继续巡线；自定义角保留角度门禁。 */
+        /* 普通转弯找到连续居中窄出口即继续巡线；非90°自定义角保留角度门禁。
+         * ±90° CUSTOM_TURN 与 LEFT/RIGHT 几何相同，捕到出口线后必须停止
+         * 继续强转并交回位置 PID，否则会越过出口线、丢线。 */
+        bool ordinary_exit=s.action!=CUSTOM_TURN ||
+            fabsf(fabsf(route_turn_target_rad(p))-JUNCTION_TURN_TARGET_RAD)<0.0001f;
         bool angle_full=turn>=target;
-        bool line_ready=s.action!=CUSTOM_TURN && p->turn_capturing &&
+        bool line_ready=ordinary_exit && p->turn_capturing &&
             o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH;
         bool exit=narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT &&
             (line_ready || angle_full || turn>=target-JUNCTION_EXIT_ANGLE_MARGIN_RATIO*target);

@@ -70,7 +70,9 @@ static void test_spacing_and_node_matrix(void)
    while(d<location) update(&p,&d,&t,0x18,0,1);
    junction(&p,&d,&t,node%2?0x1f:0xf8,0);
    CHECK(p.junctions_seen==node && p.index==0);
-   bool target=node>=counts[n] || (d>=lengths[l] && lengths[l]>0);
+   /* Segment length is a speed-planning bound, not a node authorization.
+    * Only the configured junction count may turn this step into a target. */
+   bool target=node>=counts[n];
    CHECK(p.passing_junction==!target);
    CHECK(p.state==(target?ROUTE_EXECUTING:ROUTE_CLEARING));
    float origin=p.origin_cm;

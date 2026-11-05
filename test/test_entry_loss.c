@@ -13,7 +13,10 @@ static void braking_entry(LineFollow *f,EncoderCounts *c,uint32_t *t)
  CHECK(f->odometry.left_speed_cm_s>route_entry_speed_limit(&f->route));
  tick(f,c,t,10,10,0x1f,false);
  CHECK(f->route.state==ROUTE_CANDIDATE && f->abnormal);
- tick(f,c,t,10,10,0x1f,false);
+ /* The current table uses CUSTOM_TURN -90 for the first action, so the
+  * two-frame LEFT/RIGHT early confirmation does not apply; use the normal
+  * three-frame strong-candidate gate. */
+ for(unsigned i=1;i<JUNCTION_CONFIRM_SAMPLES;++i) tick(f,c,t,10,10,0x1f,false);
  CHECK(f->route.state==ROUTE_BRAKING && f->route.junctions_seen==1);
  CHECK(f->left_target_cm_s==0 && f->right_target_cm_s==0 && !f->command.enabled);
 }
@@ -114,12 +117,14 @@ static void test_filtered_entry(void)
   line_follow_update(&f,o,c,t,.005f,i==2);
  }
  CHECK(f.state==LINE_TRACKING && f.route.state==ROUTE_FOLLOW);
- for(unsigned i=0;i<3;++i) {
+ /* CUSTOM_TURN uses the normal three-frame strong gate; the sensor filter
+  * also delays the first 0x1f by one period, so the entry needs one extra. */
+ for(unsigned i=0;i<4;++i) {
   c.left+=10;c.right+=10;t+=5;
   GrayObservation o=gray_sensor_update(&sensor,raw_for_line(0x1f),true,0);
   CHECK(o.line_mask==(i==0?0x18:0x1f));
   line_follow_update(&f,o,c,t,.005f,false);
-  CHECK(f.route.state==(i==0?ROUTE_FOLLOW:i==1?ROUTE_CANDIDATE:ROUTE_BRAKING));
+  CHECK(f.route.state==(i==0?ROUTE_FOLLOW:i<3?ROUTE_CANDIDATE:ROUTE_BRAKING));
  }
  CHECK(f.route.junctions_seen==1 && f.left_target_cm_s==0 && f.right_target_cm_s==0);
  /* Sensor majority also delays loss by one period; it does not renew node proof. */

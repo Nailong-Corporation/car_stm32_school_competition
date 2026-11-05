@@ -60,7 +60,14 @@ static void test_line_and_custom_gate(void)
  route_update(&p,mask(0xff),.9f,1.6f,150);
  CHECK(!p.component_recovery_active); /* no second budget on the same action */
 
- prepare(&p);route_update(&p,mask(0xff),0,1.5f,105);
+ /* Non-90 custom angles still require the configured angle even after a
+  * centered line is captured; only the geometrically ordinary ±90° share
+  * LEFT/RIGHT's line-capture exit. */
+ RouteStep c135[]={{1,50,CUSTOM_TURN,200,135,false,0},{1,50,STOP,200,0,false,0}};
+ route_init(&p,c135,2,NULL,NULL);p.repeat_count=1;
+ p.state=ROUTE_EXECUTING;p.phase_ms=100;p.last_sample_ms=100;
+ p.entry_heading=0;p.capture_line_seen=true;p.capture_line_ms=100;p.capture_line_cm=0;
+ route_update(&p,mask(0xff),0,1.5f,105);
  for(unsigned i=0;i<8;++i) route_update(&p,mask(0x18),.02f*i,1.5f,110+5*i);
  CHECK(p.state==ROUTE_EXECUTING && !p.line_exit_confirmed); /* custom angle evidence retained */
 }

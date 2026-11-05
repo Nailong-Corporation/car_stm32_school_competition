@@ -13,6 +13,25 @@ static void prepare_turn(LineFollow *f, EncoderCounts *c, uint32_t *now,
  f->route.entry_heading=f->route.action_start_heading=f->odometry.heading_rad-sign*turn;
 }
 
+static void test_custom90_capture_returns_to_line(void)
+{
+ for(unsigned mirror=0;mirror<2;++mirror) {
+  float sign=mirror?1.0f:-1.0f;
+  RouteStep steps[]={{1,50,CUSTOM_TURN,200,sign*90.0f,false,0},
+                     {1,50,STOP,200,0,false,0}};
+  LineFollow f;EncoderCounts c;uint32_t now;
+  /* Field case: the exit line is captured around 63deg, short of 90deg.
+   * The line must own steering so the car does not keep pivoting off it. */
+  prepare_turn(&f,&c,&now,steps,sign,1.10f);
+  tick(&f,&c,&now,0,0,mirror?0x08:0x10,false);
+  CHECK(f.route.turn_capturing && f.route.state==ROUTE_EXECUTING);
+  CHECK(sign*f.correction<0);
+  CHECK(fminf(f.left_target_cm_s,f.right_target_cm_s)>0.1f);
+  for(unsigned i=0;i<3;++i) tick(&f,&c,&now,0,0,0x18,false);
+  CHECK(f.route.state==ROUTE_CLEARING && !f.route.passing_junction);
+ }
+}
+
 static void test_settling(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) for(unsigned custom=0;custom<2;++custom) {
@@ -76,7 +95,7 @@ static void test_line_controls_capture(void)
   LineFollow f;EncoderCounts c;uint32_t now;
   prepare_turn(&f,&c,&now,steps,sign,target-.30f);
   /* The exit has crossed center: line correction must oppose the original
-   * turn even though the angle is short of target. Do not keep forcing yaw. */
+   * turn, including a custom angle short of target. Do not keep forcing yaw. */
   tick(&f,&c,&now,0,0,mirror?0x08:0x10,false);
   CHECK(f.route.turn_capturing && f.pid.primed);
   CHECK(sign*f.correction<0);
@@ -185,6 +204,7 @@ static void test_pre_capture_turn_speed(void)
 int main(void)
 {
  test_pre_capture_turn_speed();
+ test_custom90_capture_returns_to_line();
  test_line_controls_capture();
  test_settling();
 #if MPU6050_ENABLED
