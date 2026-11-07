@@ -49,6 +49,10 @@ GrayObservation gray_classify(uint8_t line_mask, bool have_previous, float previ
     if (wide) return result;
     unsigned selected = 0;
     if (result.region_count > 1) {
+        /* 印刷空心元件/极板间隙：两侧外边成组且中心两级全空，无法判断
+         * 哪一条是目标线；不按连续性挑选单边，交由上层有界穿越保持。 */
+        if ((line_mask & 0x18U) == 0U && (line_mask & 0x03U) != 0U &&
+            (line_mask & 0xc0U) != 0U) return result;
         if (!have_previous || !isfinite(previous)) return result;
         float best = 100.0f, second = 100.0f;
         for (unsigned i = 0; i < result.region_count; ++i) {

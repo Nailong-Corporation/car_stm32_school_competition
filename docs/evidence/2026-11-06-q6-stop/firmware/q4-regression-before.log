@@ -1,0 +1,2 @@
+Assertion failed: (f.planner.junctions_seen == 1), function test_wider_center_branch_overrides_narrow_latch, file test_smooth_center_branch.c, line 120.
+test/run_smooth_center_branch_tests.sh: line 9: 14780 Abort trap: 6           "$test_binary"

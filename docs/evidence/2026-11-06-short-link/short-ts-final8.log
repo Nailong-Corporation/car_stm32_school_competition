@@ -1,0 +1,6 @@
+WebSocket server error: Port 24678 is already in use
+PASS: explicit short geometry validates only bounded consecutive ordinary turns
+PASS: mirrored short links project axle displacement, preserve entry speed/exit proof and enforce loss bounds
+PASS: physical local-left x375->345 short link captures exit at (343.84,122.14), pivot x=353.59
+PASS: physical official-left x375->345 short link captures exit at (343.93,122.02), pivot x=353.59
+PASS: physical mirror-right x375->345 short link captures exit at (343.82,207.51), pivot x=353.61

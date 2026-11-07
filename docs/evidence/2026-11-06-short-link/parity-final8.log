@@ -1,0 +1,26 @@
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: /Users/zhendong/Documents/PlatformIO/Projects/car_stm32/src/line_follow.c:18:29: error: '&&' within '||' [-Werror,-Wlogical-op-parentheses]
+   18 |          (p->index<p->count && p->steps[p->index].action!=HEXAGON ||
+      |           ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/src/line_follow.c:18:29: note: place parentheses around the '&&' expression to silence this warning
+   18 |          (p->index<p->count && p->steps[p->index].action!=HEXAGON ||
+      |                             ^
+      |           (                                                      )
+1 error generated.
+
+
+1 !== 0
+
+    at file:///Users/zhendong/Documents/stm32car_simulator/tests/firmware_parity.mjs:24:12 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.12.0

@@ -13,7 +13,7 @@ static void test_turn_fallback(void)
         for (unsigned invalid=0;invalid<2;++invalid) {
             const float sign=mirror?-1.0f:1.0f;
             OdometryCalibration geometry={LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
-            RouteStep steps[]={{1,6,mirror?LEFT:RIGHT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+            RouteStep steps[]={{1,6,mirror?LEFT:RIGHT,40,0,false,0, 0},{1,6,STOP,40,0,false,0, 0}};
             LineFollow f;
             line_follow_init(&f,geometry,steps,2,NULL,NULL);
             EncoderCounts c={30000,30000};
@@ -100,7 +100,7 @@ int main(void)
     assert(fabsf(odo.heading_rad-0.2f)<.000001f && odo.y_cm>old_y);
     assert(!odometry_update_with_heading(&odo,count,.005f,true,NAN));
 
-    RouteStep steps[] = {{1, 6.0f, RIGHT, 120, 0, false, 0.0f},{1, 6.0f, STOP, 40, 0, false, 0.0f}};
+    RouteStep steps[] = {{1, 6.0f, RIGHT, 120, 0, false, 0.0f, 0},{1, 6.0f, STOP, 40, 0, false, 0.0f, 0}};
     LineFollow f;
     line_follow_init(&f,geometry,steps,2,NULL,NULL);
     GrayObservation center = gray_classify(0x18,true,0);

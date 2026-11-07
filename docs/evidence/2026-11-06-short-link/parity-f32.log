@@ -1,0 +1,3 @@
+PASS: scheme 1, 4674 identical-input C/TS frames, max target error 0.0001 cm/s; final index 3
+PASS: scheme 2, 6884 identical-input C/TS frames, max target error 0.0001 cm/s; final index 5
+PASS: scheme 3, 3201 identical-input C/TS frames, max target error 0.0001 cm/s; final index 1

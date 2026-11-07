@@ -1,0 +1,121 @@
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 23: 39947 Abort trap: 6           "$test_binary"
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 23: 39961 Abort trap: 6           "$test_binary"
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 23: 39974 Abort trap: 6           "$test_binary"
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 23: 39987 Abort trap: 6           "$test_binary"
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1535 checks)
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1541 checks)
+Assertion failed: (f->planner.state == ROUTE_CLEARING), function after_turn, file test_smooth_center_branch.c, line 60.
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/run_smooth_center_branch_tests.sh: line 9: 40025 Abort trap: 6           "$test_binary"
+Assertion failed: (x->f.state!=LINE_STOPPED), function sample, file test_pass_heading.c, line 35.
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/run_pass_heading_tests.sh: line 15: 40044 Abort trap: 6           "$test_binary"
+Assertion failed: (p.junctions_seen==1), function test_branch_identity, file test_junction_evidence.c, line 26.
+test/_tmp_run_continue.sh: line 51: 40058 Abort trap: 6           "$test_binary" "$project_dir/docs/evidence/2026-10-31-component-stop/trace.csv"
+Assertion failed: (p.junctions_seen==1), function test_branch_identity, file test_junction_evidence.c, line 26.
+test/_tmp_run_continue.sh: line 51: 40071 Abort trap: 6           "$test_binary" "$project_dir/docs/evidence/2026-10-31-component-stop/trace.csv"
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40087 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40109 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40132 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40153 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40173 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40193 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40214 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_observed_center_line_exit, file test_turn_speed_switches.c, line 17.
+test/_tmp_run_continue.sh: line 65: 40238 Abort trap: 6           "$test_binary"
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_pre_capture_turn_speed, file test_turn_settling.c, line 199.
+test/_tmp_run_continue.sh: line 87: 40265 Abort trap: 6           "$test_binary"
+Assertion failed: (f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING), function test_pre_capture_turn_speed, file test_turn_settling.c, line 199.
+test/_tmp_run_continue.sh: line 87: 40281 Abort trap: 6           "$test_binary"
+Assertion failed: (p.junctions_seen==1), function test_early_strong_evidence, file test_turn_handoff.c, line 47.
+test/_tmp_run_continue.sh: line 99: 40297 Abort trap: 6           "$test_binary"
+Assertion failed: (p.junctions_seen==1), function test_early_strong_evidence, file test_turn_handoff.c, line 47.
+test/_tmp_run_continue.sh: line 99: 40311 Abort trap: 6           "$test_binary"
+Assertion failed: (p.junctions_seen==1), function test_early_strong_evidence, file test_turn_handoff.c, line 47.
+test/_tmp_run_continue.sh: line 99: 40325 Abort trap: 6           "$test_binary"
+Assertion failed: (p.junctions_seen==1), function test_early_strong_evidence, file test_turn_handoff.c, line 47.
+test/_tmp_run_continue.sh: line 99: 40347 Abort trap: 6           "$test_binary"
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: single-count START, transient inhibit, mirrored reverse time/distance/severe gates and lock
+PASS: MPU stationary median calibration and movement rejection; centered-line button START accepted; spike rejection; probe/bus faults; stationary/90deg integration
+PASS: production heading scale, distance/speed, pose and mirrored 90-degree control gates
+PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup
+PASS: MPU yaw, startup/runtime encoder fallback, continuous mirrored turns, sticky source and encoder fault lock; tilt restart gates
+GRAY_INVERT_ENABLED=1
+Assertion failed: (selected.kind == GRAY_VALID && selected.selected_mask == 0x03), function test_sensor, file test_logic.c, line 65.
+test/_tmp_run_continue.sh: line 169: 40432 Abort trap: 6           "$test_binary"
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 169: 40472 Abort trap: 6           "$test_binary"
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+GRAY_INVERT_ENABLED=0
+Assertion failed: (selected.kind == GRAY_VALID && selected.selected_mask == 0x03), function test_sensor, file test_logic.c, line 65.
+test/_tmp_run_continue.sh: line 169: 40504 Abort trap: 6           "$test_binary"
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 169: 40544 Abort trap: 6           "$test_binary"
+PASS: encoder line-only, route bypass, interference and safety; 46242 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: seam filter=1 polarity=1 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=1 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=1; 782 checks
+PASS: seam filter=1 polarity=0 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=0 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=1; 782 checks
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/_tmp_run_continue.sh: line 279: 40829 Abort trap: 6           "$test_binary"
+Assertion failed: (p.passing_junction && p.junctions_seen==i+1 && p.index==0), function test_distance_or_count, file test_total_distance.c, line 34.
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/run_total_distance_tests.sh: line 9: 40849 Abort trap: 6           "$test_binary"
+entry-loss configuration: IMU=0 GRAY_INVERT=0
+Assertion failed: (f.route.state==ROUTE_RECOVERING && f.route.navigation_warning==ROUTE_FAILURE_ENTRY_SPEED), function test_budget, file test_entry_loss.c, line 36.
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-05-entry-loss/run_regression.sh: line 8: 40868 Abort trap: 6           "$test_dir/test" "$@"
+maneuver-loss configuration: IMU=0 GRAY_INVERT=0
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9236 checks)
+maneuver-loss configuration: IMU=0 GRAY_INVERT=1
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9236 checks)
+maneuver-loss configuration: IMU=1 GRAY_INVERT=0
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9240 checks)
+maneuver-loss configuration: IMU=1 GRAY_INVERT=1
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9240 checks)
+PASS: Scheme 0 (Debug) (steps=4, total_len=500.0 cm)
+PASS: Scheme 1 (New-track closed lap) (steps=5, total_len=1190.0 cm)
+PASS: Scheme 2 (New-track closed lap, faster) (steps=5, total_len=1190.0 cm)
+PASS: Scheme 3 (New-track closed lap, slowest) (steps=5, total_len=1190.0 cm)

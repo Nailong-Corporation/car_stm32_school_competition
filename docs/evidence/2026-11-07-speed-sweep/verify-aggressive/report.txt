@@ -1,0 +1,248 @@
+================================================================================
+ verify_course — 整圈完成 + 27 印刷元件覆盖 独立验证
+================================================================================
+run at            : 2026-11-06T16:19:16.626Z
+simulator         : /tmp/sim-patchtest-agg
+route table       : /Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-07-speed-sweep/route_table-aggressive.c
+output dir        : /tmp/vpta
+pass radius       : axle-centre <= 6 cm (sensor-bar centre also reported)
+expected items    : 27 printed components
+
+--- scheme 1 replay ---
+   command : (cwd /tmp/sim-patchtest-agg) node tests/replay.mjs 1 /tmp/vpta
+   exit    : 0  wall 548 ms
+
+--- scheme 2 replay ---
+   command : (cwd /tmp/sim-patchtest-agg) node tests/replay.mjs 2 /tmp/vpta
+   exit    : 0  wall 539 ms
+
+================================================================================
+ SCHEME 1
+================================================================================
+verdict            : PASS (lap finished + all components covered)
+ROUTE_FINISHED     : yes
+sim duration       : 90.26 s (90260 ms, 18052 control cycles)
+final state        : ROUTE_FINISHED / LINE_STOPPED
+final route index  : 29 of 29
+failure            : 0 ROUTE_FAILURE_NONE
+final pose         : x=-0.54 y=131.17 h=-14.172 d=2965.13 cm
+final pose vs P    : 21.18 cm from start point
+components covered : 27/27 (axle centre <= pass radius)
+                     : 25/27 also sampled by the sensor bar centre
+repeated passes    : r12 x2, r17 x2, r23 x2, q16 x2, q4 x2
+
+-- per route step (from CSV index column) ------------------------------------
+#    | action       | entries |  entry_ms |   exit_ms |  dur_ms | junctions | recov | warn | exit state      | entry pose -> exit pose
+0    | CUSTOM_TURN  |       1 |         5 |      3085 |    3080 |         2 |     0 |    0 | ROUTE_CLEARING  | (0.0,110.0) -> (9.1,0.0)
+1    | CUSTOM_TURN  |       1 |      3090 |      5270 |    2180 |         1 |     0 |    0 | ROUTE_CLEARING  | (9.2,-0.0) -> (53.5,6.6)
+2    | CUSTOM_TURN  |       1 |      5275 |      8825 |    3550 |         1 |     0 |    0 | ROUTE_CLEARING  | (53.5,6.7) -> (63.7,139.6)
+3    | CUSTOM_TURN  |       1 |      8830 |     12670 |    3840 |         2 |     0 |    0 | ROUTE_EXECUTING | (63.8,139.7) -> (244.7,146.7)
+4    | CUSTOM_TURN  |       1 |     12675 |     14155 |    1480 |         0 |     0 |    0 | ROUTE_CLEARING  | (244.7,146.8) -> (236.5,174.6)
+5    | CUSTOM_TURN  |       1 |     14160 |     18120 |    3960 |         1 |     0 |    0 | ROUTE_CLEARING  | (236.4,174.6) -> (95.4,184.4)
+6    | CUSTOM_TURN  |       1 |     18125 |     19865 |    1740 |         1 |     0 |    0 | ROUTE_CLEARING  | (95.4,184.5) -> (106.5,218.0)
+7    | CUSTOM_TURN  |       1 |     19870 |     24490 |    4620 |         5 |     0 |    0 | ROUTE_CLEARING  | (106.5,218.0) -> (374.9,210.9)
+8    | CUSTOM_TURN  |       1 |     24495 |     28415 |    3920 |         2 |     0 |    0 | ROUTE_EXECUTING | (374.9,210.8) -> (370.0,110.9)
+9    | CUSTOM_TURN  |       1 |     28420 |     29910 |    1490 |         0 |     0 |    0 | ROUTE_CLEARING  | (369.9,110.9) -> (341.8,118.3)
+10   | HEXAGON      |       1 |     29915 |     40535 |   10620 |         3 |     0 |    0 | ROUTE_CLEARING  | (341.8,118.4) -> (348.5,179.1)
+11   | CUSTOM_TURN  |       1 |     40540 |     42540 |    2000 |         1 |     0 |    0 | ROUTE_CLEARING  | (348.5,179.2) -> (356.1,219.2)
+12   | CUSTOM_TURN  |       1 |     42545 |     43730 |    1185 |         1 |     0 |    0 | ROUTE_CLEARING  | (356.2,219.2) -> (377.2,214.4)
+13   | CUSTOM_TURN  |       1 |     43735 |     48090 |    4355 |         1 |     0 |    0 | ROUTE_CLEARING  | (377.2,214.3) -> (366.4,1.1)
+14   | CUSTOM_TURN  |       1 |     48095 |     51270 |    3175 |         1 |     0 |    0 | ROUTE_CLEARING  | (366.3,1.1) -> (275.1,6.8)
+15   | CUSTOM_TURN  |       1 |     51275 |     53335 |    2060 |         1 |     0 |    0 | ROUTE_CLEARING  | (275.1,6.9) -> (280.7,48.6)
+16   | CUSTOM_TURN  |       1 |     53340 |     56335 |    2995 |         1 |     0 |    0 | ROUTE_CLEARING  | (280.7,48.6) -> (344.4,41.2)
+17   | CUSTOM_TURN  |       1 |     56340 |     58255 |    1915 |         1 |     0 |    0 | ROUTE_CLEARING  | (344.4,41.1) -> (339.0,1.8)
+18   | CUSTOM_TURN  |       1 |     58260 |     63855 |    5595 |         5 |     0 |    0 | ROUTE_EXECUTING | (338.9,1.8) -> (95.1,5.5)
+19   | CUSTOM_TURN  |       1 |     63860 |     65630 |    1770 |         0 |     0 |    0 | ROUTE_CLEARING  | (95.1,5.6) -> (101.2,43.1)
+20   | CUSTOM_TURN  |       1 |     65635 |     68315 |    2680 |         1 |     0 |    0 | ROUTE_EXECUTING | (101.3,43.1) -> (164.4,45.2)
+21   | CUSTOM_TURN  |       1 |     68320 |     70015 |    1695 |         0 |     0 |    0 | ROUTE_CLEARING  | (164.4,45.3) -> (179.3,80.2)
+22   | CUSTOM_TURN  |       1 |     70020 |     72045 |    2025 |         1 |     0 |    0 | ROUTE_EXECUTING | (179.4,80.2) -> (246.0,75.4)
+23   | CUSTOM_TURN  |       1 |     72050 |     73820 |    1770 |         0 |     0 |    0 | ROUTE_CLEARING  | (246.0,75.4) -> (240.2,37.7)
+24   | CUSTOM_TURN  |       1 |     73825 |     77975 |    4150 |         3 |     0 |    0 | ROUTE_CLEARING  | (240.1,37.7) -> (95.2,48.7)
+25   | CUSTOM_TURN  |       1 |     77980 |     81120 |    3140 |         1 |     0 |    0 | ROUTE_EXECUTING | (95.2,48.8) -> (87.0,139.4)
+26   | CUSTOM_TURN  |       1 |     81125 |     82810 |    1685 |         0 |     0 |    0 | ROUTE_CLEARING  | (86.9,139.4) -> (50.5,149.9)
+27   | CUSTOM_TURN  |       1 |     82815 |     86365 |    3550 |         1 |     0 |    0 | ROUTE_CLEARING  | (50.5,150.0) -> (40.6,218.4)
+28   | CUSTOM_TURN  |       1 |     86370 |     88605 |    2235 |         1 |     0 |    0 | ROUTE_CLEARING  | (40.5,218.4) -> (2.2,205.7)
+29   | STOP         |       1 |     88610 |     90260 |    1650 |         1 |     0 |    0 | ROUTE_FINISHED  | (2.3,205.6) -> (-0.5,131.2)
+
+-- step diagnostics (turn onset = |heading - entry heading| > 0.15 rad, last mask != 0) --
+#    |  pivot_ms | pivot pose        | lastMask_ms | lastMask pose     | mask | state at lastMask
+0    |      2355 | (0.2,6.6)         |        3085 | (9.1,0.0)         |  192 | ROUTE_CLEARING
+1    |      3785 | (25.1,-2.1)       |        5270 | (53.5,6.6)        |   96 | ROUTE_CLEARING
+2    |      6225 | (56.4,28.7)       |        8825 | (63.7,139.6)      |    3 | ROUTE_CLEARING
+3    |      9625 | (82.1,141.9)      |       12670 | (244.7,146.7)     |  224 | ROUTE_EXECUTING
+4    |     13400 | (245.7,167.7)     |       12710 | (244.7,147.6)     |   48 | ROUTE_EXECUTING
+5    |     14670 | (225.0,175.1)     |       17835 | (93.9,178.5)      |  128 | ROUTE_CLEARING
+6    |     18445 | (96.3,191.8)      |       19865 | (106.5,218.0)     |   12 | ROUTE_CLEARING
+7    |     20660 | (143.4,220.0)     |       24490 | (374.9,210.9)     |    3 | ROUTE_CLEARING
+8    |     25250 | (377.0,193.5)     |       27895 | (376.0,116.1)     |  128 | ROUTE_EXECUTING
+9    |     29150 | (349.0,109.3)     |       29865 | (341.9,117.3)     |    1 | ROUTE_CLEARING
+10   |     30120 | (341.4,123.5)     |       39005 | (333.8,139.7)     |  128 | ROUTE_EXECUTING
+11   |     40855 | (349.0,185.7)     |       41350 | (348.4,198.1)     |  128 | ROUTE_EXECUTING
+12   |     43005 | (368.8,221.8)     |           - | -                 |    - | -
+13   |     44040 | (379.1,208.1)     |       48090 | (366.4,1.1)       |    1 | ROUTE_CLEARING
+14   |     48705 | (352.5,-0.6)      |       51270 | (275.1,6.8)       |    1 | ROUTE_CLEARING
+15   |     51905 | (272.8,21.2)      |       53335 | (280.7,48.6)      |    7 | ROUTE_CLEARING
+16   |     54135 | (299.0,51.5)      |       56335 | (344.4,41.2)      |    6 | ROUTE_CLEARING
+17   |     57490 | (347.4,9.8)       |       58255 | (339.0,1.8)       |    3 | ROUTE_CLEARING
+18   |     58920 | (324.0,-1.3)      |       63855 | (95.1,5.5)        |    3 | ROUTE_EXECUTING
+19   |     64860 | (92.2,35.6)       |       65575 | (100.0,42.9)      |    1 | ROUTE_CLEARING
+20   |     66065 | (110.7,43.7)      |       68315 | (164.4,45.2)      |  128 | ROUTE_EXECUTING
+21   |     69345 | (170.0,75.4)      |       70015 | (179.3,80.2)      |    2 | ROUTE_CLEARING
+22   |     71430 | (238.9,81.7)      |       72045 | (246.0,75.4)      |    1 | ROUTE_EXECUTING
+23   |     73060 | (249.0,45.1)      |       73790 | (240.8,37.8)      |    1 | ROUTE_CLEARING
+24   |     74290 | (229.8,36.8)      |       77975 | (95.2,48.7)       |    3 | ROUTE_CLEARING
+25   |     78695 | (93.0,65.2)       |       81120 | (87.0,139.4)      |   96 | ROUTE_EXECUTING
+26   |     82145 | (56.4,141.2)      |       81430 | (77.0,139.6)      |    3 | ROUTE_EXECUTING
+27   |     83225 | (49.7,158.9)      |       86230 | (43.6,218.9)      |    1 | ROUTE_CLEARING
+28   |     86840 | (30.3,217.8)      |       88560 | (2.1,206.6)       |    1 | ROUTE_CLEARING
+29   |     89045 | (2.7,196.0)       |       90260 | (-0.5,131.2)      |  254 | ROUTE_FINISHED
+
+-- component coverage (axle centre distance; sensor bar = axle + 24 cm heading) --
+#   | id    | type       | el  |      x |       y |    axle |    sens | axle# | verdict     | closest hit (ms/index/state) / label
+1   | bat1  | battery    | 0   |    0.0 |   110.0 |    0.00 |    1.31 |     1 | PASS        | 5/0/ROUTE_FOLLOW BAT (P起点)
+2   | r1    | resistor   | 1   |    0.0 |    44.0 |    0.00 |    0.00 |     1 | PASS        | 1355/0/ROUTE_FOLLOW R1 (元件1)
+3   | r2    | resistor   | 2   |   23.0 |     0.0 |    2.01 |    7.66 |     1 | PASS        | 3690/1/ROUTE_FOLLOW R2 (元件2)
+4   | r3    | resistor   | 3   |   55.0 |    55.0 |    0.61 |    1.85 |     1 | PASS        | 6740/2/ROUTE_FOLLOW R3 (元件3)
+5   | r5    | resistor   | 5   |  161.0 |   140.0 |    0.45 |    0.61 |     1 | PASS        | 10770/3/ROUTE_FOLLOW R5 (元件5)
+6   | r8    | resistor   | 8   |  125.5 |   220.0 |    0.49 |    1.89 |     1 | PASS        | 20320/7/ROUTE_CANDIDATE R8 (元件8)
+7   | r9    | resistor   | 9   |  181.0 |   220.0 |    0.17 |    0.01 |     1 | PASS        | 21275/7/ROUTE_FOLLOW R9 (元件9)
+8   | r10   | resistor   | 10  |  292.0 |   220.0 |    0.09 |    0.07 |     1 | PASS        | 22165/7/ROUTE_FOLLOW R10 (元件10)
+9   | r12   | resistor   | 12  |  375.0 |   151.0 |    0.03 |    0.31 |     2 | PASS x2     | 45550/13/ROUTE_FOLLOW R12 (元件12)
+10  | r14   | resistor   | 14  |  310.0 |   195.3 |    4.80 |   12.52 |     1 | PASS        | 33840/10/ROUTE_EXECUTING R14 (环岛元件14)
+11  | r15   | resistor   | 15  |  375.0 |    70.0 |    1.70 |    1.95 |     1 | PASS        | 46110/13/ROUTE_FOLLOW R15 (元件15)
+12  | r17   | resistor   | 17  |  300.6 |     0.0 |    1.40 |    0.54 |     2 | PASS x2     | 59805/18/ROUTE_FOLLOW R17 (元件17)
+13  | r19   | resistor   | 19  |  334.0 |    50.0 |    0.65 |    1.13 |     1 | PASS        | 55445/16/ROUTE_EXECUTING R19 (元件19)
+14  | r20   | resistor   | 20  |  196.0 |     0.0 |    0.02 |    0.06 |     1 | PASS        | 61425/18/ROUTE_FOLLOW R20 (元件20)
+15  | r21   | resistor   | 21  |  145.0 |     0.0 |    0.21 |    0.20 |     1 | PASS        | 62080/18/ROUTE_FOLLOW R21 (元件21)
+16  | r23   | resistor   | 23  |  130.0 |    40.0 |    0.16 |    0.26 |     2 | PASS x2     | 76315/24/ROUTE_FOLLOW R23 (元件23)
+17  | r24   | resistor   | 24  |  206.0 |    80.0 |    0.93 |    1.45 |     1 | PASS        | 70505/22/ROUTE_FOLLOW R24 (元件24)
+18  | r25   | resistor   | 25  |  206.0 |    40.0 |    1.75 |    3.78 |     1 | PASS        | 75100/24/ROUTE_FOLLOW R25 (元件25)
+19  | r26   | resistor   | 26  |   55.0 |   187.0 |    2.15 |    3.96 |     1 | PASS        | 84350/27/ROUTE_FOLLOW R26 (虚线元件26)
+20  | r27   | resistor   | 27  |    0.0 |   177.0 |    1.43 |    3.52 |     1 | PASS        | 89600/29/ROUTE_FOLLOW R27 (元件27)
+21  | q22   | transistor | 22  |   95.0 |     0.0 |    2.55 |    0.98 |     1 | PASS        | 63595/18/ROUTE_EXECUTING Q22 (三极管22)
+22  | q16   | transistor | 16  |  345.0 |     0.0 |    0.79 |    0.88 |     2 | PASS x2     | 49005/14/ROUTE_FOLLOW Q16 (三极管16)
+23  | q18   | transistor | 18  |  275.0 |    50.0 |    2.63 |    3.27 |     1 | PASS        | 53065/15/ROUTE_EXECUTING Q18 (三极管18)
+24  | q4    | transistor | 4   |   95.0 |   140.0 |    1.60 |    1.58 |     2 | PASS x2     | 10125/3/ROUTE_FOLLOW Q4 (节点4)
+25  | q13   | transistor | 13  |  345.0 |   110.0 |    0.53 |    0.10 |     1 | PASS        | 29380/9/ROUTE_EXECUTING Q13 (三极管13)
+26  | q6    | transistor | 6   |  245.0 |   140.0 |    3.34 |    0.25 |     1 | PASS        | 12365/3/ROUTE_EXECUTING Q6 (节点6)
+27  | q11   | transistor | 11  |  150.0 |   170.0 |    1.79 |    2.34 |     1 | PASS        | 15900/5/ROUTE_FOLLOW Q11 (三极管11)
+
+================================================================================
+ SCHEME 2
+================================================================================
+verdict            : PASS (lap finished + all components covered)
+ROUTE_FINISHED     : yes
+sim duration       : 86.46 s (86460 ms, 17292 control cycles)
+final state        : ROUTE_FINISHED / LINE_STOPPED
+final route index  : 27 of 27
+failure            : 0 ROUTE_FAILURE_NONE
+final pose         : x=0.57 y=133.59 h=11.074 d=2864.50 cm
+final pose vs P    : 23.60 cm from start point
+components covered : 26/27 (axle centre <= pass radius)
+                     : 23/27 also sampled by the sensor bar centre
+missing            : r26(R26 (虚线元件26))@33.1cm
+repeated passes    : r8 x2, r12 x2, r17 x2, r25 x2, q16 x2
+
+-- per route step (from CSV index column) ------------------------------------
+#    | action       | entries |  entry_ms |   exit_ms |  dur_ms | junctions | recov | warn | exit state      | entry pose -> exit pose
+0    | CUSTOM_TURN  |       1 |         5 |      3085 |    3080 |         2 |     0 |    0 | ROUTE_CLEARING  | (0.0,110.0) -> (9.1,0.0)
+1    | CUSTOM_TURN  |       1 |      3090 |      5270 |    2180 |         1 |     0 |    0 | ROUTE_CLEARING  | (9.2,-0.0) -> (53.5,6.6)
+2    | CUSTOM_TURN  |       1 |      5275 |      8825 |    3550 |         1 |     0 |    0 | ROUTE_CLEARING  | (53.5,6.7) -> (63.7,139.6)
+3    | CUSTOM_TURN  |       1 |      8830 |     12815 |    3985 |         2 |     0 |    0 | ROUTE_CLEARING  | (63.8,139.7) -> (245.3,131.0)
+4    | CUSTOM_TURN  |       1 |     12820 |     16015 |    3195 |         3 |     0 |    0 | ROUTE_CLEARING  | (245.3,130.9) -> (234.3,40.4)
+5    | CUSTOM_TURN  |       1 |     16020 |     18915 |    2895 |         1 |     0 |    0 | ROUTE_EXECUTING | (234.2,40.4) -> (166.1,46.6)
+6    | CUSTOM_TURN  |       1 |     18920 |     20690 |    1770 |         0 |     0 |    0 | ROUTE_CLEARING  | (166.1,46.7) -> (174.3,83.9)
+7    | CUSTOM_TURN  |       1 |     20695 |     23420 |    2725 |         1 |     0 |    0 | ROUTE_EXECUTING | (174.4,83.9) -> (244.6,72.6)
+8    | CUSTOM_TURN  |       1 |     23425 |     25175 |    1750 |         0 |     0 |    0 | ROUTE_CLEARING  | (244.6,72.5) -> (235.3,36.0)
+9    | CUSTOM_TURN  |       1 |     25180 |     28755 |    3575 |         2 |     0 |    0 | ROUTE_EXECUTING | (235.2,35.9) -> (94.2,33.8)
+10   | CUSTOM_TURN  |       1 |     28760 |     30990 |    2230 |         0 |     0 |    0 | ROUTE_CLEARING  | (94.2,33.7) -> (109.4,-0.7)
+11   | CUSTOM_TURN  |       1 |     30995 |     36115 |    5120 |         4 |     0 |    0 | ROUTE_CLEARING  | (109.5,-0.7) -> (345.6,14.5)
+12   | CUSTOM_TURN  |       1 |     36120 |     38005 |    1885 |         1 |     0 |    0 | ROUTE_CLEARING  | (345.6,14.6) -> (330.8,47.0)
+13   | CUSTOM_TURN  |       1 |     38010 |     40855 |    2845 |         1 |     0 |    0 | ROUTE_CLEARING  | (330.7,47.0) -> (277.5,35.7)
+14   | CUSTOM_TURN  |       1 |     40860 |     42615 |    1755 |         1 |     0 |    0 | ROUTE_CLEARING  | (277.5,35.6) -> (286.4,1.3)
+15   | CUSTOM_TURN  |       1 |     42620 |     45925 |    3305 |         1 |     0 |    0 | ROUTE_CLEARING  | (286.5,1.3) -> (376.4,9.4)
+16   | CUSTOM_TURN  |       1 |     45930 |     50785 |    4855 |         4 |     0 |    0 | ROUTE_EXECUTING | (376.4,9.5) -> (368.6,221.8)
+17   | CUSTOM_TURN  |       1 |     50790 |     52270 |    1480 |         0 |     0 |    0 | ROUTE_CLEARING  | (368.5,221.8) -> (340.7,214.1)
+18   | HEXAGON      |       1 |     52275 |     62820 |   10545 |         2 |     0 |    0 | ROUTE_CLEARING  | (340.7,214.0) -> (346.5,150.5)
+19   | CUSTOM_TURN  |       1 |     62825 |     64475 |    1650 |         1 |     0 |    0 | ROUTE_EXECUTING | (346.5,150.4) -> (351.7,112.5)
+20   | CUSTOM_TURN  |       1 |     64480 |     65970 |    1490 |         0 |     0 |    0 | ROUTE_CLEARING  | (351.8,112.5) -> (380.0,119.2)
+21   | CUSTOM_TURN  |       1 |     65975 |     69275 |    3300 |         1 |     0 |    0 | ROUTE_CLEARING  | (380.1,119.4) -> (362.4,220.0)
+22   | CUSTOM_TURN  |       1 |     69280 |     74435 |    5155 |         3 |     0 |    0 | ROUTE_CLEARING  | (362.3,220.0) -> (93.4,207.2)
+23   | CUSTOM_TURN  |       1 |     74440 |     76225 |    1785 |         1 |     0 |    0 | ROUTE_CLEARING  | (93.4,207.1) -> (101.2,171.5)
+24   | CUSTOM_TURN  |       1 |     76230 |     78535 |    2305 |         1 |     0 |    0 | ROUTE_CLEARING  | (101.3,171.4) -> (148.7,176.8)
+25   | CUSTOM_TURN  |       1 |     78540 |     80600 |    2060 |         1 |     0 |    0 | ROUTE_CLEARING  | (148.7,176.9) -> (144.2,218.8)
+26   | CUSTOM_TURN  |       1 |     80605 |     84430 |    3825 |         2 |     0 |    0 | ROUTE_CLEARING  | (144.1,218.8) -> (0.0,211.1)
+27   | STOP         |       1 |     84435 |     86460 |    2025 |         1 |     0 |    0 | ROUTE_FINISHED  | (0.0,211.0) -> (0.6,133.6)
+
+-- step diagnostics (turn onset = |heading - entry heading| > 0.15 rad, last mask != 0) --
+#    |  pivot_ms | pivot pose        | lastMask_ms | lastMask pose     | mask | state at lastMask
+0    |      2355 | (0.2,6.6)         |        3085 | (9.1,0.0)         |  192 | ROUTE_CLEARING
+1    |      3785 | (25.1,-2.1)       |        5270 | (53.5,6.6)        |   96 | ROUTE_CLEARING
+2    |      6225 | (56.4,28.7)       |        8825 | (63.7,139.6)      |    3 | ROUTE_CLEARING
+3    |      9625 | (82.1,141.9)      |       12815 | (245.3,131.0)     |    3 | ROUTE_CLEARING
+4    |     13310 | (246.4,120.0)     |       16015 | (234.3,40.4)      |    3 | ROUTE_CLEARING
+5    |     16795 | (216.3,38.3)      |       18915 | (166.1,46.6)      |   12 | ROUTE_EXECUTING
+6    |     19925 | (165.1,77.0)      |       20655 | (173.6,83.8)      |    1 | ROUTE_CLEARING
+7    |     21185 | (185.4,84.1)      |       23420 | (244.6,72.6)      |   12 | ROUTE_EXECUTING
+8    |     24420 | (244.6,42.5)      |       25160 | (235.6,36.0)      |    1 | ROUTE_CLEARING
+9    |     25710 | (223.2,35.8)      |       28755 | (94.2,33.8)       |  192 | ROUTE_EXECUTING
+10   |     29765 | (92.6,3.5)        |       30675 | (102.9,-2.9)      |    1 | ROUTE_CLEARING
+11   |     31300 | (116.3,0.6)       |       35880 | (347.0,10.0)      |    1 | ROUTE_CLEARING
+12   |     36405 | (344.5,21.1)      |       37970 | (331.5,47.1)      |    1 | ROUTE_CLEARING
+13   |     38385 | (322.4,46.8)      |       40855 | (277.5,35.7)      |    1 | ROUTE_CLEARING
+14   |     41955 | (277.9,6.9)       |       42615 | (286.4,1.3)       |  224 | ROUTE_CLEARING
+15   |     43465 | (305.9,-1.5)      |       45925 | (376.4,9.4)       |  128 | ROUTE_CLEARING
+16   |     46525 | (378.0,23.0)      |       50785 | (368.6,221.8)     |  128 | ROUTE_EXECUTING
+17   |     51505 | (347.9,223.2)     |       51640 | (345.6,222.8)     |    1 | ROUTE_EXECUTING
+18   |     52465 | (340.3,208.9)     |       62820 | (346.5,150.5)     |   14 | ROUTE_CLEARING
+19   |     63905 | (345.7,118.8)     |       64475 | (351.7,112.5)     |  255 | ROUTE_EXECUTING
+20   |     65205 | (372.6,110.4)     |       64530 | (352.9,112.4)     |    3 | ROUTE_EXECUTING
+21   |     66340 | (380.9,127.2)     |       69275 | (362.4,220.0)     |  112 | ROUTE_CLEARING
+22   |     70350 | (336.4,221.4)     |       74435 | (93.4,207.2)      |  224 | ROUTE_CLEARING
+23   |     75465 | (92.4,178.9)      |       76225 | (101.2,171.5)     |  224 | ROUTE_CLEARING
+24   |     77025 | (119.6,168.6)     |       78535 | (148.7,176.8)     |  224 | ROUTE_CLEARING
+25   |     79775 | (152.6,209.6)     |       80600 | (144.2,218.8)     |  192 | ROUTE_CLEARING
+26   |     81120 | (132.7,220.9)     |       84430 | (0.0,211.1)       |  192 | ROUTE_CLEARING
+27   |     85185 | (-2.1,193.8)      |       86460 | (0.6,133.6)       |    3 | ROUTE_FINISHED
+
+-- component coverage (axle centre distance; sensor bar = axle + 24 cm heading) --
+#   | id    | type       | el  |      x |       y |    axle |    sens | axle# | verdict     | closest hit (ms/index/state) / label
+1   | bat1  | battery    | 0   |    0.0 |   110.0 |    0.00 |    2.40 |     1 | PASS        | 5/0/ROUTE_FOLLOW BAT (P起点)
+2   | r1    | resistor   | 1   |    0.0 |    44.0 |    0.00 |    0.00 |     1 | PASS        | 1355/0/ROUTE_FOLLOW R1 (元件1)
+3   | r2    | resistor   | 2   |   23.0 |     0.0 |    2.01 |    7.66 |     1 | PASS        | 3690/1/ROUTE_FOLLOW R2 (元件2)
+4   | r3    | resistor   | 3   |   55.0 |    55.0 |    0.61 |    1.85 |     1 | PASS        | 6740/2/ROUTE_FOLLOW R3 (元件3)
+5   | r5    | resistor   | 5   |  161.0 |   140.0 |    0.45 |    0.61 |     1 | PASS        | 10770/3/ROUTE_FOLLOW R5 (元件5)
+6   | r8    | resistor   | 8   |  125.5 |   220.0 |    0.53 |    0.05 |     2 | PASS x2     | 72855/22/ROUTE_FOLLOW R8 (元件8)
+7   | r9    | resistor   | 9   |  181.0 |   220.0 |    0.03 |    0.05 |     1 | PASS        | 71985/22/ROUTE_FOLLOW R9 (元件9)
+8   | r10   | resistor   | 10  |  292.0 |   220.0 |    1.53 |    0.62 |     1 | PASS        | 71090/22/ROUTE_FOLLOW R10 (元件10)
+9   | r12   | resistor   | 12  |  375.0 |   151.0 |    0.06 |    0.01 |     2 | PASS x2     | 48895/16/ROUTE_FOLLOW R12 (元件12)
+10  | r14   | resistor   | 14  |  310.0 |   195.3 |    2.39 |   11.22 |     1 | PASS        | 60365/18/ROUTE_EXECUTING R14 (环岛元件14)
+11  | r15   | resistor   | 15  |  375.0 |    70.0 |    1.06 |    0.29 |     1 | PASS        | 47755/16/ROUTE_FOLLOW R15 (元件15)
+12  | r17   | resistor   | 17  |  300.6 |     0.0 |    0.05 |    0.19 |     2 | PASS x2     | 33965/11/ROUTE_FOLLOW R17 (元件17)
+13  | r19   | resistor   | 19  |  334.0 |    50.0 |    2.64 |    8.14 |     1 | PASS        | 37805/12/ROUTE_CLEARING R19 (元件19)
+14  | r20   | resistor   | 20  |  196.0 |     0.0 |    0.35 |    0.50 |     1 | PASS        | 32640/11/ROUTE_FOLLOW R20 (元件20)
+15  | r21   | resistor   | 21  |  145.0 |     0.0 |    0.69 |    2.50 |     1 | PASS        | 32205/11/ROUTE_FOLLOW R21 (元件21)
+16  | r23   | resistor   | 23  |  130.0 |    40.0 |    1.00 |    1.28 |     1 | PASS        | 27270/9/ROUTE_FOLLOW R23 (元件23)
+17  | r24   | resistor   | 24  |  206.0 |    80.0 |    1.97 |    3.87 |     1 | PASS        | 21835/7/ROUTE_FOLLOW R24 (元件24)
+18  | r25   | resistor   | 25  |  206.0 |    40.0 |    1.67 |    4.38 |     2 | PASS x2     | 17225/5/ROUTE_FOLLOW R25 (元件25)
+19  | r26   | resistor   | 26  |   55.0 |   187.0 |   33.12 |   25.82 |     0 | MISS        | 82590/26/ROUTE_FOLLOW R26 (虚线元件26)
+20  | r27   | resistor   | 27  |    0.0 |   177.0 |    1.57 |    4.03 |     1 | PASS        | 85790/27/ROUTE_FOLLOW R27 (元件27)
+21  | q22   | transistor | 22  |   95.0 |     0.0 |    1.09 |    2.60 |     1 | PASS        | 30030/10/ROUTE_EXECUTING Q22 (三极管22)
+22  | q16   | transistor | 16  |  345.0 |     0.0 |    0.17 |    0.19 |     2 | PASS x2     | 44375/15/ROUTE_FOLLOW Q16 (三极管16)
+23  | q18   | transistor | 18  |  275.0 |    50.0 |    4.16 |    0.95 |     1 | PASS        | 40120/13/ROUTE_EXECUTING Q18 (三极管18)
+24  | q4    | transistor | 4   |   95.0 |   140.0 |    1.60 |    4.35 |     1 | PASS        | 10125/3/ROUTE_FOLLOW Q4 (节点4)
+25  | q13   | transistor | 13  |  345.0 |   110.0 |    5.21 |    0.13 |     1 | PASS        | 64240/19/ROUTE_EXECUTING Q13 (三极管13)
+26  | q6    | transistor | 6   |  245.0 |   140.0 |    2.94 |    0.25 |     1 | PASS        | 12380/3/ROUTE_EXECUTING Q6 (节点6)
+27  | q11   | transistor | 11  |  150.0 |   170.0 |    2.99 |    2.23 |     1 | PASS        | 78215/24/ROUTE_EXECUTING Q11 (三极管11)
+
+================================================================================
+ SUMMARY
+================================================================================
+scheme 1: ROUTE_FINISHED  90.26s  index 29/29  failure=ROUTE_FAILURE_NONE  components 27/27 (expected 27 for this scheme) (sensor 25)
+scheme 2: ROUTE_FINISHED  86.46s  index 27/27  failure=ROUTE_FAILURE_NONE  components 26/27 (expected 26 for this scheme) (sensor 23)
+
+overall: PASS
+limits : axle-centre proximity only (not the physical 8-channel reading); greyscale
+         component footprints are not modelled here; positions come from the
+         simulator map (calibration assumption, see 2026-11-06-new-track).
+

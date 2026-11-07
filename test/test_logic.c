@@ -61,11 +61,12 @@ static void test_sensor(void)
         CHECK(a.kind == b.kind);
         if (a.kind == GRAY_VALID) NEAR(a.position, -b.position);
     }
+    /* Two outer groups with an empty centre are the hollow interior of a
+     * printed resistor, so continuity must not pick one side for the car. */
     GrayObservation selected = gray_classify(0xc3, true, -6.0f);
-    CHECK(selected.kind == GRAY_VALID && selected.selected_mask == 0x03);
-    NEAR(selected.position, -6.0f);
+    CHECK(selected.kind == GRAY_AMBIGUOUS);
     selected = gray_classify(0xc3, true, 6.0f);
-    CHECK(selected.kind == GRAY_VALID && selected.selected_mask == 0xc0);
+    CHECK(selected.kind == GRAY_AMBIGUOUS);
     CHECK(gray_classify(0xc3, true, 0.0f).kind == GRAY_AMBIGUOUS);
     CHECK(gray_classify(0xc3, true, NAN).kind == GRAY_AMBIGUOUS);
     CHECK(gray_classify(0xff, true, 0.0f).kind == GRAY_AMBIGUOUS);

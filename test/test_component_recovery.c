@@ -4,7 +4,7 @@
 
 static void prepare(RoutePlanner *p)
 {
- static const RouteStep steps[]={{1,50,CUSTOM_TURN,200,90,false,0},{1,50,STOP,200,0,false,0}};
+ static const RouteStep steps[]={{1,50,CUSTOM_TURN,200,90,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
  init(p,steps,2);
  p->state=ROUTE_EXECUTING;p->phase_ms=100;p->last_sample_ms=100;
  p->entry_heading=0;p->capture_line_seen=true;p->capture_line_ms=100;p->capture_line_cm=0;
@@ -63,7 +63,7 @@ static void test_line_and_custom_gate(void)
  /* Non-90 custom angles still require the configured angle even after a
   * centered line is captured; only the geometrically ordinary ±90° share
   * LEFT/RIGHT's line-capture exit. */
- RouteStep c135[]={{1,50,CUSTOM_TURN,200,135,false,0},{1,50,STOP,200,0,false,0}};
+ RouteStep c135[]={{1,50,CUSTOM_TURN,200,135,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
  route_init(&p,c135,2,NULL,NULL);p.repeat_count=1;
  p.state=ROUTE_EXECUTING;p.phase_ms=100;p.last_sample_ms=100;
  p.entry_heading=0;p.capture_line_seen=true;p.capture_line_ms=100;p.capture_line_cm=0;
@@ -75,7 +75,7 @@ static void test_line_and_custom_gate(void)
 static void test_control_and_clearance(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,steps,2);
   f.startup_elapsed_s=1;f.left_target_cm_s=f.right_target_cm_s=f.base=16;
   f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;
@@ -101,7 +101,7 @@ static void test_control_and_clearance(void)
   for(unsigned i=0;i<50 && f.route.index==0;++i) tick(&f,&c,&t,5,5,0x18,false);
   CHECK(f.route.index==1 && f.route.state==ROUTE_FOLLOW);
  }
- RouteStep steps[]={{2,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{2,50,LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
  RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0xff,0);CHECK(p.passing_junction && p.state==ROUTE_CLEARING);
  update(&p,&d,&t,0xff,0,100);
@@ -112,7 +112,7 @@ static void test_control_and_clearance(void)
 #if MPU6050_ENABLED
 static void test_imu_fallback_and_feedback_fault(void)
 {
- const RouteStep steps[]={{1,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+ const RouteStep steps[]={{1,50,LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts c={0};uint32_t t=0;
  line_follow_init(&f,calibration(),steps,2,NULL,NULL);
  for(unsigned i=0;i<3;++i) {

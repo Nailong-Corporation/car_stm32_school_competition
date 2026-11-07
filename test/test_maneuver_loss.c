@@ -26,8 +26,8 @@ static void executing_loss(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) for(unsigned custom=0;custom<2;++custom) {
   float sign=mirror?1:-1;
-  RouteStep s[]={{1,50,custom?CUSTOM_TURN:mirror?RIGHT:LEFT,50,custom?sign*135:0,false,65},
-                 {1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,custom?CUSTOM_TURN:mirror?RIGHT:LEFT,50,custom?sign*135:0,false,65, 0},
+                 {1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;maneuver_start(&f,&c,&t,s);
   f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;f.route.entry_cm=f.odometry.distance_cm;
   f.route.entry_heading=f.odometry.heading_rad-sign*(custom?1.6f:.9f);
@@ -58,7 +58,7 @@ static void executing_loss(void)
 static void clearing_loss(void)
 {
  for(unsigned straight=0;straight<2;++straight) {
-  RouteStep s[]={{1,50,straight?STRAIGHT:LEFT,50,0,false,65},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,straight?STRAIGHT:LEFT,50,0,false,65, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;maneuver_start(&f,&c,&t,s);
   f.route.state=ROUTE_CLEARING;f.route.phase_ms=f.route.capture_line_ms=t;
   f.route.clear_cm=f.route.capture_line_cm=f.odometry.distance_cm;
@@ -78,13 +78,13 @@ static void clearing_loss(void)
 static void handoff_deadline(void)
 {
  for(unsigned speed=0;speed<2;++speed) {
-  RouteStep s[]={{1,50,LEFT,50,0,false,65},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,LEFT,50,0,false,65, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
-  for(unsigned i=0;i<30;++i) tick(&f,&c,&t,speed?10:6,speed?10:6,0x18,false);
-  tick(&f,&c,&t,speed?10:6,speed?10:6,0x1f,false);
+  for(unsigned i=0;i<30;++i) tick(&f,&c,&t,speed?50:6,speed?50:6,0x18,false);
+  tick(&f,&c,&t,speed?50:6,speed?50:6,0x1f,false);
   CHECK(f.route.state==ROUTE_CANDIDATE);
   f.abnormal=true;f.last_reliable_ms=t+5-INTERFERENCE_TIMEOUT_MS;
-  tick(&f,&c,&t,speed?10:6,speed?10:6,0x1f,false);
+  tick(&f,&c,&t,speed?50:6,speed?50:6,0x1f,false);
   CHECK(f.state!=LINE_STOPPED && f.route.junctions_seen==1);
   CHECK(f.route.state==(speed?ROUTE_BRAKING:ROUTE_EXECUTING));
   if(speed) CHECK(f.left_target_cm_s==0 && f.right_target_cm_s==0);
@@ -92,7 +92,7 @@ static void handoff_deadline(void)
 }
 static void hard_faults(void)
 {
- RouteStep s[]={{1,50,LEFT,50,0,false,65},{1,50,STOP,50,0,false,0}};
+ RouteStep s[]={{1,50,LEFT,50,0,false,65, 0},{1,50,STOP,50,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
  f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;
  tick(&f,&c,&t,30000,0,0,false);
@@ -103,7 +103,7 @@ static void hard_faults(void)
 }
 static void straight_exit_gate(void)
 {
- RouteStep s[]={{1,50,STRAIGHT,50,0,false,65},{1,50,STOP,50,0,false,0}};
+ RouteStep s[]={{1,50,STRAIGHT,50,0,false,65, 0},{1,50,STOP,50,0,false,0, 0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0xff,0);
  update(&p,&d,&t,0,0,90);CHECK(p.state==ROUTE_EXECUTING && !p.line_exit_confirmed);

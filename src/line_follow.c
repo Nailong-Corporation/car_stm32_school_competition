@@ -15,7 +15,18 @@ static bool route_owns_gray_loss(const RoutePlanner *p)
 {
     return p->state==ROUTE_BRAKING || p->state==ROUTE_RECOVERING ||
         ((p->state==ROUTE_EXECUTING || p->state==ROUTE_CLEARING) &&
-         p->index<p->count && p->steps[p->index].action!=HEXAGON);
+         ((p->index<p->count && p->steps[p->index].action!=HEXAGON) ||
+          (p->state==ROUTE_EXECUTING && p->turn_approaching)));
+}
+
+/* A front sensor may capture a perpendicular exit while the axle still yaws.
+ * Only the adjacent non-target passage may borrow this bounded exit reference;
+ * normal narrow-line steering continues to use position PID. */
+static float passage_heading(const LineFollow *f, float fallback)
+{
+    return f->exit_heading_pending &&
+        fabsf(f->exit_heading_rad-f->odometry.heading_rad)<=JUNCTION_SETTLE_BAND_RAD ?
+        f->exit_heading_rad : fallback;
 }
 #endif
 
@@ -357,6 +368,14 @@ static void open_loop_update(LineFollow *f, GrayObservation obs, uint32_t now_ms
  * 编码器模式用 counts 更新里程和速度内环，仅开启路径时推进路口；PWM 模式忽略 counts。
  * 非法观测或时序进入故障停车；启动请求为一次性，超时判断先于恢复确认。
  */
+/* Forward declaration: the controller body uses this before its definition. */
+#if defined(__GNUC__)
+#define LINE_FOLLOW_MAYBE_UNUSED __attribute__((unused))
+#else
+#define LINE_FOLLOW_MAYBE_UNUSED
+#endif
+static LINE_FOLLOW_MAYBE_UNUSED inline bool gray_plausible(LineFollow *f,GrayObservation obs);
+
 static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, EncoderCounts counts,
                         uint32_t now_ms, float dt, bool start_request,
                         bool imu_valid, float imu_heading_rad)
@@ -436,6 +455,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         memset(&f->turn_trace,0,sizeof(f->turn_trace));
         memset(&f->navigation_trace,0,sizeof(f->navigation_trace));
         f->exit_anchor_valid=f->exit_recovery_active=false;
+        f->exit_heading_pending=false;
         f->exit_lateral_error_cm=0;
         f->start_result = LINE_START_ACCEPTED;
         f->state = LINE_TRACKING;
@@ -444,6 +464,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         f->last_reliable_ms = now_ms;
         f->have_reliable = true;
         f->abnormal = false;
+        f->component_cross_latched=false;
         f->base = 0.0f;
         f->startup_elapsed_s = 0.0f;
         f->braking_slew = (BrakingSlew){0};
@@ -456,9 +477,31 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         pid_reset(&f->pid);
         speed_control_reset(&f->speed);
     }
+    /* Printed component graphics (hollow resistors, transistor V, battery
+     * plates) must be crossable. Latch the crossing window as soon as the
+     * component signature appears; while latched, hold-and-cross is allowed
+     * for a bounded distance/time. A real line loss or an unrelated ambiguity
+     * that was never preceded by a component signature keeps 400 ms / 8 cm. */
+    if(!f->abnormal) f->component_cross_latched=false;
+    else if(!f->component_cross_latched && gray_is_component_pattern(obs)) {
+        f->component_cross_latched=true;
+        f->component_cross_ms=now_ms;
+        f->component_cross_cm=f->odometry.distance_cm;
+    }
+    bool component_crossing=f->abnormal && f->component_cross_latched &&
+        (uint32_t)(now_ms-f->component_cross_ms)<COMPONENT_CROSS_MS &&
+        fabsf(f->odometry.distance_cm-f->component_cross_cm)<COMPONENT_CROSS_MAX_CM;
+    /* Pose mode: a printed component hides the wire for up to ~10 cm along the
+     * segment and the pose says the car is still on it, so reuse the bounded
+     * component-crossing window instead of the plain 400 ms / 8 cm cut. */
+    bool pose_bounded_loss=f->route.pose_mode &&
+        (f->route.state==ROUTE_FOLLOW || f->route.state==ROUTE_CANDIDATE);
+    uint32_t lost_ms=pose_bounded_loss?POSE_BOUNDED_LOSS_MS:INTERFERENCE_TIMEOUT_MS;
+    float lost_cm=pose_bounded_loss?POSE_BOUNDED_LOSS_CM:INTERFERENCE_MAX_DISTANCE_CM;
     bool gray_loss_expired=(LOST_LINE_STOP_ENABLED || PRESET_ROUTE_ENABLED) && f->abnormal &&
-        ((uint32_t)(now_ms-f->last_reliable_ms)>=INTERFERENCE_TIMEOUT_MS ||
-         fabsf(f->odometry.distance_cm-f->abnormal_origin_cm)>=INTERFERENCE_MAX_DISTANCE_CM);
+        !component_crossing &&
+        ((uint32_t)(now_ms-f->last_reliable_ms)>=lost_ms ||
+         fabsf(f->odometry.distance_cm-f->abnormal_origin_cm)>=lost_cm);
 #if !PRESET_ROUTE_ENABLED
     if(gray_loss_expired) {line_follow_stop(f,LINE_STOP_LOST);return;}
 #endif
@@ -466,6 +509,10 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     bool route_owned_gray_loss=route_owns_gray_loss(&f->route);
     RouteState previous_route = f->route.state;
     size_t previous_index = f->route.index;
+    float previous_exit_axis=f->route.entry_heading+route_turn_target_rad(&f->route);
+    bool right_angle_handoff=previous_route==ROUTE_EXECUTING &&
+        !f->route.passing_junction && f->route.steps[previous_index].action!=HEXAGON &&
+        fabsf(fabsf(route_turn_target_rad(&f->route))-JUNCTION_TURN_TARGET_RAD)<0.0001f;
     bool completing_turn=previous_route==ROUTE_CLEARING &&
         !f->route.passing_junction && route_current_action(&f->route)!=STRAIGHT;
     float previous_turn=(f->odometry.heading_rad-f->route.entry_heading)*
@@ -474,12 +521,38 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         f->turn_exit[previous_index].minimum_turn_rad=fminf(
             f->turn_exit[previous_index].minimum_turn_rad,previous_turn);
     route_set_speed(&f->route, f->odometry.left_speed_cm_s, f->odometry.right_speed_cm_s);
-    route_update(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms);
+    /* Odometry frame -> track frame. The odometry origin is the START point in
+     * the car's initial heading (x forward, y right); the planner's anchored
+     * start pose places it in track coordinates (production: P headong north). */
+    {
+        float start_h=f->route.start_heading_rad;
+        float cos_h=cosf(start_h),sin_h=sinf(start_h);
+        float axle_x=f->route.start_x_cm+f->odometry.x_cm*cos_h-f->odometry.y_cm*sin_h;
+        float axle_y=f->route.start_y_cm+f->odometry.x_cm*sin_h+f->odometry.y_cm*cos_h;
+        route_update_pose(&f->route, obs, f->odometry.distance_cm, f->odometry.heading_rad, now_ms,
+                          axle_x, axle_y);
+    }
     /* Let real same-frame node confirmation transfer the budget. Unconfirmed
      * candidates/FOLLOW still expire before normal line recovery can renew it. */
     if(gray_loss_expired && !route_owned_gray_loss && !route_owns_gray_loss(&f->route)) {
         line_follow_stop(f,LINE_STOP_LOST);return;
     }
+    if(f->route.state==ROUTE_EXECUTING && !f->route.passing_junction &&
+       previous_route!=ROUTE_EXECUTING) f->exit_heading_pending=false;
+    if(right_angle_handoff && f->route.state==ROUTE_CLEARING) {
+        f->exit_heading_rad=previous_exit_axis;
+        f->exit_heading_origin_cm=f->odometry.distance_cm;
+        f->exit_heading_pending=true;
+    }
+    /* The borrowed axis is local to the front-sensor handoff corridor. */
+    if(f->exit_heading_pending &&
+       fabsf(f->odometry.distance_cm-f->exit_heading_origin_cm)>GRAY_FORWARD_OFFSET_CM)
+        f->exit_heading_pending=false;
+    if(f->exit_heading_pending && f->route.state==ROUTE_FOLLOW &&
+       f->route.approach_center_count>=LINE_CONFIRM_SAMPLES &&
+       (fabsf(f->odometry.heading_rad-f->exit_heading_rad)<=JUNCTION_PASS_ALIGNED_RAD ||
+        fabsf(f->turn_yaw_rate_rad_s)<=JUNCTION_PASS_SETTLED_YAW_RAD_S))
+        f->exit_heading_pending=false;
     f->exit_recovery_active=f->route.component_recovery_active;
     if (completing_turn && f->route.state==ROUTE_FOLLOW)
         f->exit_accelerating=TURN_EXIT_ACCEL_ENABLED;
@@ -518,7 +591,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         line_follow_stop(f, LINE_STOP_ROUTE); return;
     }
     if(f->route.state==ROUTE_RECOVERING && previous_route!=ROUTE_RECOVERING) {
-        pid_reset(&f->pid);f->abnormal=false;
+        pid_reset(&f->pid);f->abnormal=false;f->exit_heading_pending=false;
     }
     if (f->route.state == ROUTE_FINISHED) { line_follow_stop(f, LINE_STOP_ROUTE_COMPLETE); return; }
     if (previous_route == ROUTE_EXECUTING && f->route.state == ROUTE_CLEARING) {
@@ -536,18 +609,9 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     float planning_origin=route_planning_origin(&f->route);
     float planning_entry_speed=route_planning_entry_speed_limit(&f->route);
     float navigation_wheel_cap=WHEEL_TARGET_MAX_CM_S;
-    /* Short turns cannot rely on a late coast-down at the front sensor.
-     * Keep their whole approach slow, including the next segment preview.
-     * The measured entry gate still decides whether a turn may start. */
-    bool short_turn=planning_step.segment_length_cm<=ROUTE_LONG_SEGMENT_CM &&
-        (planning_step.action==LEFT || planning_step.action==RIGHT ||
-         planning_step.action==CUSTOM_TURN || planning_step.action==HEXAGON);
-    if(TURN_APPROACH_SLOWDOWN_ENABLED && short_turn &&
-       (f->route.state==ROUTE_FOLLOW || f->route.state==ROUTE_CANDIDATE ||
-        f->route.state==ROUTE_CLEARING)) {
-        base_speed=fminf(base_speed,planning_entry_speed);
-        navigation_wheel_cap=planning_entry_speed;
-    }
+    /* No unconditional slow-down before known nodes. Distance-envelope
+     * planning decelerates from measured speed; the node's 16 cm/s gate
+     * prevents a turn until actually reached. */
     /* A graphic cannot authorize segment-speed blind passage. Only reliable
      * centered exit evidence restores the unchanged distance envelope. */
     bool passing_without_exit=(f->route.passing_junction &&
@@ -585,8 +649,13 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         else f->braking_accel_cm_s2+=dt/(BRAKING_ACCEL_FILTER_TAU_S+dt)*
             (raw_accel-f->braking_accel_cm_s2);
         f->braking_speed_primed=true;
+        /* Generated lengths describe junction geometry. Account for the front
+         * probe and the previous turn's axle advance once, identically in TS. */
+        float exit_advance=route_planning_index(&f->route)>0?WHEEL_TRACK_CM:0;
+        float target_distance=fmaxf(0,planning_step.segment_length_cm-
+            GRAY_FORWARD_OFFSET_CM-exit_advance);
         BrakingPlan plan = braking_plan(base_speed, fminf(base_speed,planning_entry_speed),
-            planning_step.segment_length_cm, f->odometry.distance_cm-planning_origin,
+            target_distance, f->odometry.distance_cm-planning_origin,
             fmaxf(fabsf(f->odometry.left_speed_cm_s),fabsf(f->odometry.right_speed_cm_s)),
             BRAKING_SAFE_DECEL_CM_S2, BRAKING_DISTANCE_MARGIN_CM, BRAKING_CALIBRATION_CONFIRMED);
         if (!plan.valid) { line_follow_stop(f,LINE_STOP_ROUTE); return; }
@@ -622,6 +691,17 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     else {f->braking_active=false;f->braking_reverse_active=false;}
     if (f->route.search_pending && planning_step.segment_length_cm>0)
         base_speed=fminf(base_speed,planning_entry_speed);
+    /* Pose mode: keep exit speed until the outgoing line is re-centred, and
+     * pre-slow before the known corner so the brake phase does not eat the
+     * pivot approach distance. The window grows with v^2/(2*a_safe). */
+    if(f->route.pose_mode) {
+        if(f->route.post_turn_slow)
+            base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
+        float brake_w=(f->odometry.left_speed_cm_s*f->odometry.left_speed_cm_s)/
+            (2.0f*BRAKING_SAFE_DECEL_CM_S2);
+        if(f->route.pose_gap_bar_cm<=fmaxf(ROUTE_WAYPOINT_SLOW_CM,brake_w+8.0f))
+            base_speed=fminf(base_speed,entry_speed_limit);
+    }
     /* Exit handoff stays slow even while previewing the next distance envelope. */
     if(f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
         base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
@@ -645,13 +725,44 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
     float base_speed = LINE_FOLLOW_SPEED_CM_S;
 #endif
 #if PRESET_ROUTE_ENABLED
-    if(f->route.state==ROUTE_CANDIDATE &&
+    if(f->route.pose_mode && f->route.pose_cross_valid &&
+       f->route.state==ROUTE_FOLLOW && step.action!=HEXAGON) {
+        /* Unified pose path-following: the car is on a known straight segment
+         * between two table corners, so track that line directly. The 8-channel
+         * reading trims the cross-track estimate only while it agrees with the
+         * pose; this survives printed symbols, dead-end short legs and the
+         * 24 cm look-ahead leaving the wire at a corner. */
+        bool trusted=gray_plausible(f,obs);
+        bool usable=trusted && narrow;
+        float cross=f->route.pose_cross_cm;
+        if(usable) {
+            cross=(1.0f-POSE_GRAY_TRIM)*cross+POSE_GRAY_TRIM*(-obs.position*0.55f);
+            if(stable) {
+                f->have_reliable=true;f->last_reliable_ms=now_ms;
+                f->reliable_position=obs.position;
+            }
+            f->abnormal=false;
+        } else if(!f->abnormal && fabsf(f->route.pose_cross_cm)>ROUTE_WAYPOINT_GATE_CM) {
+            /* The pose itself says the car is off the segment: from here the
+             * grey loss is real, so arm the bounded loss window instead of
+             * trusting the path follower. */
+            f->abnormal=true;f->abnormal_origin_cm=f->odometry.distance_cm;
+        }
+        float desired=f->route.pose_seg_heading_rad+atan2f(-cross,POSE_PURSUIT_LOOKAHEAD_CM);
+        float corr=HEADING_KP_CM_S_PER_RAD*atan2f(sinf(desired-f->odometry.heading_rad),
+                                                  cosf(desired-f->odometry.heading_rad));
+        float cap=.5f*fmaxf(base_speed,1.0f);
+        corr=fmaxf(-cap,fminf(cap,corr));
+        f->state=usable?LINE_TRACKING:LINE_GAP_HOLD;
+        pid_reset(&f->pid);
+        outer_targets(f,base_speed,corr,dt);
+    } else if(f->route.state==ROUTE_CANDIDATE &&
        !route_target_ready(&f->route,f->odometry.distance_cm,true)) {
         /* Intermediate graphics are nodes to pass, not a reason to slow down.
          * Candidate and clearance deadlines still bound missing exit evidence. */
         f->state=LINE_JUNCTION;f->abnormal=false;pid_reset(&f->pid);
         outer_targets(f,base_speed,HEADING_KP_CM_S_PER_RAD*
-            (f->route.entry_heading-f->odometry.heading_rad),dt);
+            (passage_heading(f,f->route.entry_heading)-f->odometry.heading_rad),dt);
     } else if(f->route.state==ROUTE_RECOVERING) {
         f->state=LINE_JUNCTION;f->abnormal=false;
         if(narrow && stable) {
@@ -670,28 +781,53 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         f->state=LINE_JUNCTION;f->abnormal=false;f->exit_accelerating=false;
         pid_reset(&f->pid);
         outer_targets(f,f->route.passing_junction?base_speed:fminf(step.turn_speed,COMPONENT_RECOVERY_SPEED_CM_S),
-            HEADING_KP_CM_S_PER_RAD*(f->route.component_recovery_heading-f->odometry.heading_rad)-
+            HEADING_KP_CM_S_PER_RAD*((f->route.passing_junction?
+                passage_heading(f,f->route.component_recovery_heading):
+                f->route.component_recovery_heading)-f->odometry.heading_rad)-
                 JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s,dt);
     } else if(f->route.state==ROUTE_EXECUTING && step.action==HEXAGON) {
         HexagonNavigation *x=&f->route.hexagon;
         f->state=LINE_JUNCTION;f->abnormal=false;f->exit_accelerating=false;
         if(previous_route!=ROUTE_EXECUTING) pid_reset(&f->pid);
         float outer=fminf(step.turn_speed,fminf(HEXAGON_SPEED_CM_S,JUNCTION_SETTLE_SPEED_CM_S));
-        float direction=route_current_action(&f->route)==LEFT?-1.0f:1.0f;
         float correction;
-        if(x->use_line) {
+        if(f->route.turn_approaching) {
+            pid_reset(&f->pid);
+            straight_targets(f,outer,HEADING_KP_CM_S_PER_RAD*
+                (f->route.action_start_heading-f->odometry.heading_rad),dt);
+            /* Fall through to the speed controller below.  Returning here
+             * skipped speed_control_update and kept the previous BRAKING
+             * frame's zero/standby-off command, so the car coasted to a stop
+             * and timed the hexagon entry out before reaching the vertex. */
+        } else if(x->turning) {
+            /* Pose-mode ring pivot to the next 30/60 degree vertex heading. */
+            pid_reset(&f->pid);
+            float err=atan2f(sinf(x->target_heading-f->odometry.heading_rad),
+                             cosf(x->target_heading-f->odometry.heading_rad));
+            correction=JUNCTION_SETTLE_HEADING_KP*err-
+                JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
+            correction=fmaxf(-.5f*outer,fminf(.5f*outer,correction));
+            outer_targets(f,outer,correction,dt);
+        } else if(x->use_line) {
             if(!pid_update(&f->pid,obs.position,dt,.5f*outer,&correction)) {
                 line_follow_stop(f,LINE_STOP_FAULT);return;
             }
+            correction-=JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
+            outer_targets(f,outer,correction,dt);
         } else {
             pid_reset(&f->pid);
-            bool guide=x->state==HEXAGON_ENTERING ||
-                (x->state==HEXAGON_FOLLOWING && obs.line_mask!=0 && !x->line_samples);
-            correction=guide?direction*.5f*outer:
-                HEADING_KP_CM_S_PER_RAD*(x->hold_heading-f->odometry.heading_rad);
+            correction=HEADING_KP_CM_S_PER_RAD*(x->target_heading-f->odometry.heading_rad)-
+                JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
+            if(f->route.pose_mode) {
+                /* Inside-ring legs use the leg cross-track; the entry approach
+                 * uses the incoming segment cross-track so a drifted approach
+                 * lands on V0 instead of beside it. */
+                correction-=JUNCTION_CROSS_KP*(x->cross_cm!=0.0f?x->cross_cm:
+                    f->route.pose_cross_cm);
+            }
+            correction=fmaxf(-.5f*outer,fminf(.5f*outer,correction));
+            outer_targets(f,outer,correction,dt);
         }
-        correction-=JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
-        outer_targets(f,outer,correction,dt);
     } else if (f->route.state == ROUTE_EXECUTING) {
         f->exit_accelerating=false;
         if(previous_route!=ROUTE_EXECUTING) {pid_reset(&f->pid);speed_control_reset(&f->speed);}
@@ -699,6 +835,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         float direction=route_current_action(&f->route)==LEFT?-1.0f:1.0f;
         float target=route_turn_target_rad(&f->route);
         float turn=direction*(f->odometry.heading_rad-f->route.entry_heading);
+
         /* The front sensor can cross the exit line in a few control periods.
          * Request the capture speed from the start of the turn: capping only
          * after the first edge leaves the outer wheel moving too fast to
@@ -710,13 +847,33 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         bool settling=route_current_action(&f->route)!=STRAIGHT && band>0 && remaining<=band;
         float base=.5f*outer;
         float correction=direction*base;
-        if(route_current_action(&f->route)==STRAIGHT) {
+        if(f->route.turn_approaching) {
+            pid_reset(&f->pid);
+            straight_targets(f,outer,HEADING_KP_CM_S_PER_RAD*
+                (f->route.action_start_heading-f->odometry.heading_rad),dt);
+        } else if(route_current_action(&f->route)==STRAIGHT) {
             /* 直行过口按过路速度，不再强制降到转弯速度。 */
             float pass=fminf(base_speed,fmaxf(outer,JUNCTION_PASS_SPEED_CM_S));
             straight_targets(f,pass,HEADING_KP_CM_S_PER_RAD*
                 (f->route.entry_heading-f->odometry.heading_rad),dt);
         } else {
-            if(route_uses_corner_arc(&f->route) && !f->route.corner_arc_complete && !settling &&
+            if(f->route.pose_mode) {
+                /* Pose-mode pivot: saturated heading feedback towards the exact
+                 * corner heading. The grey line is deliberately not used inside
+                 * the turn, so a printed symbol cannot pull the pivot. */
+                pid_reset(&f->pid);
+                float target_heading=f->route.entry_heading+direction*fabsf(target);
+                float err=atan2f(sinf(target_heading-f->odometry.heading_rad),
+                                 cosf(target_heading-f->odometry.heading_rad));
+                float corr;
+                if(fabsf(err)>0.15f) corr=err>0.0f?base:-base;
+                else {
+                    corr=JUNCTION_SETTLE_HEADING_KP*err-1.2f*f->turn_yaw_rate_rad_s;
+                    corr=fmaxf(-base,fminf(base,corr));
+                }
+                (void)base;
+                correction=corr; /* the shared turn_targets call below applies it */
+            } else if(route_uses_corner_arc(&f->route) && !f->route.corner_arc_complete && !settling &&
                !f->route.capture_line_seen) {
                 float track=f->odometry.calibration.track_cm;
                 if(CORNER_RADIUS_CM<=track*.5f) {line_follow_stop(f,LINE_STOP_CALIBRATION);return;}
@@ -731,20 +888,14 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
                     if(!pid_update(&f->pid,obs.position,dt,base,&line)) {line_follow_stop(f,LINE_STOP_FAULT);return;}
                 } else pid_reset(&f->pid);
                 float heading_kp=settling?JUNCTION_SETTLE_HEADING_KP:JUNCTION_CAPTURE_HEADING_KP;
-                /* While the exit is visible, position PID owns steering.
-                 * A remaining-angle term or mandatory original-turn minimum
-                 * would override the opposite correction as the line crosses. */
                 correction=f->route.turn_capturing?line:heading_kp*
                     (f->route.entry_heading+target-f->odometry.heading_rad);
-                /* A perfectly centered early exit still needs a small bounded
-                 * angle-completion bias. Never override nonzero line steering. */
                 if(f->route.turn_capturing && fabsf(obs.position)<0.01f &&
                    fabsf(line)<0.05f && turn<fabsf(target))
                     correction=direction*fminf(base,JUNCTION_CAPTURE_CENTER_BIAS_CM_S);
                 if(!f->route.turn_capturing && turn<fabsf(target))
                     correction=direction*fmaxf(direction*correction,
                         fminf(base,JUNCTION_CAPTURE_MIN_TURN_CM_S));
-                /* 使用实际航向变化率而非目标轮差；无线也不得到角后重新强转。 */
                 correction-=JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
             } else pid_reset(&f->pid);
             turn_targets(f,outer,correction,dt);
@@ -772,7 +923,8 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         } else {
             pid_reset(&f->pid);
             outer_targets(f, pass, HEADING_KP_CM_S_PER_RAD*
-                (f->route.entry_heading-f->odometry.heading_rad), dt);
+                ((f->route.passing_junction?passage_heading(f,f->route.entry_heading):
+                  f->route.entry_heading)-f->odometry.heading_rad), dt);
         }
     } else
 #endif
@@ -785,6 +937,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             pid_reset(&f->pid);
             speed_control_reset(&f->speed);
             f->abnormal = false;
+            f->component_cross_latched=false;
         }
         f->state = LINE_TRACKING;
         if (stable) {
@@ -795,10 +948,18 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         float base = base_speed * (1.0f - POSITION_CURVE_SLOWDOWN * fabsf(obs.position) / 7.0f);
         float next = next_outer(f,base,dt);
         float correction;
-        if (!pid_update(&f->pid, obs.position, dt,
-                        .5f*next, &correction)) {
-            line_follow_stop(f, LINE_STOP_FAULT);
-            return;
+        bool trusted=gray_plausible(f,obs);
+        if (trusted) {
+            if (!pid_update(&f->pid, obs.position, dt,
+                            .5f*next, &correction)) {
+                line_follow_stop(f, LINE_STOP_FAULT);
+                return;
+            }
+        } else {
+            pid_reset(&f->pid);
+            correction=HEADING_KP_CM_S_PER_RAD*
+                (f->route.pose_bearing_rad-f->odometry.heading_rad);
+            f->state=LINE_GAP_HOLD;
         }
 #if PRESET_ROUTE_ENABLED
         if(f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
@@ -810,12 +971,20 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
          * Do not integrate graphics into the normal white-line position PID. */
         if (!f->abnormal) {
             f->abnormal = true;
-            f->hold_heading_rad = f->odometry.heading_rad;
+            /* Hold along the known segment, not towards the corner: on a
+             * zero-length row the corner is behind the car. */
+            f->hold_heading_rad = (f->route.pose_mode && f->route.state==ROUTE_FOLLOW)
+                ? (f->route.pose_cross_valid ? f->route.pose_seg_heading_rad
+                                            : f->route.pose_bearing_rad)
+                : f->odometry.heading_rad;
 #if PRESET_ROUTE_ENABLED
             /* Do not lock the already overshot yaw as the new exit direction. */
             if(f->route.state==ROUTE_CLEARING && f->route.line_exit_confirmed &&
-               route_current_action(&f->route)!=STRAIGHT)
-                f->hold_heading_rad=f->route.line_exit_heading_rad;
+               route_current_action(&f->route)!=STRAIGHT) {
+                float sign=route_turn_target_rad(&f->route)<0.0f?-1.0f:1.0f;
+                f->hold_heading_rad=f->route.line_exit_heading_rad-
+                    sign*JUNCTION_EXIT_REWIND_RAD;
+            }
 #endif
             f->abnormal_origin_cm = f->odometry.distance_cm;
         }
@@ -824,6 +993,16 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         float base = obs.kind == GRAY_NONE ? fminf(base_speed, HOLD_SPEED_CM_S) :
                                             fminf(base_speed, AMBIGUOUS_SPEED_CM_S);
         float correction=HEADING_KP_CM_S_PER_RAD*(f->hold_heading_rad-f->odometry.heading_rad);
+#if PRESET_ROUTE_ENABLED
+        /* Pose-mode cross-track hold: a heading-only hold drives parallel to the
+         * segment and never comes back, so add the lateral term while the wire is
+         * hidden by a printed component or rejected by the plausibility gate. */
+        if(f->route.pose_mode && f->route.pose_cross_valid &&
+           f->route.state==ROUTE_FOLLOW) {
+            correction-=JUNCTION_CROSS_KP*f->route.pose_cross_cm;
+            correction=fmaxf(-.5f*base,fminf(.5f*base,correction));
+        }
+#endif
 #if PRESET_ROUTE_ENABLED
         if(f->route.state==ROUTE_CLEARING && f->route.line_exit_confirmed &&
            route_current_action(&f->route)!=STRAIGHT) {
@@ -923,6 +1102,25 @@ void line_follow_update_heading(LineFollow *f, GrayObservation obs, EncoderCount
         trace->next=(uint16_t)((trace->next+1U)%NAVIGATION_TRACE_CAPACITY);
         if(trace->count<NAVIGATION_TRACE_CAPACITY) ++trace->count;
     }
+#endif
+}
+
+/* A grey reading is trusted only when its lateral offset agrees with the pose's
+ * offset from the active segment line (+-4 weight units, ~2.2 cm). A printed
+ * transistor branch or resistor arm reads like a line but sits where the pose
+ * says the car is centred, so it is rejected and the pose takes over. */
+static LINE_FOLLOW_MAYBE_UNUSED inline bool gray_plausible(LineFollow *f,GrayObservation obs)
+{
+#if PRESET_ROUTE_ENABLED
+    if(!f->route.pose_mode || !f->route.pose_cross_valid) return true;
+    /* A centred narrow line is unambiguous: after a fast pivot the pose can be
+     * several cm off, and rejecting this reading would leave the car without
+     * the very line it needs to recover on. */
+    if(route_is_narrow_line(obs) && fabsf(obs.position)<=JUNCTION_CENTER_LIMIT) return true;
+    float expected=-f->route.pose_cross_cm/0.55f;
+    return fabsf(obs.position-expected)<=JUNCTION_POSE_GRAY_SPREAD;
+#else
+    (void)f;(void)obs;return true;
 #endif
 }
 

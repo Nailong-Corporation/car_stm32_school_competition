@@ -198,7 +198,7 @@
 #define POSITION_KP_CM_S              1.8f   /* 白线位置比例系数。 */
 #define POSITION_KI_CM_S              0.0f   /* 白线位置积分系数初值。 */
 #define POSITION_KD_CM_S              0.025f /* 白线位置微分系数。 */
-#define POSITION_CURVE_SLOWDOWN       0.35f  /* 最大位置偏差时，相对路段基础速度的降速比例。 */
+#define POSITION_CURVE_SLOWDOWN       0.0f  /* 最大位置偏差时，相对路段基础速度的降速比例。 */
 /* 转弯速度功能独立开关：修改头文件后 pio run，不增加构建环境。 */
 #ifndef TURN_APPROACH_SLOWDOWN_ENABLED
 #define TURN_APPROACH_SLOWDOWN_ENABLED 1
@@ -242,7 +242,7 @@
 #define REVERSE_BRAKE_MAX_PWM        60.0f /* 255标尺下的反向指令上限。 */
 
 #define TARGET_RISE_CM_S2           160.0f  /* 恢复/切段加速斜率，单位 cm/s²；6→40 目标约 0.213 s，START 仍受 1 s 包络。 */
-#define LINE_FOLLOW_SPEED_CM_S        12.0f /* 编码器仅巡线时的基础速度；路径模式改用表中 cruise_speed。 */
+#define LINE_FOLLOW_SPEED_CM_S        50.0f /* 编码器仅巡线时的基础速度；路径模式改用表中 cruise_speed。 */
 
 /* ==================== 八、丢线、图形干扰与航向保持 ====================
  * 两模式均冻结普通位置 PID，并从最后稳定白线起计时；孤立有效帧不刷新预算。
@@ -283,6 +283,16 @@
 #define JUNCTION_WRONG_WAY_RAD         0.35f
 #define JUNCTION_CENTER_LIMIT          2.0f
 #define JUNCTION_CAPTURE_MIN_RAD       0.70f
+#define JUNCTION_EXIT_ALIGNMENT_RAD    0.15f /* Capture alone does not certify a completed 90-degree turn. */
+/* ±90° 动作的轮轴接近距离：节点由 8 路杆最外通道先看到（半跨约 3.85 cm），
+ * 确认后还要滑行，因而不宜用满 24 cm。该值与仿真器 TURN_PIVOT_APPROACH_CM 同步。 */
+#define TURN_PIVOT_APPROACH_CM         17.0f
+
+/* 转弯已确认出口后再次丢线时，把保持航向向弯内侧回一点：枢轴可能早于真实
+ * 转角数厘米，出口线会落在 8 路杆半跨之外。与仿真器 JUNCTION_EXIT_REWIND_RAD 同步。 */
+#define JUNCTION_EXIT_REWIND_RAD       0.17f
+
+#define JUNCTION_APPROACH_TIMEOUT_MS   3000U
 #define JUNCTION_CLEAR_MAX_CM          20.0f
 #define STEERING_FEEDBACK_MIN_CM_S     5.0f
 #define STEERING_FEEDBACK_MIN_HALF_CM_S 0.1f
@@ -292,11 +302,13 @@
 #define JUNCTION_TURN_TARGET_RAD       1.570796327f
 /* 未标定的转弯初值：动作开始即限外轮目标，近目标角切换航向增益；阻尼不是物理制动。 */
 #define JUNCTION_SETTLE_BAND_RAD       0.60f /* 临近目标角时切换到收敛航向增益。 */
-#define JUNCTION_SETTLE_SPEED_CM_S    16.0f /* 非直行转弯从动作开始的外轮目标上限；待实车标定。 */
+#define JUNCTION_PASS_ALIGNED_RAD      0.10f /* 连续中心且回正至出口轴约5.7°后，释放临时过口航向。 */
+#define JUNCTION_PASS_SETTLED_YAW_RAD_S 0.15f /* 稳定中心且低角速度也可释放，避免累积角误差保留旧轴。 */
+#define JUNCTION_SETTLE_SPEED_CM_S    28.0f /* 非直行转弯从动作开始的外轮目标上限；待实车标定。 */
 #define JUNCTION_SETTLE_HEADING_KP    24.0f /* 近角度半差比例，受外轮上限约束。 */
 #define JUNCTION_YAW_DAMPING           2.5f /* (cm/s)/(rad/s)，输出轮速半差。 */
 #define JUNCTION_YAW_FILTER_TAU_S      0.030f
-#define JUNCTION_EXIT_SPEED_CM_S      16.0f /* 转弯 CLEARING 上限，另受 turn_speed/cruise 限制。 */
+#define JUNCTION_EXIT_SPEED_CM_S      20.0f /* 转弯 CLEARING 上限，另受 turn_speed/cruise 限制。 */
 #define COMPONENT_RECOVERY_SPEED_CM_S 16.0f /* 已捕线近出口/离口遇图形：保持进入时航向找线。 */
 #define COMPONENT_RECOVERY_MAX_CM     12.0f
 #define COMPONENT_RECOVERY_TIMEOUT_MS 1200U
@@ -315,8 +327,10 @@
 #define MPU6050_MAX_YAW_RATE_RAD_S 12.0f
 #define JUNCTION_SEARCH_TIMEOUT_MS 2000U
 #define JUNCTION_SEARCH_MAX_CM 12.0f
-#define JUNCTION_ENTRY_BRAKE_TIMEOUT_MS 1200U /* 入口滑行降速时限；2026-10-30 由 500 ms 放宽。 */
-#define JUNCTION_ENTRY_BRAKE_MAX_CM 10.0f     /* 入口滑行降速距离；2 cm 在百 cm/s 级只够几十 ms。 */
+/* 2026-11-06 新版赛道：印刷元件符号（空心电阻/三极管/电池）在节点附近遮住导线，
+ * 节点确认可能晚于几何路口，入口降速预算相应放宽；仍为有界保护，超限进入恢复停车。 */
+#define JUNCTION_ENTRY_BRAKE_TIMEOUT_MS 2000U /* 入口滑行降速时限。 */
+#define JUNCTION_ENTRY_BRAKE_MAX_CM 24.0f     /* 入口滑行降速距离。 */
 #define JUNCTION_COUNT_CLEAR_MS 50U
 #define JUNCTION_COUNT_CLEAR_CM 2.0f /* 离口重新武装距离：防同一路口尾缘重复计数；路口间距须大于此值。 */
 #define JUNCTION_STRAIGHT_EXIT_MAX_WIDTH 3U /* 直行过图形的出口：居中且至多3路，侧边/宽图形不解锁。 */
@@ -329,7 +343,7 @@
  * Entry/exit guides assume tangent straight exit with an opposite-side branch.
  */
 #define HEXAGON_MAX_ANGLE_DEG          720.0f
-#define HEXAGON_SPEED_CM_S             16.0f
+#define HEXAGON_SPEED_CM_S             24.0f
 #define HEXAGON_ENTRY_MIN_RAD           0.35f
 #define HEXAGON_ENTRY_TIMEOUT_MS     3000U
 #define HEXAGON_ENTRY_MAX_CM           30.0f
@@ -354,5 +368,46 @@
 #define NAVIGATION_RECOVERY_MS 1200U
 #define NAVIGATION_RECOVERY_CM 12.0f
 #define NAVIGATION_RECOVERY_SPEED_CM_S 16.0f
+
+/* ==================== 2026-11-07 pose (encoder/IMU) route navigation ====================
+ * Mirrors /Users/zhendong/Documents/stm32car_simulator src/sim/config.ts.
+ * The route table stores geometry lengths reduced by the 5 cm distance margin;
+ * the absolute corner waypoint is recovered from the start pose plus the
+ * cumulative (length, angle) chain.  The 8-channel bar still confirms every
+ * corner it can see; the pose check runs in parallel so a printed symbol that
+ * hides the wire (Q22 transistor) or a leg shorter than the 24 cm look-ahead
+ * cannot stall the run (user-approved 2026-11-07 "grey first, pose fallback").
+ * Host regression builds pass -DPOSE_NAV_ENABLED=0 to keep the legacy
+ * grey-only contract; production keeps 1. */
+#ifndef POSE_NAV_ENABLED
+#define POSE_NAV_ENABLED 1
+#endif
+#define ROUTE_MAX_STEPS 32U
+#define ROUTE_START_X_CM 0.0f
+#define ROUTE_START_Y_CM 110.0f
+#define ROUTE_START_HEADING_RAD (-1.570796327f) /* track frame: 0=+x east, +pi/2=+y south */
+#define ROUTE_WAYPOINT_MARGIN_CM 5.0f
+#define ROUTE_WAYPOINT_CONFIRM_CM 2.5f /* bar-to-corner radius that confirms a row */
+#define ROUTE_WAYPOINT_FALLBACK_CM 18.0f /* odometry overrun that still hands the row over */
+#define ROUTE_WAYPOINT_RING_CONFIRM_CM 3.0f /* ring vertex: axle, not the look-ahead bar */
+#define ROUTE_WAYPOINT_GATE_CM 12.0f /* grey node must be this close to the row corner */
+#define ROUTE_WAYPOINT_EXIT_CM 14.0f /* pose turn hand-off distance from the corner */
+#define ROUTE_WAYPOINT_EXIT_ANGLE_RAD 0.12f /* looser hand-off covers a faster pivot's residual */
+#define ROUTE_WAYPOINT_SLOW_CM 30.0f /* baseline pre-corner braking window */
+#define ROUTE_CLEAR_POSE_CM 2.0f /* pose-mode clearance travel before the next row */
+#define JUNCTION_POSE_GRAY_SPREAD 4.0f /* grey position (~0.55 cm/unit) vs pose cross-track */
+#define JUNCTION_CROSS_KP 2.0f /* (cm/s) differential per cm of pose cross-track */
+#define POSE_PURSUIT_LOOKAHEAD_CM 30.0f
+#define POSE_GRAY_TRIM 0.25f
+/* Hexagon ring geometry: regular hexagon, side 35 cm, right vertex (345,165).
+ * Pose polygon: entry turn 30 deg at V0, five 60 deg vertices, exit turn 30 deg. */
+#define HEXAGON_CENTER_X_CM 310.0f
+#define HEXAGON_CENTER_Y_CM 165.0f
+#define HEXAGON_SIDE_CM 35.0f
+#define HEXAGON_TURN_RAD 1.047197551f
+#define HEXAGON_ENTRY_TURN_RAD 0.523598776f
+#define HEXAGON_TURN_TOL_RAD 0.06f
+#define HEXAGON_ENTRY_APPROACH_MAX_CM 35.0f
+#define HEXAGON_LEG_CROSS_MAX_CM 10.0f
 
 #endif

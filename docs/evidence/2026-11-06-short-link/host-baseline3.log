@@ -1,0 +1,23 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9321 checks)
+HEXAGON FSM: 9321 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9325 checks)
+HEXAGON FSM: 9325 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9321 checks)
+HEXAGON FSM: 9321 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9325 checks)
+HEXAGON FSM: 9325 checks PASS
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1535 checks)
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1541 checks)
+PASS: mirrored post-turn narrow drift, wider real center branches, rearming, side/separated evidence and raw polarity 0 (7232 checks)
+PASS: mirrored post-turn narrow drift, wider real center branches, rearming, side/separated evidence and raw polarity 1 (7232 checks)
+Assertion failed: (fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=16.0f+.001f), function test_approach_and_entry, file test_turn_handoff.c, line 13.
+test/run_host_tests.sh: line 58: 13636 Abort trap: 6           "$test_binary"

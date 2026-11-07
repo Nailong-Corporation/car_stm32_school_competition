@@ -1,0 +1,9 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/src/line_follow.c:18:29: error: '&&' within '||' [-Werror,-Wlogical-op-parentheses]
+   18 |          (p->index<p->count && p->steps[p->index].action!=HEXAGON ||
+      |           ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/src/line_follow.c:18:29: note: place parentheses around the '&&' expression to silence this warning
+   18 |          (p->index<p->count && p->steps[p->index].action!=HEXAGON ||
+      |                             ^
+      |           (                                                      )
+1 error generated.

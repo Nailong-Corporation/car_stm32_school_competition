@@ -48,8 +48,8 @@ int main(void)
     /* 实际生产比例的控制链：旧公式已经报90°时，修正后还约69.3°，不能离口。
      * 无线时不得仅凭角度成功；出现真实中心线后才进入捕获。 */
     for(unsigned mirror=0;mirror<2;++mirror) {
-        RouteStep steps[]={{1, 6.0f, mirror?LEFT:RIGHT, 120, 0, false, 0.0f},
-                           {1, 6.0f, STOP, 40, 0, false, 0.0f}};
+        RouteStep steps[]={{1, 6.0f, mirror?LEFT:RIGHT, 120, 0, false, 0.0f, 0},
+                           {1, 6.0f, STOP, 40, 0, false, 0.0f, 0}};
         LineFollow f; line_follow_init(&f,c,steps,2,NULL,NULL);
         f.route.repeat_count=1;
         counts=(EncoderCounts){30000,30000};

@@ -17,8 +17,8 @@ static void test_custom90_capture_returns_to_line(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
   float sign=mirror?1.0f:-1.0f;
-  RouteStep steps[]={{1,50,CUSTOM_TURN,200,sign*90.0f,false,0},
-                     {1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{1,50,CUSTOM_TURN,200,sign*90.0f,false,0, 0},
+                     {1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;
   /* Field case: the exit line is captured around 63deg, short of 90deg.
    * The line must own steering so the car does not keep pivoting off it. */
@@ -37,7 +37,7 @@ static void test_settling(void)
  for(unsigned mirror=0;mirror<2;++mirror) for(unsigned custom=0;custom<2;++custom) {
   float sign=mirror?1.0f:-1.0f;
   RouteStep steps[]={{1,50,custom?CUSTOM_TURN:(mirror?RIGHT:LEFT),200,
-                     custom?sign*135:0,false,0},{1,50,STOP,200,0,false,0}};
+                     custom?sign*135:0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
   float target=custom?JUNCTION_TURN_TARGET_RAD*1.5f:JUNCTION_TURN_TARGET_RAD;
   LineFollow f;EncoderCounts c;uint32_t now;
   prepare_turn(&f,&c,&now,steps,sign,target);
@@ -45,7 +45,7 @@ static void test_settling(void)
   CHECK(f.route.state==ROUTE_EXECUTING && !f.route.line_exit_confirmed);
   /* No exit: hold angle, do not return to a full-speed pivot. */
   NEAR(f.left_target_cm_s,f.right_target_cm_s);
-  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=16.001f);
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_SETTLE_SPEED_CM_S+0.001f);
 
   prepare_turn(&f,&c,&now,steps,sign,target+.10f);
   tick(&f,&c,&now,0,0,0,false);
@@ -66,7 +66,7 @@ static void test_settling(void)
   CHECK(f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING);
   for(unsigned i=0;i<20;++i) {
    tick(&f,&c,&now,10,10,0x18,false);
-   CHECK(f.route.index==0 && fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=16.001f);
+   CHECK(f.route.index==0 && fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_EXIT_SPEED_CM_S+.001f);
   }
   for(unsigned i=0;i<40 && f.route.index==0;++i) tick(&f,&c,&now,10,10,0x18,false);
   CHECK(f.route.index==1 && f.route.state==ROUTE_FOLLOW && f.route.junctions_seen==0);
@@ -90,8 +90,8 @@ static void test_line_controls_capture(void)
   float sign=mirror?1.0f:-1.0f;
   float target=JUNCTION_TURN_TARGET_RAD*(mode==2?1.5f:1.0f);
   RouteStep steps[]={{1,50,mode==2?CUSTOM_TURN:(mirror?RIGHT:LEFT),200,
-                     mode==2?sign*135.0f:0,mode==1,0},
-                     {1,50,STOP,200,0,false,0}};
+                     mode==2?sign*135.0f:0,mode==1,0, 0},
+                     {1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;
   prepare_turn(&f,&c,&now,steps,sign,target-.30f);
   /* The exit has crossed center: line correction must oppose the original
@@ -129,7 +129,7 @@ static void test_imu_rate_and_fallback(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
   float sign=mirror?1.0f:-1.0f;
-  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c={0};uint32_t now=0;
   line_follow_init(&f,calibration(),steps,2,NULL,NULL);
   for(unsigned i=0;i<3;++i) {
@@ -183,8 +183,8 @@ static void test_pre_capture_turn_speed(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) for(unsigned arc=0;arc<2;++arc) {
   float sign=mirror?1.0f:-1.0f;
-  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,arc!=0,0},
-                     {1,50,STOP,50,0,false,0}};
+  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,arc!=0,0, 0},
+                     {1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;
   prepare_turn(&f,&c,&now,steps,sign,.10f);
   tick(&f,&c,&now,0,0,0,false);
@@ -197,7 +197,7 @@ static void test_pre_capture_turn_speed(void)
   for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i)
    tick(&f,&c,&now,0,0,0x18,false);
   CHECK(f.route.state==ROUTE_CLEARING && f.state==LINE_TRACKING);
-  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_SETTLE_SPEED_CM_S+.001f);
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_EXIT_SPEED_CM_S+.001f);
  }
 }
 

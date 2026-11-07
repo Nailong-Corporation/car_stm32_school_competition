@@ -1,0 +1,208 @@
+================================================================================
+ verify_course — 整圈完成 + 27 印刷元件覆盖 独立验证
+================================================================================
+run at            : 2026-11-06T14:16:54.902Z
+simulator         : /Users/zhendong/Documents/stm32car_simulator
+route table       : /Users/zhendong/Documents/PlatformIO/Projects/car_stm32/src/route_table.c
+output dir        : /tmp/cv-baseline-20261106T221228
+pass radius       : axle-centre <= 6 cm (sensor-bar centre also reported)
+expected items    : 27 printed components
+
+--- scheme 1 replay ---
+   (reused existing CSV, replay not executed)
+
+--- scheme 2 replay ---
+   (reused existing CSV, replay not executed)
+
+================================================================================
+ SCHEME 1
+================================================================================
+verdict            : FAIL
+ROUTE_FINISHED     : no
+sim duration       : 28.48 s (28480 ms, 5696 control cycles)
+final state        : ROUTE_FAILED / LINE_STOPPED
+final route index  : 5 of 29
+failure            : 11 ROUTE_FAILURE_EXIT_LOST
+final pose         : x=88.05 y=169.49 h=3.155 d=666.30 cm
+final pose vs P    : 106.27 cm from start point
+components covered : 8/27 (axle centre <= pass radius)
+                     : 6/27 also sampled by the sensor bar centre
+missing            : r8(R8 (元件8))@50.0cm, r9(R9 (元件9))@49.7cm, r10(R10 (元件10))@71.6cm, r12(R12 (元件12))@131.4cm, r14(R14 (环岛元件14))@72.5cm, r15(R15 (元件15))@152.3cm, r17(R17 (元件17))@153.6cm, r19(R19 (元件19))@131.2cm, r20(R20 (元件20))@139.8cm, r21(R21 (元件21))@89.1cm, r23(R23 (元件23))@74.6cm, r24(R24 (元件24))@59.8cm, r25(R25 (元件25))@99.8cm, r26(R26 (虚线元件26))@37.4cm, r27(R27 (元件27))@67.0cm, q22(Q22 (三极管22))@39.6cm, q16(Q16 (三极管16))@176.2cm, q18(Q18 (三极管18))@97.6cm, q13(Q13 (三极管13))@108.6cm
+
+-- per route step (from CSV index column) ------------------------------------
+#    | action       | entries |  entry_ms |   exit_ms |  dur_ms | junctions | recov | warn | exit state      | entry pose -> exit pose
+0    | CUSTOM_TURN  |       1 |         5 |      5445 |    5440 |         2 |     0 |    0 | ROUTE_CLEARING  | (0.0,110.0) -> (13.1,-0.9)
+1    | CUSTOM_TURN  |       1 |      5450 |      9240 |    3790 |         1 |     0 |    0 | ROUTE_CLEARING  | (13.2,-0.9) -> (56.4,13.3)
+2    | CUSTOM_TURN  |       1 |      9245 |     15395 |    6150 |         2 |     0 |    0 | ROUTE_CLEARING  | (56.4,13.4) -> (78.2,140.8)
+3    | CUSTOM_TURN  |       1 |     15400 |     21010 |    5610 |         2 |     0 |    0 | ROUTE_EXECUTING | (78.3,140.8) -> (242.8,147.5)
+4    | CUSTOM_TURN  |       1 |     21015 |     23860 |    2845 |         0 |     0 |    0 | ROUTE_CLEARING  | (242.8,147.6) -> (230.4,171.6)
+5    | CUSTOM_TURN  |       1 |     23865 |     28480 |    4615 |         1 |     1 |    5 | ROUTE_FAILED    | (230.4,171.6) -> (88.1,169.5)
+
+-- step diagnostics (turn onset = |heading - entry heading| > 0.15 rad, last mask != 0) --
+#    |  pivot_ms | pivot pose        | lastMask_ms | lastMask pose     | mask | state at lastMask
+0    |      3810 | (0.1,5.8)         |        5445 | (13.1,-0.9)       |   56 | ROUTE_CLEARING
+1    |      7590 | (49.9,-0.0)       |        9240 | (56.4,13.3)       |   56 | ROUTE_CLEARING
+2    |     13045 | (54.8,133.9)      |       15395 | (78.2,140.8)      |   28 | ROUTE_CLEARING
+3    |     19755 | (236.2,139.8)     |       21010 | (242.8,147.5)     |   48 | ROUTE_EXECUTING
+4    |     22060 | (244.1,163.7)     |       23860 | (230.4,171.6)     |   56 | ROUTE_CLEARING
+5    |         - | -                 |       26645 | (117.5,169.9)     |   12 | ROUTE_CLEARING *failed step*
+
+-- component coverage (axle centre distance; sensor bar = axle + 24 cm heading) --
+#   | id    | type       | el  |      x |       y |    axle |    sens | axle# | verdict     | closest hit (ms/index/state) / label
+1   | bat1  | battery    | 0   |    0.0 |   110.0 |    0.00 |   24.00 |     1 | PASS        | 5/0/ROUTE_FOLLOW BAT (P起点)
+2   | r1    | resistor   | 1   |    0.0 |    44.0 |    0.00 |    0.00 |     1 | PASS        | 1785/0/ROUTE_FOLLOW R1 (元件1)
+3   | r2    | resistor   | 2   |   23.0 |     0.0 |    0.63 |    9.01 |     1 | PASS        | 5860/1/ROUTE_FOLLOW R2 (元件2)
+4   | r3    | resistor   | 3   |   55.0 |    55.0 |    0.20 |    0.24 |     1 | PASS        | 10170/2/ROUTE_FOLLOW R3 (元件3)
+5   | r5    | resistor   | 5   |  161.0 |   140.0 |    0.11 |    0.26 |     1 | PASS        | 17065/3/ROUTE_FOLLOW R5 (元件5)
+6   | r8    | resistor   | 8   |  125.5 |   220.0 |   50.00 |   49.91 |     0 | MISS        | 26055/5/ROUTE_FOLLOW R8 (元件8)
+7   | r9    | resistor   | 9   |  181.0 |   220.0 |   49.66 |   49.77 |     0 | MISS        | 24765/5/ROUTE_FOLLOW R9 (元件9)
+8   | r10   | resistor   | 10  |  292.0 |   220.0 |   71.60 |   57.52 |     0 | MISS        | 22745/4/ROUTE_EXECUTING R10 (元件10)
+9   | r12   | resistor   | 12  |  375.0 |   151.0 |  131.38 |  114.66 |     0 | MISS        | 21695/4/ROUTE_EXECUTING R12 (元件12)
+10  | r14   | resistor   | 14  |  310.0 |   195.3 |   72.47 |   63.98 |     0 | MISS        | 22410/4/ROUTE_EXECUTING R14 (环岛元件14)
+11  | r15   | resistor   | 15  |  375.0 |    70.0 |  152.31 |  135.61 |     0 | MISS        | 20585/3/ROUTE_EXECUTING R15 (元件15)
+12  | r17   | resistor   | 17  |  300.6 |     0.0 |  153.61 |  145.97 |     0 | MISS        | 20015/3/ROUTE_EXECUTING R17 (元件17)
+13  | r19   | resistor   | 19  |  334.0 |    50.0 |  131.16 |  117.28 |     0 | MISS        | 20345/3/ROUTE_EXECUTING R19 (元件19)
+14  | r20   | resistor   | 20  |  196.0 |     0.0 |  139.84 |  122.41 |     0 | MISS        | 17615/3/ROUTE_FOLLOW R20 (元件20)
+15  | r21   | resistor   | 21  |  145.0 |     0.0 |   89.08 |   71.51 |     0 | MISS        | 8915/1/ROUTE_EXECUTING R21 (元件21)
+16  | r23   | resistor   | 23  |  130.0 |    40.0 |   74.65 |   62.69 |     0 | MISS        | 9745/2/ROUTE_CLEARING R23 (元件23)
+17  | r24   | resistor   | 24  |  206.0 |    80.0 |   59.82 |   59.75 |     0 | MISS        | 17825/3/ROUTE_FOLLOW R24 (元件24)
+18  | r25   | resistor   | 25  |  206.0 |    40.0 |   99.82 |   99.75 |     0 | MISS        | 17825/3/ROUTE_FOLLOW R25 (元件25)
+19  | r26   | resistor   | 26  |   55.0 |   187.0 |   37.40 |   19.99 |     0 | MISS        | 28480/5/ROUTE_FAILED R26 (虚线元件26)
+20  | r27   | resistor   | 27  |    0.0 |   177.0 |   67.00 |   58.53 |     0 | MISS        | 5/0/ROUTE_FOLLOW R27 (元件27)
+21  | q22   | transistor | 22  |   95.0 |     0.0 |   39.57 |   21.84 |     0 | MISS        | 8775/1/ROUTE_EXECUTING Q22 (三极管22)
+22  | q16   | transistor | 16  |  345.0 |     0.0 |  176.18 |  164.38 |     0 | MISS        | 20210/3/ROUTE_EXECUTING Q16 (三极管16)
+23  | q18   | transistor | 18  |  275.0 |    50.0 |   97.57 |   91.24 |     0 | MISS        | 19985/3/ROUTE_EXECUTING Q18 (三极管18)
+24  | q4    | transistor | 4   |   95.0 |   140.0 |    0.47 |    0.61 |     1 | PASS        | 15795/3/ROUTE_FOLLOW Q4 (节点4)
+25  | q13   | transistor | 13  |  345.0 |   110.0 |  108.58 |   91.02 |     0 | MISS        | 20760/3/ROUTE_EXECUTING Q13 (三极管13)
+26  | q6    | transistor | 6   |  245.0 |   140.0 |    4.75 |    0.32 |     1 | PASS        | 20485/3/ROUTE_EXECUTING Q6 (节点6)
+27  | q11   | transistor | 11  |  150.0 |   170.0 |    0.29 |    0.68 |     1 | PASS        | 25450/5/ROUTE_FOLLOW Q11 (三极管11)
+
+-- last 20 control cycles before stop --------------------------------
+     ms | index | state           | count |        x |        y | mask | pos | line          | fail
+  28385 |     5 | ROUTE_RECOVERING |     1 |     89.6 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28390 |     5 | ROUTE_RECOVERING |     1 |     89.5 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28395 |     5 | ROUTE_RECOVERING |     1 |     89.4 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28400 |     5 | ROUTE_RECOVERING |     1 |     89.3 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28405 |     5 | ROUTE_RECOVERING |     1 |     89.3 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28410 |     5 | ROUTE_RECOVERING |     1 |     89.2 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28415 |     5 | ROUTE_RECOVERING |     1 |     89.1 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28420 |     5 | ROUTE_RECOVERING |     1 |     89.0 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28425 |     5 | ROUTE_RECOVERING |     1 |     88.9 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28430 |     5 | ROUTE_RECOVERING |     1 |     88.9 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28435 |     5 | ROUTE_RECOVERING |     1 |     88.8 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28440 |     5 | ROUTE_RECOVERING |     1 |     88.7 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28445 |     5 | ROUTE_RECOVERING |     1 |     88.6 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28450 |     5 | ROUTE_RECOVERING |     1 |     88.5 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28455 |     5 | ROUTE_RECOVERING |     1 |     88.5 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28460 |     5 | ROUTE_RECOVERING |     1 |     88.4 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28465 |     5 | ROUTE_RECOVERING |     1 |     88.3 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28470 |     5 | ROUTE_RECOVERING |     1 |     88.2 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28475 |     5 | ROUTE_RECOVERING |     1 |     88.1 |    169.5 |    0 |   0 | LINE_JUNCTION | 0   
+  28480 |     5 | ROUTE_FAILED    |     1 |     88.1 |    169.5 |    0 |   0 | LINE_STOPPED  | 11  
+
+================================================================================
+ SCHEME 2
+================================================================================
+verdict            : FAIL
+ROUTE_FINISHED     : no
+sim duration       : 49.52 s (49520 ms, 9904 control cycles)
+final state        : ROUTE_FAILED / LINE_STOPPED
+final route index  : 9 of 27
+failure            : 11 ROUTE_FAILURE_EXIT_LOST
+final pose         : x=111.52 y=-2.37 h=-7.914 d=982.24 cm
+final pose vs P    : 158.31 cm from start point
+components covered : 10/27 (axle centre <= pass radius)
+                     : 8/27 also sampled by the sensor bar centre
+missing            : r8(R8 (元件8))@80.0cm, r9(R9 (元件9))@80.1cm, r10(R10 (元件10))@97.1cm, r12(R12 (元件12))@133.4cm, r14(R14 (环岛元件14))@90.4cm, r15(R15 (元件15))@129.0cm, r17(R17 (元件17))@70.3cm, r19(R19 (元件19))@87.6cm, r20(R20 (元件20))@39.6cm, r21(R21 (元件21))@33.3cm, r26(R26 (虚线元件26))@47.0cm, r27(R27 (元件27))@67.0cm, q22(Q22 (三极管22))@16.6cm, q16(Q16 (三极管16))@108.7cm, q18(Q18 (三极管18))@28.6cm, q13(Q13 (三极管13))@100.5cm, q11(Q11 (三极管11))@30.1cm
+repeated passes    : r25 x2
+
+-- per route step (from CSV index column) ------------------------------------
+#    | action       | entries |  entry_ms |   exit_ms |  dur_ms | junctions | recov | warn | exit state      | entry pose -> exit pose
+0    | CUSTOM_TURN  |       1 |         5 |      5445 |    5440 |         2 |     0 |    0 | ROUTE_CLEARING  | (0.0,110.0) -> (13.1,-0.9)
+1    | CUSTOM_TURN  |       1 |      5450 |      9240 |    3790 |         1 |     0 |    0 | ROUTE_CLEARING  | (13.2,-0.9) -> (56.4,13.3)
+2    | CUSTOM_TURN  |       1 |      9245 |     15395 |    6150 |         2 |     0 |    0 | ROUTE_CLEARING  | (56.4,13.4) -> (78.2,140.8)
+3    | CUSTOM_TURN  |       1 |     15400 |     21295 |    5895 |         2 |     0 |    0 | ROUTE_CLEARING  | (78.3,140.8) -> (243.5,127.7)
+4    | CUSTOM_TURN  |       1 |     21300 |     25965 |    4665 |         2 |     0 |    0 | ROUTE_CLEARING  | (243.5,127.6) -> (233.5,39.2)
+5    | CUSTOM_TURN  |       1 |     25970 |     30740 |    4770 |         2 |     0 |    0 | ROUTE_EXECUTING | (233.4,39.2) -> (163.0,51.3)
+6    | CUSTOM_TURN  |       1 |     30745 |     33765 |    3020 |         0 |     0 |    0 | ROUTE_CLEARING  | (163.0,51.4) -> (174.9,80.2)
+7    | CUSTOM_TURN  |       1 |     33770 |     39185 |    5415 |         2 |     1 |    5 | ROUTE_EXECUTING | (175.0,80.2) -> (246.0,68.2)
+8    | CUSTOM_TURN  |       1 |     39190 |     42230 |    3040 |         0 |     1 |    5 | ROUTE_CLEARING  | (246.0,68.1) -> (233.7,39.4)
+9    | CUSTOM_TURN  |       1 |     42235 |     49520 |    7285 |         3 |     2 |    5 | ROUTE_FAILED    | (233.6,39.4) -> (111.5,-2.4)
+
+-- step diagnostics (turn onset = |heading - entry heading| > 0.15 rad, last mask != 0) --
+#    |  pivot_ms | pivot pose        | lastMask_ms | lastMask pose     | mask | state at lastMask
+0    |      3810 | (0.1,5.8)         |        5445 | (13.1,-0.9)       |   56 | ROUTE_CLEARING
+1    |      7590 | (49.9,-0.0)       |        9240 | (56.4,13.3)       |   56 | ROUTE_CLEARING
+2    |     13045 | (54.8,133.9)      |       15395 | (78.2,140.8)      |   28 | ROUTE_CLEARING
+3    |     19790 | (236.5,139.6)     |       21295 | (243.5,127.7)     |   28 | ROUTE_CLEARING
+4    |     24350 | (244.8,46.8)      |       25965 | (233.5,39.2)      |   30 | ROUTE_CLEARING
+5    |     29180 | (170.1,39.5)      |       30740 | (163.0,51.3)      |    6 | ROUTE_EXECUTING
+6    |     32195 | (162.7,73.5)      |       33765 | (174.9,80.2)      |   28 | ROUTE_CLEARING
+7    |     37645 | (239.0,79.5)      |       39185 | (246.0,68.2)      |   12 | ROUTE_EXECUTING
+8    |     40615 | (246.4,46.3)      |       42230 | (233.7,39.4)      |   28 | ROUTE_CLEARING
+9    |     46000 | (121.1,41.0)      |       47980 | (113.2,22.1)      |    1 | ROUTE_EXECUTING *failed step*
+
+-- component coverage (axle centre distance; sensor bar = axle + 24 cm heading) --
+#   | id    | type       | el  |      x |       y |    axle |    sens | axle# | verdict     | closest hit (ms/index/state) / label
+1   | bat1  | battery    | 0   |    0.0 |   110.0 |    0.00 |   24.00 |     1 | PASS        | 5/0/ROUTE_FOLLOW BAT (P起点)
+2   | r1    | resistor   | 1   |    0.0 |    44.0 |    0.00 |    0.00 |     1 | PASS        | 1785/0/ROUTE_FOLLOW R1 (元件1)
+3   | r2    | resistor   | 2   |   23.0 |     0.0 |    0.63 |    9.01 |     1 | PASS        | 5860/1/ROUTE_FOLLOW R2 (元件2)
+4   | r3    | resistor   | 3   |   55.0 |    55.0 |    0.20 |    0.24 |     1 | PASS        | 10170/2/ROUTE_FOLLOW R3 (元件3)
+5   | r5    | resistor   | 5   |  161.0 |   140.0 |    0.11 |    0.26 |     1 | PASS        | 17065/3/ROUTE_FOLLOW R5 (元件5)
+6   | r8    | resistor   | 8   |  125.5 |   220.0 |   79.99 |   80.07 |     0 | MISS        | 16260/3/ROUTE_FOLLOW R8 (元件8)
+7   | r9    | resistor   | 9   |  181.0 |   220.0 |   80.13 |   79.85 |     0 | MISS        | 17365/3/ROUTE_FOLLOW R9 (元件9)
+8   | r10   | resistor   | 10  |  292.0 |   220.0 |   97.07 |   87.11 |     0 | MISS        | 20145/3/ROUTE_EXECUTING R10 (元件10)
+9   | r12   | resistor   | 12  |  375.0 |   151.0 |  133.43 |  115.88 |     0 | MISS        | 21090/3/ROUTE_EXECUTING R12 (元件12)
+10  | r14   | resistor   | 14  |  310.0 |   195.3 |   90.41 |   75.84 |     0 | MISS        | 20410/3/ROUTE_EXECUTING R14 (环岛元件14)
+11  | r15   | resistor   | 15  |  375.0 |    70.0 |  129.00 |  111.84 |     0 | MISS        | 39170/7/ROUTE_EXECUTING R15 (元件15)
+12  | r17   | resistor   | 17  |  300.6 |     0.0 |   70.28 |   58.99 |     0 | MISS        | 41065/8/ROUTE_EXECUTING R17 (元件17)
+13  | r19   | resistor   | 19  |  334.0 |    50.0 |   87.56 |   73.42 |     0 | MISS        | 40410/8/ROUTE_EXECUTING R19 (元件19)
+14  | r20   | resistor   | 20  |  196.0 |     0.0 |   39.64 |   37.78 |     0 | MISS        | 27445/5/ROUTE_FOLLOW R20 (元件20)
+15  | r21   | resistor   | 21  |  145.0 |     0.0 |   33.28 |   33.33 |     0 | MISS        | 49250/9/ROUTE_RECOVERING R21 (元件21)
+16  | r23   | resistor   | 23  |  130.0 |    40.0 |    0.88 |    0.35 |     1 | PASS        | 45360/9/ROUTE_EXECUTING R23 (元件23)
+17  | r24   | resistor   | 24  |  206.0 |    80.0 |    0.98 |    1.49 |     1 | PASS        | 35525/7/ROUTE_FOLLOW R24 (元件24)
+18  | r25   | resistor   | 25  |  206.0 |    40.0 |    0.11 |    0.11 |     2 | PASS x2     | 43270/9/ROUTE_FOLLOW R25 (元件25)
+19  | r26   | resistor   | 26  |   55.0 |   187.0 |   46.98 |   29.32 |     0 | MISS        | 14330/2/ROUTE_EXECUTING R26 (虚线元件26)
+20  | r27   | resistor   | 27  |    0.0 |   177.0 |   67.00 |   58.53 |     0 | MISS        | 5/0/ROUTE_FOLLOW R27 (元件27)
+21  | q22   | transistor | 22  |   95.0 |     0.0 |   16.63 |   16.33 |     0 | MISS        | 49435/9/ROUTE_RECOVERING Q22 (三极管22)
+22  | q16   | transistor | 16  |  345.0 |     0.0 |  108.66 |  101.10 |     0 | MISS        | 40860/8/ROUTE_EXECUTING Q16 (三极管16)
+23  | q18   | transistor | 18  |  275.0 |    50.0 |   28.57 |   18.15 |     0 | MISS        | 40350/8/ROUTE_EXECUTING Q18 (三极管18)
+24  | q4    | transistor | 4   |   95.0 |   140.0 |    0.47 |    0.61 |     1 | PASS        | 15795/3/ROUTE_FOLLOW Q4 (节点4)
+25  | q13   | transistor | 13  |  345.0 |   110.0 |  100.55 |   86.93 |     0 | MISS        | 21760/4/ROUTE_FOLLOW Q13 (三极管13)
+26  | q6    | transistor | 6   |  245.0 |   140.0 |    5.08 |    0.32 |     1 | PASS        | 20450/3/ROUTE_EXECUTING Q6 (节点6)
+27  | q11   | transistor | 11  |  150.0 |   170.0 |   30.15 |   30.13 |     0 | MISS        | 16855/3/ROUTE_FOLLOW Q11 (三极管11)
+
+-- last 20 control cycles before stop --------------------------------
+     ms | index | state           | count |        x |        y | mask | pos | line          | fail
+  49425 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -0.9 |    0 |   0 | LINE_JUNCTION | 0   
+  49430 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -0.9 |    0 |   0 | LINE_JUNCTION | 0   
+  49435 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.0 |    0 |   0 | LINE_JUNCTION | 0   
+  49440 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.1 |    0 |   0 | LINE_JUNCTION | 0   
+  49445 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.2 |    0 |   0 | LINE_JUNCTION | 0   
+  49450 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.2 |    0 |   0 | LINE_JUNCTION | 0   
+  49455 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.3 |    0 |   0 | LINE_JUNCTION | 0   
+  49460 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.4 |    0 |   0 | LINE_JUNCTION | 0   
+  49465 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.5 |    0 |   0 | LINE_JUNCTION | 0   
+  49470 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.6 |    0 |   0 | LINE_JUNCTION | 0   
+  49475 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.6 |    0 |   0 | LINE_JUNCTION | 0   
+  49480 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.7 |    0 |   0 | LINE_JUNCTION | 0   
+  49485 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.8 |    0 |   0 | LINE_JUNCTION | 0   
+  49490 |     9 | ROUTE_RECOVERING |     3 |    111.6 |     -1.9 |    0 |   0 | LINE_JUNCTION | 0   
+  49495 |     9 | ROUTE_RECOVERING |     3 |    111.5 |     -2.0 |    0 |   0 | LINE_JUNCTION | 0   
+  49500 |     9 | ROUTE_RECOVERING |     3 |    111.5 |     -2.0 |    0 |   0 | LINE_JUNCTION | 0   
+  49505 |     9 | ROUTE_RECOVERING |     3 |    111.5 |     -2.1 |    0 |   0 | LINE_JUNCTION | 0   
+  49510 |     9 | ROUTE_RECOVERING |     3 |    111.5 |     -2.2 |    0 |   0 | LINE_JUNCTION | 0   
+  49515 |     9 | ROUTE_RECOVERING |     3 |    111.5 |     -2.3 |    0 |   0 | LINE_JUNCTION | 0   
+  49520 |     9 | ROUTE_FAILED    |     3 |    111.5 |     -2.4 |    0 |   0 | LINE_STOPPED  | 11  
+
+================================================================================
+ SUMMARY
+================================================================================
+scheme 1: NOT-FINISHED  28.48s  index 5/29  failure=ROUTE_FAILURE_EXIT_LOST  components 8/27 (sensor 6)
+scheme 2: NOT-FINISHED  49.52s  index 9/27  failure=ROUTE_FAILURE_EXIT_LOST  components 10/27 (sensor 8)
+
+overall: FAIL — at least one scheme did not complete the lap with full coverage
+limits : axle-centre proximity only (not the physical 8-channel reading); greyscale
+         component footprints are not modelled here; positions come from the
+         simulator map (calibration assumption, see 2026-11-06-new-track).
+

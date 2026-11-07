@@ -1,0 +1,38 @@
+WebSocket server error: Port 24678 is already in use
+8:39:42 PM [vite] (ssr) Error when evaluating SSR module /tests/hexagon_entry.test.ts: Expected values to be strictly equal:
+
+true !== false
+
+      at eval (/Users/zhendong/Documents/stm32car_simulator/tests/hexagon_entry.test.ts:47:35)
+      at async ESModulesEvaluator.runInlinedModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1062:5)
+      at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1284:61)
+      at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/dep-CkSfqg8D.js:25587:23)
+      at async SSRCompatModuleRunner.cachedRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1180:76)
+      at async SSRCompatModuleRunner.import (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1117:12)
+      at async instantiateModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/dep-CkSfqg8D.js:25544:12)
+      at async file:///Users/zhendong/Documents/stm32car_simulator/tests/run_hexagon_entry.mjs:3:6
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+    at eval (/Users/zhendong/Documents/stm32car_simulator/tests/hexagon_entry.test.ts:47:35)
+    at async ESModulesEvaluator.runInlinedModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1062:5)
+    at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1284:61)
+    at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/dep-CkSfqg8D.js:25587:23)
+    at async SSRCompatModuleRunner.cachedRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1180:76)
+    at async SSRCompatModuleRunner.import (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1117:12)
+    at async instantiateModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/dep-CkSfqg8D.js:25544:12)
+    at async file:///Users/zhendong/Documents/stm32car_simulator/tests/run_hexagon_entry.mjs:3:6 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.12.0

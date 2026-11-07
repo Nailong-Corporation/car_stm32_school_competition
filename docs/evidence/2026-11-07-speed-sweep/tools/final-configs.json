@@ -1,0 +1,59 @@
+{
+ "recommended": {
+  "config_ts": {
+   "JUNCTION_SETTLE_SPEED_CM_S": 24.0,
+   "HEXAGON_SPEED_CM_S": 24.0,
+   "POSE_BOUNDED_LOSS_MS": 2000,
+   "POSE_BOUNDED_LOSS_CM": 30.0
+  },
+  "route_ts": {
+   "SHORT_LINK_MAX_LATERAL_CM": 14
+  },
+  "manifest": {
+   "cruise_speed_cm_s": 100,
+   "turn_speed_cm_s": 24.0
+  },
+  "result": {
+   "scheme1_s": 118.09,
+   "scheme2_s": 114.17,
+   "components": {
+    "scheme1": "27/27",
+    "scheme2": "26/27"
+   },
+   "verify_course": "PASS"
+  }
+ },
+ "aggressive": {
+  "config_ts": {
+   "JUNCTION_SETTLE_SPEED_CM_S": 32.0,
+   "HEXAGON_SPEED_CM_S": 32.0,
+   "POSE_BOUNDED_LOSS_MS": 2000,
+   "POSE_BOUNDED_LOSS_CM": 30.0,
+   "ROUTE_WAYPOINT_SLOW_CM": 16.0,
+   "BRAKING_SAFE_DECEL_CM_S2": 300.0,
+   "ROUTE_CLEAR_POSE_CM": 0.5,
+   "JUNCTION_SETTLE_HEADING_KP": 40.0,
+   "TURN_PIVOT_APPROACH_CM": 15.0,
+   "POSE_PURSUIT_LOOKAHEAD_CM": 20.0,
+   "ROUTE_SHORT_SPEED_CM_S": 80.0,
+   "JUNCTION_EXIT_SPEED_CM_S": 24.0
+  },
+  "route_ts": {
+   "SHORT_LINK_MAX_LATERAL_CM": 14
+  },
+  "manifest": {
+   "cruise_speed_cm_s": 150,
+   "turn_speed_cm_s": 32.0
+  },
+  "result": {
+   "scheme1_s": 90.26,
+   "scheme2_s": 86.46,
+   "components": {
+    "scheme1": "27/27",
+    "scheme2": "26/27"
+   },
+   "verify_course": "PASS"
+  },
+  "warning": "cruise 145/155 与 pivot 33 均失败；仅仿真可达"
+ }
+}

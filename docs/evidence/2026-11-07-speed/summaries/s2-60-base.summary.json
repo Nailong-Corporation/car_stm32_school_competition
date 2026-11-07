@@ -1,0 +1,177 @@
+{
+  "scheme": 2,
+  "cruise_override": 60,
+  "switches": {
+    "MOTOR_REVERSE_BRAKE_ENABLED": 0,
+    "BRAKING_REVERSE_HARDWARE_CONFIRMED": 0,
+    "REVERSE_BRAKE_ARMED": false
+  },
+  "reached_index": 9,
+  "completed_steps": 9,
+  "final": {
+    "ms": 49520,
+    "index": 9,
+    "state": "ROUTE_FAILED",
+    "x": 111.522,
+    "y": -2.366,
+    "distance_cm": 982.24,
+    "failure": 11,
+    "failure_name": "ROUTE_FAILURE_EXIT_LOST",
+    "line": "LINE_STOPPED"
+  },
+  "peak_speed_cm_s": 74.99,
+  "tracking_frames": 2974,
+  "tracking_pct": 30,
+  "gap_hold_frames": 45,
+  "junction_frames": 6882,
+  "max_abs_pos_tracking": 5,
+  "rms_pos_tracking": 0.79,
+  "reverse_active_ms": 0,
+  "reverse_by_step_ms": {},
+  "step_starts": [
+    {
+      "index": 0,
+      "ms": 5,
+      "x": 0,
+      "y": 110,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 1,
+      "ms": 5450,
+      "x": 13.158,
+      "y": -0.91,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 2,
+      "ms": 9245,
+      "x": 56.389,
+      "y": 13.356,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 3,
+      "ms": 15400,
+      "x": 78.288,
+      "y": 140.832,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 4,
+      "ms": 21300,
+      "x": 243.486,
+      "y": 127.64,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 5,
+      "ms": 25970,
+      "x": 233.38,
+      "y": 39.198,
+      "state": "ROUTE_CLEARING"
+    },
+    {
+      "index": 6,
+      "ms": 30745,
+      "x": 163.026,
+      "y": 51.385,
+      "state": "ROUTE_EXECUTING"
+    },
+    {
+      "index": 7,
+      "ms": 33770,
+      "x": 174.973,
+      "y": 80.215,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 8,
+      "ms": 39190,
+      "x": 246.009,
+      "y": 68.144,
+      "state": "ROUTE_EXECUTING"
+    },
+    {
+      "index": 9,
+      "ms": 42235,
+      "x": 233.584,
+      "y": 39.441,
+      "state": "ROUTE_FOLLOW"
+    }
+  ],
+  "executing_entries": [
+    {
+      "index": 0,
+      "ms": 2545,
+      "x": 0,
+      "y": 25.034,
+      "entry_speed_100ms_before": 15.37,
+      "mask": 248
+    },
+    {
+      "index": 1,
+      "ms": 6315,
+      "x": 30.703,
+      "y": -0.465,
+      "entry_speed_100ms_before": 16.56,
+      "mask": 248
+    },
+    {
+      "index": 2,
+      "ms": 11805,
+      "x": 54.794,
+      "y": 114.899,
+      "entry_speed_100ms_before": 14.29,
+      "mask": 31
+    },
+    {
+      "index": 3,
+      "ms": 18505,
+      "x": 217.154,
+      "y": 139.798,
+      "entry_speed_100ms_before": 13.82,
+      "mask": 255
+    },
+    {
+      "index": 4,
+      "ms": 23185,
+      "x": 244.764,
+      "y": 65.102,
+      "entry_speed_100ms_before": 15.15,
+      "mask": 31
+    },
+    {
+      "index": 5,
+      "ms": 27895,
+      "x": 189.283,
+      "y": 39.663,
+      "entry_speed_100ms_before": 14.78,
+      "mask": 31
+    },
+    {
+      "index": 6,
+      "ms": 31920,
+      "x": 162.592,
+      "y": 70.451,
+      "entry_speed_100ms_before": 16.06,
+      "mask": 0
+    },
+    {
+      "index": 7,
+      "ms": 36390,
+      "x": 219.938,
+      "y": 79.344,
+      "entry_speed_100ms_before": 14.53,
+      "mask": 255
+    },
+    {
+      "index": 9,
+      "ms": 44690,
+      "x": 140.532,
+      "y": 40.501,
+      "entry_speed_100ms_before": 19.35,
+      "mask": 48
+    }
+  ]
+}

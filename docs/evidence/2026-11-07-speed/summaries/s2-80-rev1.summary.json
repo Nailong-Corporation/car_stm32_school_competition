@@ -1,0 +1,91 @@
+{
+  "scheme": 2,
+  "cruise_override": 80,
+  "switches": {
+    "MOTOR_REVERSE_BRAKE_ENABLED": 1,
+    "BRAKING_REVERSE_HARDWARE_CONFIRMED": 1,
+    "REVERSE_BRAKE_ARMED": true
+  },
+  "reached_index": 3,
+  "completed_steps": 3,
+  "final": {
+    "ms": 19650,
+    "index": 3,
+    "state": "ROUTE_FAILED",
+    "x": 249.241,
+    "y": 139.312,
+    "distance_cm": 493.066,
+    "failure": 11,
+    "failure_name": "ROUTE_FAILURE_EXIT_LOST",
+    "line": "LINE_STOPPED"
+  },
+  "peak_speed_cm_s": 106.856,
+  "tracking_frames": 1623,
+  "tracking_pct": 41.3,
+  "gap_hold_frames": 40,
+  "junction_frames": 2264,
+  "max_abs_pos_tracking": 5,
+  "rms_pos_tracking": 1.158,
+  "reverse_active_ms": 705,
+  "reverse_by_step_ms": {
+    "0": 205,
+    "2": 250,
+    "3": 250
+  },
+  "step_starts": [
+    {
+      "index": 0,
+      "ms": 5,
+      "x": 0,
+      "y": 110,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 1,
+      "ms": 5220,
+      "x": 13.209,
+      "y": -0.926,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 2,
+      "ms": 9155,
+      "x": 57.411,
+      "y": 14.07,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 3,
+      "ms": 15040,
+      "x": 78.248,
+      "y": 140.786,
+      "state": "ROUTE_FOLLOW"
+    }
+  ],
+  "executing_entries": [
+    {
+      "index": 0,
+      "ms": 2310,
+      "x": 0,
+      "y": 25.038,
+      "entry_speed_100ms_before": 14.92,
+      "mask": 248
+    },
+    {
+      "index": 1,
+      "ms": 6110,
+      "x": 31.23,
+      "y": -0.542,
+      "entry_speed_100ms_before": 16.32,
+      "mask": 248
+    },
+    {
+      "index": 2,
+      "ms": 11460,
+      "x": 54.893,
+      "y": 114.935,
+      "entry_speed_100ms_before": 15.33,
+      "mask": 31
+    }
+  ]
+}

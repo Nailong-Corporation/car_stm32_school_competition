@@ -4,7 +4,7 @@
 static void test_observed_center_line_exit(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},{2,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},{2,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
   f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
   f.route.state=ROUTE_EXECUTING;f.route.phase_ms=now;
@@ -23,8 +23,8 @@ static void test_observed_center_line_exit(void)
 static void test_turn_into_adjacent_diode(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},
-                     {2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},
+                     {2,50,LEFT,200,0,false,50, 0},{1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,3);
   f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
   f.route.state=ROUTE_EXECUTING;f.route.phase_ms=now;
@@ -49,7 +49,7 @@ static void test_turn_into_adjacent_diode(void)
 static void test_diode_straight_clearance(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{2,50,LEFT,200,0,false,50, 0},{1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
   f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
   for(unsigned i=0;i<3;++i) tick(&f,&c,&now,0,0,0x18,false);
@@ -78,7 +78,7 @@ static void test_diode_straight_clearance(void)
  /* Broad centered graphics, isolated center frames and side edges must not
   * unlock counting or renew the bounded straight-clearance loss budget. */
  for(unsigned condition=0;condition<3;++condition) {
-  RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{2,50,LEFT,200,0,false,50, 0},{1,50,STOP,200,0,false,0, 0}};
   RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
   junction(&p,&d,&t,0x0f,0);
   CHECK(p.state==ROUTE_CLEARING && p.junctions_seen==1);
@@ -89,7 +89,7 @@ static void test_diode_straight_clearance(void)
   }
   CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0);
  }
- RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{2,50,LEFT,200,0,false,50, 0},{1,50,STOP,200,0,false,0, 0}};
  RoutePlanner p;init(&p,steps,2);float d=0;uint32_t t=0;
  junction(&p,&d,&t,0x0f,0);
  d=p.capture_line_cm+INTERFERENCE_MAX_DISTANCE_CM;
@@ -100,7 +100,7 @@ static void test_diode_straight_clearance(void)
 }
 static void test_fast_penultimate_junction(void)
 {
- RouteStep steps[]={{2,50,LEFT,200,0,false,50},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{2,50,LEFT,200,0,false,50, 0},{1,50,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  for(unsigned i=0;i<3;++i) tick(&f,&c,&now,0,0,0x18,false);
@@ -147,8 +147,8 @@ static void test_final_segment_speed_cap(void)
 {
  /* Unknown length is slow throughout; measured length uses the distance envelope. */
  for(unsigned length=0;length<2;++length) {
-  RouteStep steps[]={{1,50,LEFT,200,0,false,length?1000:0},
-                     {1,50,STOP,200,0,false,0}};
+  RouteStep steps[]={{1,50,LEFT,200,0,false,length?1000:0,0},
+                     {1,50,STOP,200,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
   f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
   f.base=f.left_target_cm_s=f.right_target_cm_s=200;
@@ -162,7 +162,7 @@ static void test_final_segment_speed_cap(void)
 #endif
   CHECK(f.route.final_segment_active && f.route.junctions_seen==0);
  }
- RouteStep steps[]={{3,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{3,50,LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  f.base=f.left_target_cm_s=f.right_target_cm_s=200;
@@ -214,7 +214,7 @@ int main(void)
 #else
  CHECK(out.left>=0);
 #endif
- RouteStep steps[]={{1,6,LEFT,50,0,false,0},{1,6,STOP,80,0,false,0}};
+ RouteStep steps[]={{1,6,LEFT,50,0,false,0, 0},{1,6,STOP,80,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t now;start(&f,&c,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
  f.base=f.left_target_cm_s=f.right_target_cm_s=50;

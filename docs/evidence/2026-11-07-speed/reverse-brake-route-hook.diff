@@ -1,0 +1,135 @@
+--- a/src/sim/line_follow.ts
++++ b/src/sim/line_follow.ts
+@@ -61,6 +61,12 @@
+   ROUTE_START_Y_CM,
+   ROUTE_WAYPOINT_SLOW_CM,
+   HEXAGON_TURN_TOL_RAD,
++  BRAKING_ACCEL_FILTER_TAU_S,
++  BRAKING_REVERSE_GUARD_CM,
++  BRAKING_REVERSE_MAX_MS,
++  BRAKING_REVERSE_MIN_SPEED_CM_S,
++  REVERSE_BRAKE_ARMED,
++  REVERSE_BRAKE_MARGIN_CM_S,
+ } from './config';
+ import { OdometryModel, defaultOdometryCalibration } from './odometry';
+ import { RoutePlannerModel, routeIsNarrowLine, routeIsClearLine } from './route';
+@@ -109,6 +115,10 @@
+   public braking_origin_cm = 0;
+   public braking_active = false;
+   public braking_reverse_active = false;
++  public braking_reverse_ms = 0;
++  public braking_speed_primed = false;
++  public braking_previous_speed_cm_s = 0;
++  public braking_accel_cm_s2 = 0;
+   public have_reliable = false;
+   public abnormal = false;
+   public valid_count = 0;
+@@ -170,6 +180,10 @@
+ 
+     this.braking_active = false;
+     this.braking_reverse_active = false;
++    this.braking_reverse_ms = 0;
++    this.braking_speed_primed = false;
++    this.braking_previous_speed_cm_s = 0;
++    this.braking_accel_cm_s2 = 0;
+     this.have_reliable = false;
+     this.abnormal = false;
+     this.valid_count = 0;
+@@ -485,15 +499,22 @@
+         this.braking_slew.acceleration = 0;
+         this.braking_origin_cm = planning_origin;
+         this.braking_active = true;
++        this.braking_speed_primed = false;
++        this.braking_reverse_ms = 0;
++        this.braking_reverse_active = false;
+       }
+       const exitAdvance = this.route.planningIndex() > 0 ? WHEEL_TRACK_CM : 0;
+       const target_dist = Math.max(0, planning_step.segment_length_cm - GRAY_FORWARD_OFFSET_CM - exitAdvance);
++      const speed = Math.max(
++        Math.abs(this.odometry.left_speed_cm_s),
++        Math.abs(this.odometry.right_speed_cm_s)
++      );
+       const plan = brakingPlan(
+         base_speed,
+         Math.min(base_speed, planning_entry_speed),
+         target_dist,
+         this.odometry.distance_cm - planning_origin,
+-        Math.max(Math.abs(this.odometry.left_speed_cm_s), Math.abs(this.odometry.right_speed_cm_s)),
++        speed,
+         BRAKING_SAFE_DECEL_CM_S2,
+         BRAKING_DISTANCE_MARGIN_CM,
+         true
+@@ -504,6 +525,42 @@
+       }
+       navigation_wheel_cap = Math.min(navigation_wheel_cap, plan.allowed_speed);
+       this.braking_active = true;
++      /* Observed deceleration drives the "passive braking is not enough"
++       * decision that arms reverse braking, as in the C controller. */
++      const raw_accel = this.braking_speed_primed
++        ? (speed - this.braking_previous_speed_cm_s) / dt
++        : 0.0;
++      this.braking_previous_speed_cm_s = speed;
++      if (!this.braking_speed_primed) this.braking_accel_cm_s2 = raw_accel;
++      else
++        this.braking_accel_cm_s2 +=
++          (dt / (BRAKING_ACCEL_FILTER_TAU_S + dt)) * (raw_accel - this.braking_accel_cm_s2);
++      this.braking_speed_primed = true;
++      const decision = brakingDecide(
++        speed,
++        planning_entry_speed,
++        plan.remaining_cm,
++        -this.braking_accel_cm_s2,
++        BRAKING_SAFE_DECEL_CM_S2,
++        BRAKING_REVERSE_GUARD_CM
++      );
++      this.braking_reverse_active = false;
++      if (
++        REVERSE_BRAKE_ARMED &&
++        decision.reverse_needed &&
++        !decision.distance_exhausted &&
++        narrow &&
++        stable &&
++        this.route.state === RouteState.ROUTE_FOLLOW &&
++        Math.min(this.odometry.left_speed_cm_s, this.odometry.right_speed_cm_s) >
++          BRAKING_REVERSE_MIN_SPEED_CM_S &&
++        this.braking_reverse_ms < BRAKING_REVERSE_MAX_MS
++      ) {
++        const frame_ms = Math.round(dt * 1000.0);
++        if (frame_ms <= BRAKING_REVERSE_MAX_MS - this.braking_reverse_ms) {
++          this.braking_reverse_active = true;
++        }
++      }
+       base_speed = brakingSlew(
+         this.braking_slew,
+         plan.allowed_speed,
+@@ -794,12 +851,29 @@
+       this.correction = 0.5 * (this.left_target_cm_s - this.right_target_cm_s);
+     }
+ 
++    /* A frame that leaves the tracking state, or whose commanded deceleration is
++     * within the margin, disarms reverse braking. Only a tracking frame with a
++     * narrow line may spend the per-segment reverse-torque time budget. */
++    if (
++      this.state !== LineState.LINE_TRACKING ||
++      Math.min(
++        this.odometry.left_speed_cm_s - this.left_target_cm_s,
++        this.odometry.right_speed_cm_s - this.right_target_cm_s
++      ) <= REVERSE_BRAKE_MARGIN_CM_S
++    ) {
++      this.braking_reverse_active = false;
++    }
++    if (this.braking_reverse_active) {
++      this.braking_reverse_ms += Math.round(dt * 1000.0);
++    }
++
+     const { success, command } = this.speed.update(
+       this.left_target_cm_s,
+       this.right_target_cm_s,
+       this.odometry.left_speed_cm_s,
+       this.odometry.right_speed_cm_s,
+-      dt
++      dt,
++      this.braking_reverse_active && this.state === LineState.LINE_TRACKING && narrow
+     );
+ 
+     if (!success) {

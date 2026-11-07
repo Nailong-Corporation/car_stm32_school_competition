@@ -1,0 +1,131 @@
+{
+  "scheme": 2,
+  "cruise_override": 60,
+  "switches": {
+    "MOTOR_REVERSE_BRAKE_ENABLED": 1,
+    "BRAKING_REVERSE_HARDWARE_CONFIRMED": 1,
+    "REVERSE_BRAKE_ARMED": true
+  },
+  "reached_index": 5,
+  "completed_steps": 5,
+  "final": {
+    "ms": 34700,
+    "index": 5,
+    "state": "ROUTE_FAILED",
+    "x": 130.734,
+    "y": 83.867,
+    "distance_cm": 731.894,
+    "failure": 11,
+    "failure_name": "ROUTE_FAILURE_EXIT_LOST",
+    "line": "LINE_STOPPED"
+  },
+  "peak_speed_cm_s": 77.874,
+  "tracking_frames": 2799,
+  "tracking_pct": 40.3,
+  "gap_hold_frames": 34,
+  "junction_frames": 4104,
+  "max_abs_pos_tracking": 5,
+  "rms_pos_tracking": 0.828,
+  "reverse_active_ms": 1010,
+  "reverse_by_step_ms": {
+    "0": 250,
+    "2": 200,
+    "3": 250,
+    "4": 140,
+    "5": 170
+  },
+  "step_starts": [
+    {
+      "index": 0,
+      "ms": 5,
+      "x": 0,
+      "y": 110,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 1,
+      "ms": 5465,
+      "x": 13.208,
+      "y": -0.926,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 2,
+      "ms": 9180,
+      "x": 55.987,
+      "y": 12.606,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 3,
+      "ms": 15315,
+      "x": 78.285,
+      "y": 140.84,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 4,
+      "ms": 21175,
+      "x": 243.339,
+      "y": 127.75,
+      "state": "ROUTE_FOLLOW"
+    },
+    {
+      "index": 5,
+      "ms": 26510,
+      "x": 223.636,
+      "y": 39.078,
+      "state": "ROUTE_FOLLOW"
+    }
+  ],
+  "executing_entries": [
+    {
+      "index": 0,
+      "ms": 2555,
+      "x": 0,
+      "y": 25.039,
+      "entry_speed_100ms_before": 15.05,
+      "mask": 248
+    },
+    {
+      "index": 1,
+      "ms": 6290,
+      "x": 30.215,
+      "y": -0.547,
+      "entry_speed_100ms_before": 15.29,
+      "mask": 248
+    },
+    {
+      "index": 2,
+      "ms": 11725,
+      "x": 54.797,
+      "y": 114.987,
+      "entry_speed_100ms_before": 15.54,
+      "mask": 31
+    },
+    {
+      "index": 3,
+      "ms": 18405,
+      "x": 217.147,
+      "y": 139.79,
+      "entry_speed_100ms_before": 12.46,
+      "mask": 255
+    },
+    {
+      "index": 4,
+      "ms": 23105,
+      "x": 244.748,
+      "y": 65.065,
+      "entry_speed_100ms_before": 14.25,
+      "mask": 63
+    },
+    {
+      "index": 5,
+      "ms": 29870,
+      "x": 157.491,
+      "y": 40.093,
+      "entry_speed_100ms_before": 14.99,
+      "mask": 60
+    }
+  ]
+}

@@ -133,8 +133,15 @@ typedef struct {
     uint8_t valid_count;
     float reliable_position, base, correction, left_target_cm_s, right_target_cm_s;
     float hold_heading_rad, abnormal_origin_cm;
+    /* 印刷元件穿越窗口：首次出现元件图形特征时锁存，允许有界保持直行；
+     * 真正丢线仍按 400ms/8cm，不使用该窗口。 */
+    bool component_cross_latched;
+    uint32_t component_cross_ms;
+    float component_cross_cm;
     float held_pwm_correction; /* Open-loop interference hold, not measured heading. */
     float turn_yaw_rate_rad_s; /* 当前航向来源实际增量 / dt 的低通值，右转正。 */
+    bool exit_heading_pending; /* 捕线后未对齐：相邻非目标过口暂用几何出口轴。 */
+    float exit_heading_rad, exit_heading_origin_cm;
     bool exit_anchor_valid, exit_recovery_active;
     float exit_anchor_x_cm, exit_anchor_y_cm, exit_axis_rad, exit_lateral_error_cm;
     bool exit_accelerating; /* 低速离口完成后快速加速，达到规划目标后清除。 */

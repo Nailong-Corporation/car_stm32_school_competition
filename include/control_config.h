@@ -43,6 +43,18 @@
 #endif
 #define SENSOR_CONTINUITY_DISTANCE  3.0f
 #define SENSOR_CONTINUITY_MARGIN    1.0f
+/* 印刷元件（空心电阻、三极管 V 形、电池极板）是赛道的干扰/记分图形：
+ * 其对称宽线或两侧外边、中心空白的特征属于可穿越图形，不是路口。
+ * 穿越窗口只对这类图形特征延长；真正丢线（GRAY_NONE）仍按原 400ms/8cm 截止。 */
+#define COMPONENT_CROSS_MAX_CM      20.0f
+#define COMPONENT_CROSS_MS          1000U
+/* Pose-mode bounded blind follow: after a pivot the axle can sit 3-7 cm off
+ * the segment while the 24 cm look-ahead bar cannot see the wire, so the
+ * dead-reckoned pose carries the car through the gap for this long/distance
+ * before the plain line-loss stop applies. Speed-scaled from the 1000 ms /
+ * 20 cm component-crossing cut-off once cruise is raised (2026-11-07 sweep). */
+#define POSE_BOUNDED_LOSS_MS        2000U
+#define POSE_BOUNDED_LOSS_CM        30.0f
 #define LINE_CONFIRM_SAMPLES        3U
 #define MOTOR_COMMAND_MAX          255.0f
 #define MOTOR_PWM_LIMIT            255.0f /* 255 标尺的满占空比；仍保留非负限幅。 */

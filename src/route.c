@@ -4,6 +4,18 @@
 #include <math.h>
 #include <string.h>
 
+/* Explicit short links only: geometry in the table is never inferred from a
+ * normal segment's trigger distance. Bounds include the preceding pivot. */
+#define SHORT_LINK_MIN_CM 20.0f
+#define SHORT_LINK_MAX_CM 40.0f
+#define SHORT_LINK_MAX_LATERAL_CM 14.0f /* faster pivots project more lateral drift */
+#define SHORT_LINK_MAX_HEADING_RAD 0.30f
+#define SHORT_LINK_TIMEOUT_MS 6000U
+static bool ordinary_right_angle(RouteStep s)
+{
+    return !s.corner_arc_enabled && (s.action==LEFT || s.action==RIGHT ||
+        (s.action==CUSTOM_TURN && fabsf(fabsf(s.angle_deg)-90.0f)<0.001f));
+}
 static void fail(RoutePlanner *p, RouteFailure reason)
 {
     if (p->failure == ROUTE_FAILURE_NONE) p->failure = reason;
@@ -48,20 +60,27 @@ static uint8_t separated_sides(GrayObservation o)
 static JunctionEvidence junction_shape(GrayObservation o,uint8_t *sides)
 {
     *sides=0;
-    uint8_t separated=separated_sides(o);
-    if(separated) {*sides=separated;return JUNCTION_EVIDENCE_SEPARATED;}
-    /* Graphics use the same temporal/motion proof and clearance lock. */
-    if(o.region_count>1 && o.white_count>=3) {
+    /* 印刷电阻也是计数节点；与真实支路共用连续帧、位移和离口去重。
+     * 图形穿越保持航向的分类仍由巡线层独立使用，不否决这里的节点。 */
+    bool hollow=o.region_count==2 && o.white_count>=2 &&
+        (o.line_mask&0x18U)==0 && (o.line_mask&0x07U) && (o.line_mask&0xe0U);
+    if((o.region_count==2 && o.white_count>=3) || hollow) {
         *sides=(uint8_t)(((o.line_mask&0x07U)?1U:0U)|((o.line_mask&0xe0U)?2U:0U));
         if(!*sides) *sides=3U;
         return JUNCTION_EVIDENCE_SEPARATED;
     }
+    uint8_t separated=separated_sides(o);
+    if(separated) {*sides=separated;return JUNCTION_EVIDENCE_SEPARATED;}
+    /* 未满足图形证据的多区域不计数；单区域宽横边和侧分支均可计数。 */
     if(o.region_count!=1) return JUNCTION_EVIDENCE_NONE;
     *sides=branch_sides(o);
+    /* 空心电阻横边通常只覆盖居中四路，不一定触及最外侧两路。 */
+    if(o.white_count>=4 && (o.line_mask&0x18U)==0x18U && !*sides) *sides=3U;
     if(*sides && (o.line_mask&0x18U) && o.white_count>=3)
         return JUNCTION_EVIDENCE_CENTER_BRANCH;
-    if(*sides && route_is_narrow_line(o) && o.white_count<=JUNCTION_EDGE_MAX_WIDTH)
-        return JUNCTION_EVIDENCE_EDGE;
+    /* 2026-11-06: a narrow line with only an outer group (no central pair) is
+     * a printed symbol's V arm / resistor cap, not a branch; the old weak EDGE
+     * node is retired so symbols cannot authorize or miscount junctions. */
     *sides=0;
     return JUNCTION_EVIDENCE_NONE;
 }
@@ -71,9 +90,11 @@ static void reset_evidence(RoutePlanner *p, uint32_t now)
     p->candidate_count=p->exit_count=p->approach_center_count=0;
     p->have_approach_center=p->exit_candidate_pending=false;
     p->turn_capturing=p->corner_arc_complete=false;
+    p->turn_rewind_active=p->turn_rewind_pending=false;
     p->line_exit_confirmed=p->turn_ended_on_line=p->capture_line_seen=false;
     p->capture_line_samples=0;
     p->next_junction_samples=0;p->candidate_separated=false;
+    p->turn_branch_samples=0;p->turn_branch_sides=0;
     p->line_confirmed_exit_used=false;
     p->candidate_kind=JUNCTION_EVIDENCE_NONE;p->candidate_sides=0;
     p->next_junction_sides=0;
@@ -89,6 +110,8 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
 {
     memset(p,0,sizeof(*p));
     p->steps=steps; p->count=count; p->repeat_count=ROUTE_REPEAT_COUNT;
+    p->start_x_cm=ROUTE_START_X_CM;p->start_y_cm=ROUTE_START_Y_CM;
+    p->start_heading_rad=ROUTE_START_HEADING_RAD;
     p->repeat_action=ROUTE_REPEAT_ACTION; p->stop_callback=callback; p->callback_context=context;
     p->valid=steps!=NULL && count>0;
     for(size_t i=0;p->valid && i<count;++i) {
@@ -104,7 +127,10 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
              fabsf(s.angle_deg)>=60.0f && fabsf(s.angle_deg)<=HEXAGON_MAX_ANGLE_DEG &&
              !s.corner_arc_enabled)) &&
             (s.action!=STOP || i==count-1) &&
-            (!s.corner_arc_enabled || (isfinite(CORNER_RADIUS_CM) && CORNER_RADIUS_CM>WHEEL_TRACK_CM*.5f));
+            (!s.corner_arc_enabled || (isfinite(CORNER_RADIUS_CM) && CORNER_RADIUS_CM>WHEEL_TRACK_CM*.5f)) &&
+            isfinite(s.short_link_cm) && (s.short_link_cm==0 ||
+             (i>0 && s.short_link_cm>=SHORT_LINK_MIN_CM && s.short_link_cm<=SHORT_LINK_MAX_CM &&
+              ordinary_right_angle(s) && ordinary_right_angle(steps[i-1])));
     }
     if(p->valid && steps[count-1].action!=STOP) p->valid=false;
     p->state=p->valid?ROUTE_FOLLOW:ROUTE_FAILED;
@@ -112,6 +138,20 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
 }
 void route_start(RoutePlanner *p,float d,uint32_t now)
 {
+    p->short_link_tracking=p->short_link_active=p->turn_approaching=false;
+    p->post_turn_slow=false;p->post_turn_samples=0;
+    /* Absolute corner waypoints: anchored start pose plus the cumulative table
+     * chain (the table already subtracts the 5 cm margin, added back here). */
+    {
+        float wx=p->start_x_cm, wy=p->start_y_cm, wh=p->start_heading_rad;
+        for(size_t i=0;i<p->count && i<ROUTE_MAX_STEPS;++i) {
+            float len=p->steps[i].segment_length_cm>0.0f
+                ? p->steps[i].segment_length_cm+ROUTE_WAYPOINT_MARGIN_CM : 0.0f;
+            wx+=len*cosf(wh); wy+=len*sinf(wh);
+            p->waypoint_x_cm[i]=wx; p->waypoint_y_cm[i]=wy;
+            wh+=(p->steps[i].angle_deg*(float)M_PI)/180.0f;
+        }
+    }
     p->index=0; p->completed_laps=0; p->junctions_seen=0;
     p->origin_cm=p->final_segment_origin_cm=d;
     p->segment_ms=now; p->passing_junction=p->lap_boundary=false;
@@ -189,11 +229,20 @@ static void begin_action(RoutePlanner *p,float d,float h,uint32_t now)
 {
     p->state=ROUTE_EXECUTING; p->phase_ms=now;
     p->entry_cm=d;
-    p->entry_heading=p->action_start_heading=h;
+    if(!p->short_link_active) p->entry_heading=h;
+    p->action_start_heading=p->entry_heading;
+    p->turn_approach_origin_cm=d;
+    p->turn_approach_cm=fmaxf(0.0f,
+        TURN_PIVOT_APPROACH_CM-(p->pose_mode?p->pose_trigger_late_cm:0.0f));
+    p->turn_approaching=!p->passing_junction &&
+        ((false && p->steps[p->index].action==HEXAGON) ||
+         (!route_uses_corner_arc(p) &&
+          fabsf(fabsf(route_turn_target_rad(p))-JUNCTION_TURN_TARGET_RAD)<0.0001f &&
+          p->steps[p->index].action!=HEXAGON));
     reset_evidence(p,now);
     if(p->steps[p->index].action==HEXAGON && !p->passing_junction) {
         p->hexagon=(HexagonNavigation){.state=HEXAGON_ENTERING,
-            .phase_ms=now,.action_ms=now,.line_ms=now,.phase_cm=d,.line_cm=d,
+            .phase_ms=now,.action_ms=now,.line_ms=now,.phase_cm=d,.line_cm=d,.branch_cm=d,
             .hold_heading=h};
     }
 }
@@ -228,9 +277,43 @@ static void anchor_next_segment(RoutePlanner *p,float d,uint32_t now)
     p->next_segment_origin_cm=d;p->next_segment_ms=now;
     p->next_segment_origin_valid=true;p->search_pending=false;
 }
+static void start_short_link_tracking(RoutePlanner *p,float d,float h,uint32_t now)
+{
+    p->short_link_active=false;
+    p->short_link_tracking=!p->passing_junction && p->index+1<p->count &&
+        p->steps[p->index+1].short_link_cm>0 && ordinary_right_angle(p->steps[p->index]);
+    if(!p->short_link_tracking) return;
+    p->short_link_heading=p->entry_heading+route_turn_target_rad(p);
+    p->short_link_forward_cm=p->short_link_lateral_cm=0;
+    p->short_link_last_cm=d;p->short_link_last_heading=h;p->short_link_ms=now;
+}
 static void enter_clear(RoutePlanner *p,float d,uint32_t now)
 {
-    p->state=ROUTE_CLEARING;p->phase_ms=now;p->clear_cm=d;
+    if(p->short_link_tracking && !p->passing_junction && p->line_exit_confirmed &&
+       p->index+1<p->count && p->steps[p->index+1].short_link_cm>0) {
+        /* Only a real confirmed preceding exit can grant this explicit geometry
+         * transfer. No node is synthesized and STOP is excluded by validation. */
+        if(fabsf(p->line_exit_heading_rad-p->short_link_heading)>SHORT_LINK_MAX_HEADING_RAD) {
+            p->short_link_tracking=false;
+        } else {
+            /* The preceding pivot's lateral motion measures its effective
+             * turn footprint, including coast. Reuse it only on this explicit
+             * link instead of pretending every moving turn has radius track/2. */
+            p->short_link_pivot_lead_cm=fmaxf(WHEEL_TRACK_CM*.5f,fabsf(p->short_link_lateral_cm));
+            if(p->short_link_pivot_lead_cm>SHORT_LINK_MAX_LATERAL_CM ||
+               p->steps[p->index+1].short_link_cm-p->short_link_pivot_lead_cm-p->short_link_forward_cm<1.0f) {
+                p->short_link_tracking=false;fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);return;
+            }
+            ++p->index;p->junctions_seen=0;
+            p->origin_cm=p->final_segment_origin_cm=d;p->segment_ms=now;
+            begin_action(p,d,p->short_link_heading,now);
+            p->short_link_active=true;
+            float remaining=p->steps[p->index].short_link_cm-p->short_link_pivot_lead_cm-p->short_link_forward_cm;
+            p->turn_approach_origin_cm=d-(TURN_PIVOT_APPROACH_CM-remaining);
+            return;
+        }
+    }
+    p->state=ROUTE_CLEARING;p->post_turn_slow=p->pose_mode;p->phase_ms=now;p->clear_cm=d;
     p->exit_count=0;p->exit_candidate_pending=false;
     p->turn_capturing=false;p->turn_ended_on_line=true;
     if(!p->passing_junction && route_current_action(p)!=STRAIGHT)
@@ -260,6 +343,19 @@ static bool complete_clear(RoutePlanner *p,float d,uint32_t now)
     p->final_segment_active=true;
     p->state=ROUTE_FOLLOW;reset_evidence(p,now);
     return true;
+}
+/* “几何 − 5 cm”的表内距离是车轴里程。传感器前伸 24 cm，短段上出口确认时
+ * 前探头可能已经越过下一个节点；因此相邻交接额外允许“探头位置达标”：
+ * 探头里程 = 车轴里程 + GRAY_FORWARD_OFFSET_CM。它只用于相邻节点的交接
+ * 资格，不改变主计数的里程基准和速度包络。 */
+static bool next_segment_sensor_ready(const RoutePlanner *p,float d)
+{
+    if(p->passing_junction || !p->next_segment_origin_valid) return false;
+    size_t next=p->index+1U;
+    if(next>=p->count) return false;
+    float length=p->steps[next].segment_length_cm;
+    if(!(length>0.0f)) return false;
+    return d+GRAY_FORWARD_OFFSET_CM-p->next_segment_origin_cm>=length;
 }
 static bool component_recovery(RoutePlanner *p,GrayObservation o,float d,float h,
                                uint32_t now,bool adjacent,bool eligible)
@@ -301,123 +397,146 @@ static bool component_recovery(RoutePlanner *p,GrayObservation o,float d,float h
      * or changing the turn angle baseline. */
     return false;
 }
+static float ring_vertex_x(int dir,int i,float sign)
+{
+    (void)sign;
+    int k=dir>0 ? (6-(i%6))%6 : i%6;
+    return HEXAGON_CENTER_X_CM+HEXAGON_SIDE_CM*cosf(-(float)k*(float)M_PI/3.0f);
+}
+static float ring_vertex_y(int dir,int i,float sign)
+{
+    (void)sign;
+    int k=dir>0 ? (6-(i%6))%6 : i%6;
+    return HEXAGON_CENTER_Y_CM+HEXAGON_SIDE_CM*sinf(-(float)k*(float)M_PI/3.0f);
+}
+/* Pose-driven regular hexagon traversal (2026-11-07).
+ *
+ * The ring has one external connection (right vertex V0), so a loop entered
+ * from one side has to leave on the other side.  The table's HEXAGON angle
+ * sign selects the direction (+ = clockwise) and the traversal uses the known
+ * 35 cm edges / 60 deg vertices with odometry + IMU: waiting for the 24 cm
+ * look-ahead bar to find the next vertex cannot work on 35 cm edges, and the
+ * old tangent/branch exit assumption does not hold for this lollipop.
+ * The 8-channel line still centres the car along each edge. */
 static void hexagon_update(RoutePlanner *p,GrayObservation o,float d,float h,
                            uint32_t now,bool adjacent)
 {
     HexagonNavigation *x=&p->hexagon;
-    float sign=route_current_action(p)==LEFT?-1.0f:1.0f;
-    float turn=sign*(h-p->entry_heading),target=fabsf(route_turn_target_rad(p));
-    bool entering=x->state==HEXAGON_ENTERING;
-    bool exiting=x->state==HEXAGON_EXITING;
-    bool line=route_is_narrow_line(o) && o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH;
-    bool center=line && fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
-    x->use_line=false;
-    /* All deadlines precede evidence acceptance, including graphic recovery.
-     * Net yaw (not sum(abs(delta))) prevents oscillations from earning a lap. */
-    if(turn < -JUNCTION_WRONG_WAY_RAD || turn>target+HEXAGON_OVERANGLE_RAD) {
-        fail(p,turn<0?ROUTE_FAILURE_WRONG_WAY:ROUTE_FAILURE_TURN_LIMIT);return;
-    }
+    int dir=route_turn_target_rad(p)>=0.0f?1:-1;
+    float h0=p->entry_heading;
+    const float turn_angles[7]={HEXAGON_ENTRY_TURN_RAD,HEXAGON_TURN_RAD,HEXAGON_TURN_RAD,
+        HEXAGON_TURN_RAD,HEXAGON_TURN_RAD,HEXAGON_TURN_RAD,HEXAGON_ENTRY_TURN_RAD};
+    float cumulative[7];
+    for(int i=0;i<7;++i) cumulative[i]=(i>0?cumulative[i-1]:0.0f)+turn_angles[i];
+    float axle_x=p->pose_axle_x_cm,axle_y=p->pose_axle_y_cm;
     if((uint32_t)(now-x->action_ms)>=HEXAGON_ACTION_TIMEOUT_MS ||
-       fabsf(d-p->entry_cm)>=HEXAGON_ACTION_MAX_CM ||
-       (entering && ((uint32_t)(now-x->phase_ms)>=HEXAGON_ENTRY_TIMEOUT_MS ||
-                     fabsf(d-x->phase_cm)>=HEXAGON_ENTRY_MAX_CM)) ||
-       (exiting && ((uint32_t)(now-x->phase_ms)>=HEXAGON_EXIT_TIMEOUT_MS ||
-                    fabsf(d-x->phase_cm)>=HEXAGON_EXIT_MAX_CM))) {
+       fabsf(d-p->entry_cm)>=HEXAGON_ACTION_MAX_CM) {
         fail(p,ROUTE_FAILURE_ACTION_TIMEOUT);return;
     }
-    uint32_t loss_ms=entering?HEXAGON_ENTRY_LOST_MS:INTERFERENCE_TIMEOUT_MS;
-    float loss_cm=entering?HEXAGON_ENTRY_LOST_CM:INTERFERENCE_MAX_DISTANCE_CM;
-    if(!p->component_recovery_active &&
-       ((uint32_t)(now-x->line_ms)>=loss_ms || fabsf(d-x->line_cm)>=loss_cm)) {
-        fail(p,ROUTE_FAILURE_EXIT_LOST);return;
-    }
-    if(!adjacent) {
-        x->line_samples=x->branch_samples=x->center_samples=0;
-        x->center_pending=false;x->exit_armed=false;p->have_approach_center=false;
-        if(x->state==HEXAGON_EXIT_CANDIDATE) x->state=HEXAGON_FOLLOWING;
-    }
-    /* A fresh opposite-side branch AFTER the configured angle is necessary.
-     * The ordinary turn's early line-only completion is deliberately absent. */
-    uint8_t sides;
-    JunctionEvidence kind=junction_shape(o,&sides);
-    uint8_t exit_side=sign>0?1U:2U;
-    bool history=p->have_approach_center &&
-        (uint32_t)(now-p->approach_center_ms)<JUNCTION_CENTER_MEMORY_MS &&
-        d>=p->approach_center_cm && d-p->approach_center_cm<=JUNCTION_CENTER_MEMORY_CM;
-    if(turn<target || p->component_recovery_active) x->exit_armed=false;
-    bool branch=adjacent && turn>=target && sides==exit_side &&
-        kind!=JUNCTION_EVIDENCE_NONE && !p->component_recovery_active;
-    if(x->state==HEXAGON_FOLLOWING && x->exit_armed && branch && history) {
-        x->exit_armed=false;
-        x->state=HEXAGON_EXIT_CANDIDATE;x->branch_ms=now;x->branch_cm=d;
-        x->branch_samples=0;p->candidate_kind=kind;x->hold_heading=h;
-    }
-    if(x->state==HEXAGON_EXIT_CANDIDATE) {
-        if((uint32_t)(now-x->branch_ms)>=JUNCTION_CONFIRM_TIMEOUT_MS) {
-            fail(p,ROUTE_FAILURE_CONFIRM_TIMEOUT);return;
+    /* Direction / over-rotation guards (the polygon FSM bypasses the generic
+     * EXECUTING checks, so it must not lose them). */
+    {
+        float target_rad=fabsf(route_turn_target_rad(p));
+        float net=(h-h0)*(float)dir;
+        if(net<-JUNCTION_WRONG_WAY_RAD) {fail(p,ROUTE_FAILURE_WRONG_WAY);return;}
+        if(net>target_rad+HEXAGON_OVERANGLE_RAD) {
+            fail(p,ROUTE_FAILURE_TURN_LIMIT);return;
         }
-        if(!branch) {
-            x->state=HEXAGON_FOLLOWING;x->branch_samples=0;
-        } else {
-            if(kind!=JUNCTION_EVIDENCE_CENTER_BRANCH) p->candidate_kind=kind;
-            bool weak=p->candidate_kind!=JUNCTION_EVIDENCE_CENTER_BRANCH;
-            unsigned samples=weak?JUNCTION_EDGE_CONFIRM_SAMPLES:JUNCTION_CONFIRM_SAMPLES;
-            float distance=weak?JUNCTION_EDGE_CONFIRM_CM:JUNCTION_CONFIRM_DISTANCE_CM;
-            if(x->branch_samples<samples) ++x->branch_samples;
-            if(x->branch_samples>=samples && d-x->branch_cm>=distance) {
-                x->state=HEXAGON_EXITING;x->phase_ms=now;x->phase_cm=d;
-                x->hold_heading=h;x->center_samples=0;x->center_pending=false;
-                x->line_samples=0;
+    }
+    bool narrow=route_is_narrow_line(o);
+    bool centered=narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
+    /* Only a completely blank bar is true loss inside the ring; the printed
+     * R14 symbol and the vertex joins keep some channel lit. */
+    if(o.line_mask!=0 && adjacent) {x->line_ms=now;x->line_cm=d;}
+    if(x->state==HEXAGON_ENTERING) {
+        /* The action starts when the look-ahead bar reaches V0; drive straight
+         * until the axle is one turn-lead short of the vertex. */
+        float vx=ring_vertex_x(dir,0,0.0f),vy=ring_vertex_y(dir,0,0.0f);
+        float raw_gap=hypotf(axle_x-vx,axle_y-vy);
+        float entry_lead=WHEEL_TRACK_CM*0.5f*tanf(0.5f*turn_angles[0]);
+        if(raw_gap>entry_lead+0.6f) {
+            x->turning=false;
+            x->use_line=narrow && centered;
+            x->target_heading=h0;
+            if((uint32_t)(now-x->action_ms)>=HEXAGON_ACTION_TIMEOUT_MS ||
+               fabsf(d-p->entry_cm)>=HEXAGON_ENTRY_APPROACH_MAX_CM)
+                fail(p,ROUTE_FAILURE_ENTRY_SPEED);
+            return;
+        }
+        x->turning=true;x->turn_index=0;
+        x->target_heading=h0+(float)dir*turn_angles[0];
+        x->vertex_x_cm=ring_vertex_x(dir,1,0.0f);x->vertex_y_cm=ring_vertex_y(dir,1,0.0f);
+        x->leg_from_x_cm=vx;x->leg_from_y_cm=vy;
+        x->state=HEXAGON_FOLLOWING;
+        return;
+    }
+    if(x->state==HEXAGON_FOLLOWING) {
+        if(x->turning) {
+            x->use_line=false;
+            float err=x->target_heading-h;
+            if(fabsf(atan2f(sinf(err),cosf(err)))<=HEXAGON_TURN_TOL_RAD) {
+                x->turning=false;x->leg_start_cm=d;
+                x->line_seen=true;x->line_ms=now;x->line_cm=d;
+                if((int)x->turn_index>=6) {
+                    /* Pose-mode exit: the axle is at V0 and already turned onto
+                     * the external line, hand over directly. */
+                    x->state=HEXAGON_DONE;x->use_line=false;
+                    p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+                    enter_clear(p,d,now);return;
+                }
+                x->leg_from_x_cm=ring_vertex_x(dir,(int)x->turn_index,0.0f);
+                x->leg_from_y_cm=ring_vertex_y(dir,(int)x->turn_index,0.0f);
+                x->vertex_x_cm=ring_vertex_x(dir,(int)x->turn_index+1,0.0f);
+                x->vertex_y_cm=ring_vertex_y(dir,(int)x->turn_index+1,0.0f);
             }
-            /* Choose tangent continuation. Freeze position PID on the branch. */
+            return;
+        }
+        {
+            float next_angle=fabsf(turn_angles[(int)x->turn_index+1]);
+            float lead=WHEEL_TRACK_CM*0.5f*tanf(0.5f*next_angle);
+            float gap=hypotf(x->vertex_x_cm-axle_x,x->vertex_y_cm-axle_y);
+            if(gap<=lead+(p->pose_valid?0.6f:0.0f)) {
+                ++x->turn_index;
+                x->turning=true;
+                x->target_heading=h0+(float)dir*cumulative[(int)x->turn_index];
+                x->use_line=false;
+                return;
+            }
+            x->use_line=centered || (narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT+1.0f);
+            /* Blind stretch: bound the leg by the pose cross-track instead of
+             * the 400 ms grey-loss timer. */
+            float ldx=x->vertex_x_cm-x->leg_from_x_cm;
+            float ldy=x->vertex_y_cm-x->leg_from_y_cm;
+            float llen=hypotf(ldx,ldy);
+            if(llen>1e-3f)
+                x->cross_cm=(-(axle_x-x->leg_from_x_cm)*ldy+
+                             (axle_y-x->leg_from_y_cm)*ldx)/llen;
+            else x->cross_cm=0.0f;
+            if(p->pose_valid && fabsf(x->cross_cm)>HEXAGON_LEG_CROSS_MAX_CM) {
+                fail(p,ROUTE_FAILURE_EXIT_LOST);return;
+            }
             return;
         }
     }
-    bool recovering=p->component_recovery_active;
-    if(component_recovery(p,o,d,h,now,adjacent,x->line_seen && !line)) {
-        x->line_samples=x->center_samples=0;x->center_pending=false;
-        p->have_approach_center=false;
+    if(x->state==HEXAGON_EXITING) {
+        x->use_line=centered;
+        if((uint32_t)(now-x->phase_ms)>=HEXAGON_EXIT_TIMEOUT_MS ||
+           fabsf(d-x->phase_cm)>=HEXAGON_EXIT_MAX_CM) {
+            fail(p,ROUTE_FAILURE_EXIT_LOST);return;
+        }
+        if(!centered) {x->center_samples=0;x->center_pending=false;}
+        else {
+            if(!x->center_pending) {x->center_pending=true;x->center_ms=now;x->center_cm=d;}
+            if(x->center_samples<LINE_CONFIRM_SAMPLES) ++x->center_samples;
+        }
+        if(x->center_samples>=LINE_CONFIRM_SAMPLES &&
+           (uint32_t)(now-x->center_ms)>=HEXAGON_EXIT_CONFIRM_MS &&
+           d-x->center_cm>=HEXAGON_EXIT_CONFIRM_CM) {
+            x->state=HEXAGON_DONE;
+            p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+            enter_clear(p,d,now);
+        }
         return;
-    }
-    if(recovering) {
-        /* component_recovery proved three centered frames before returning. */
-        x->line_ms=now;x->line_cm=d;x->line_samples=LINE_CONFIRM_SAMPLES;
-    }
-    if(!line || !adjacent) x->line_samples=0;
-    if(line && adjacent && x->line_samples<LINE_CONFIRM_SAMPLES) ++x->line_samples;
-    bool stable=x->line_samples>=LINE_CONFIRM_SAMPLES;
-    if(stable && (!entering || turn>=HEXAGON_ENTRY_MIN_RAD)) {
-        x->line_seen=true;x->line_ms=now;x->line_cm=d;x->hold_heading=h;
-        p->capture_line_seen=true;p->capture_line_ms=now;p->capture_line_cm=d;
-    }
-    if(entering) {
-        if(stable && turn>=HEXAGON_ENTRY_MIN_RAD) {
-            x->state=HEXAGON_FOLLOWING;x->phase_ms=now;x->phase_cm=d;
-        } else return;
-    }
-    x->use_line=line && stable;
-    if(center && stable) {
-        p->have_approach_center=true;p->approach_center_ms=now;p->approach_center_cm=d;
-        /* Require a post-angle corridor before accepting a new branch.
-         * A branch already visible before the angle must not be banked. */
-        if(turn>=target && x->state==HEXAGON_FOLLOWING) x->exit_armed=true;
-    }
-    if(x->state!=HEXAGON_EXITING) return;
-    /* Angle must remain satisfied throughout outgoing-line confirmation.
-     * No 95% shortcut and no success on deadline. A single center frame,
-     * an edge, or lingering branch cannot complete HEXAGON. */
-    bool exit=center && stable && adjacent && turn>=target;
-    if(!exit) {x->center_samples=0;x->center_pending=false;}
-    if(exit && !x->center_pending) {
-        x->center_pending=true;x->center_ms=now;x->center_cm=d;
-    }
-    if(exit && x->center_samples<LINE_CONFIRM_SAMPLES) ++x->center_samples;
-    if(x->center_samples>=LINE_CONFIRM_SAMPLES &&
-       (uint32_t)(now-x->center_ms)>=HEXAGON_EXIT_CONFIRM_MS &&
-       d-x->center_cm>=HEXAGON_EXIT_CONFIRM_CM) {
-        x->state=HEXAGON_DONE;
-        p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
-        enter_clear(p,d,now);
     }
 }
 
@@ -455,12 +574,12 @@ float route_cruise_speed(const RoutePlanner *p)
 bool route_target_ready(const RoutePlanner *p,float d,bool next)
 {
     RouteStep s=p->steps[p->index];
-    /* 计数表项只由路口计数授权动作。总段长度用于限速/减速包络，
-     * 不能因距离耗尽就把下一个检测到的路口提前当目标，否则计数4的
-     * 路段会在第一个路口直接转弯。计数0的旧表项仍允许仅按长度搜口。 */
-    if(s.junction_count>0)
-        return (uint32_t)p->junctions_seen+(next?1U:0U)>=s.junction_count;
-    return s.segment_length_cm>0 && d-p->origin_cm>=s.segment_length_cm;
+    /* 最多路口数与总段距离任一满足后，仍须由调用方确认真实灰度节点。
+     * 距离本身不触发动作；计数包含当前正在确认的节点。 */
+    bool count_ready=s.junction_count>0 &&
+        (uint32_t)p->junctions_seen+(next?1U:0U)>=s.junction_count;
+    bool distance_ready=s.segment_length_cm>0 && d-p->origin_cm>=s.segment_length_cm;
+    return count_ready || distance_ready;
 }
 bool route_recover_navigation(RoutePlanner *p,float d,float h,uint32_t now)
 {
@@ -472,6 +591,7 @@ bool route_recover_navigation(RoutePlanner *p,float d,float h,uint32_t now)
         break;
     default: return false; /* Invalid feedback/config and sustained loss remain stops. */
     }
+    p->short_link_tracking=p->short_link_active=p->turn_approaching=false;
     p->navigation_warning=p->failure;
     if(p->navigation_recoveries<UINT32_MAX) ++p->navigation_recoveries;
     p->failure=ROUTE_FAILURE_NONE;
@@ -480,14 +600,69 @@ bool route_recover_navigation(RoutePlanner *p,float d,float h,uint32_t now)
     p->capture_line_ms=now;p->capture_line_cm=d;
     return true;
 }
-void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now)
+void route_update_pose(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now,
+                       float axle_x_cm,float axle_y_cm)
 {
     if(p->state==ROUTE_FINISHED || p->state==ROUTE_FAILED || p->state==ROUTE_DISABLED) return;
     if(!p->valid || p->index>=p->count || !isfinite(d) || !isfinite(h) ||
        !isfinite(p->measured_left_cm_s) || !isfinite(p->measured_right_cm_s)) {
         fail(p,ROUTE_FAILURE_INVALID);return;
     }
+    /* Pose (encoder/IMU) navigation state: the caller supplies the axle pose in
+     * track cm. NaN (legacy wrapper) or POSE_NAV_ENABLED=0 keeps the grey-only
+     * contract; see include/motion_config.h. */
+    p->pose_valid = POSE_NAV_ENABLED && isfinite(axle_x_cm) && isfinite(axle_y_cm) &&
+                    p->count>0 && p->count<=ROUTE_MAX_STEPS;
+    p->pose_mode = p->pose_valid;
+    p->pose_axle_x_cm=axle_x_cm;p->pose_axle_y_cm=axle_y_cm;
+    if(p->pose_valid && p->index<p->count) {
+        float wh=h-(float)M_PI*.5f;
+        float sx=axle_x_cm+GRAY_FORWARD_OFFSET_CM*cosf(wh);
+        float sy=axle_y_cm+GRAY_FORWARD_OFFSET_CM*sinf(wh);
+        p->pose_gap_bar_cm=hypotf(sx-p->waypoint_x_cm[p->index],sy-p->waypoint_y_cm[p->index]);
+        p->pose_bearing_rad=atan2f(p->waypoint_y_cm[p->index]-axle_y_cm,
+            p->waypoint_x_cm[p->index]-axle_x_cm)+(float)M_PI*.5f;
+        float px=p->index>0?p->waypoint_x_cm[p->index-1]:p->start_x_cm;
+        float py=p->index>0?p->waypoint_y_cm[p->index-1]:p->start_y_cm;
+        float dx=p->waypoint_x_cm[p->index]-px,dy=p->waypoint_y_cm[p->index]-py;
+        float len=hypotf(dx,dy);
+        if(len>1e-3f) {
+            p->pose_cross_cm=(-(axle_x_cm-px)*dy+(axle_y_cm-py)*dx)/len;
+            p->pose_cross_bar_cm=p->pose_cross_cm+
+                GRAY_FORWARD_OFFSET_CM*sinf(wh-atan2f(dy,dx));
+            p->pose_seg_heading_rad=atan2f(dy,dx)+(float)M_PI*.5f;
+            p->pose_cross_valid=true;
+        } else {
+            /* Degenerate (zero-length) row: there is no segment line, so hold
+             * the row's entry heading instead of bearing back to the corner. */
+            p->pose_cross_valid=false;p->pose_cross_cm=0.0f;p->pose_cross_bar_cm=0.0f;
+            p->pose_bearing_rad=p->entry_heading;p->pose_seg_heading_rad=p->entry_heading;
+        }
+    } else {
+        p->pose_gap_bar_cm=INFINITY;p->pose_cross_valid=false;
+        p->pose_cross_cm=0.0f;p->pose_cross_bar_cm=0.0f;
+    }
     RouteStep s=p->steps[p->index];
+    if(p->short_link_tracking) {
+        float ds=d-p->short_link_last_cm,dh=h-p->short_link_last_heading;
+        float half=.5f*dh;
+        float chord=fabsf(half)<.0001f?1.0f:sinf(half)/half;
+        float angle=.5f*(h+p->short_link_last_heading)-p->short_link_heading;
+        p->short_link_forward_cm+=ds*chord*cosf(angle);
+        p->short_link_lateral_cm+=ds*chord*sinf(angle);
+        p->short_link_last_cm=d;p->short_link_last_heading=h;
+        if(p->short_link_active) {
+            if((uint32_t)(now-p->short_link_ms)>=SHORT_LINK_TIMEOUT_MS || !((uint32_t)(now-p->last_sample_ms)<=CONTROL_MAX_INTERVAL_MS) ||
+               fabsf(p->short_link_lateral_cm)>SHORT_LINK_MAX_LATERAL_CM ||
+               fabsf(h-p->short_link_heading)>SHORT_LINK_MAX_HEADING_RAD ||
+               ds<-.01f || p->short_link_forward_cm>s.short_link_cm+2.0f) {
+                p->short_link_tracking=p->short_link_active=false;
+                fail(p,ROUTE_FAILURE_EXIT_RECAPTURE);return;
+            }
+            float remaining=s.short_link_cm-p->short_link_pivot_lead_cm-p->short_link_forward_cm;
+            p->turn_approach_origin_cm=d-(TURN_PIVOT_APPROACH_CM-remaining);
+        }
+    }
     if(p->state==ROUTE_RECOVERING) {
         /* Only sustained loss expires recovery, never time spent on reliable line.
          * Deadline precedes any late recovery sample; isolated frames cannot renew it. */
@@ -520,8 +695,44 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
     if(p->state==ROUTE_FOLLOW || p->state==ROUTE_CANDIDATE || p->state==ROUTE_CLEARING)
         refresh_distance(p,d,now);
     if(p->state==ROUTE_FOLLOW || p->state==ROUTE_CANDIDATE) {
+        /* Parallel pose trigger: the table corner is known in track coordinates,
+         * so encoders+IMU can hand the row over even when a printed symbol
+         * hides the wire or the leg is shorter than the 24 cm look-ahead. */
+        if(p->pose_mode && p->state==ROUTE_FOLLOW) {
+            float wx=p->waypoint_x_cm[p->index],wy=p->waypoint_y_cm[p->index];
+            float wh=h-(float)M_PI*.5f;
+            float sx=axle_x_cm+GRAY_FORWARD_OFFSET_CM*cosf(wh);
+            float sy=axle_y_cm+GRAY_FORWARD_OFFSET_CM*sinf(wh);
+            float case_gap=hypotf(axle_x_cm-wx,axle_y_cm-wy);
+            float bar_gap=hypotf(sx-wx,sy-wy);
+            float proj=(wx-axle_x_cm)*cosf(wh)+(wy-axle_y_cm)*sinf(wh);
+            float lateral=fabsf(-(wx-axle_x_cm)*sinf(wh)+(wy-axle_y_cm)*cosf(wh));
+            float bar_proj=proj-GRAY_FORWARD_OFFSET_CM;
+            bool passed=bar_proj<=ROUTE_WAYPOINT_CONFIRM_CM && lateral<=ROUTE_WAYPOINT_GATE_CM;
+            bool reached=bar_gap<=ROUTE_WAYPOINT_CONFIRM_CM || passed;
+            bool fallback=s.segment_length_cm>0.0f &&
+                d-p->origin_cm>=s.segment_length_cm+ROUTE_WAYPOINT_FALLBACK_CM;
+            (void)case_gap;
+            p->pose_trigger_late_cm=bar_proj<0.0f?-bar_proj:0.0f;
+            if((reached||fallback) && s.action!=STRAIGHT) {
+                p->candidate_count=0;p->search_pending=false;p->passing_junction=false;
+                if(p->junctions_seen<UINT16_MAX) ++p->junctions_seen;
+                if(route_current_action(p)!=STRAIGHT && !entry_speed_ready(p)) {
+                    p->state=ROUTE_BRAKING;p->phase_ms=now;p->entry_cm=d;p->entry_heading=h;return;
+                }
+                accept_target(p,d,h,now);return;
+            }
+        }
         bool narrow=route_is_narrow_line(o);
         bool center=narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT;
+        /* Post-turn slow ends as soon as the outgoing line is re-centred: the
+         * pivot's yaw residual is gone and the next corner can be planned at
+         * normal speed again (mirror of the simulator). */
+        if(p->post_turn_slow && narrow && center && adjacent) {
+            if(++p->post_turn_samples>=LINE_CONFIRM_SAMPLES) p->post_turn_slow=false;
+        } else if(p->post_turn_slow && (!narrow || !center)) {
+            p->post_turn_samples=0;
+        }
         /* A continuous overlapping narrow line sliding to one edge is curve
          * evidence, not a newly appearing branch. Latch until stable center
          * returns; a noisy missing frame must not reclassify the same edge. */
@@ -550,7 +761,14 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         bool history=(p->state==ROUTE_CANDIDATE && d>=p->entry_cm) || recent_center;
         uint8_t sides;
         JunctionEvidence kind=junction_shape(o,&sides);
-        bool smooth=kind==JUNCTION_EVIDENCE_EDGE && (sides&p->smooth_edge_sides);
+        /* The three-channel drift is a single sliding line, but a real branch
+         * adds at least a fourth channel before it can reach center. Keep the
+         * existing latch for narrow connected shapes; wider connected shapes
+         * retain the ordinary strong-branch confirmation. */
+        bool smooth=(kind==JUNCTION_EVIDENCE_EDGE ||
+            (kind==JUNCTION_EVIDENCE_CENTER_BRANCH &&
+             o.white_count<=JUNCTION_EDGE_MAX_WIDTH)) &&
+            (sides&p->smooth_edge_sides);
         bool shape=history && kind!=JUNCTION_EVIDENCE_NONE && !smooth;
         /* Real loss / single abrupt frames never count as junctions. */
         if(!shape || !adjacent) {
@@ -596,7 +814,15 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         if(p->candidate_count<samples || d-p->entry_cm<distance) return;
         p->last_confirmed_kind=p->candidate_kind;
         if(p->junctions_seen<UINT16_MAX) ++p->junctions_seen; /* Saturate; lock until clearance. */
-        p->passing_junction=!route_target_ready(p,d,false);
+        bool pose_matches=true;
+        if(p->pose_mode) {
+            float gate=s.action==HEXAGON?ROUTE_WAYPOINT_RING_CONFIRM_CM:ROUTE_WAYPOINT_GATE_CM;
+            float wh=h-(float)M_PI*.5f;
+            float sx=axle_x_cm+GRAY_FORWARD_OFFSET_CM*cosf(wh);
+            float sy=axle_y_cm+GRAY_FORWARD_OFFSET_CM*sinf(wh);
+            pose_matches=hypotf(sx-p->waypoint_x_cm[p->index],sy-p->waypoint_y_cm[p->index])<=gate;
+        }
+        p->passing_junction=!route_target_ready(p,d,false) || !pose_matches;
         p->search_pending=false;
         if(p->passing_junction) { begin_action(p,d,h,now);enter_clear(p,d,now);return; }
         /* 直行过口无强转风险，不设入口轮速门禁；转弯/STOP 仍先降速到位。 */
@@ -611,12 +837,26 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
            fabsf(h-p->entry_heading)>JUNCTION_WRONG_WAY_RAD) {
             fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;
         }
-        if(entry_speed_ready(p)) {
-            /* The confirmed node may have passed under the front sensor while
-             * coasting. Zero targets cannot find it again once speed is low.
-             * Abort into the existing bounded recovery, never turn on loss or
-             * treat recovered plain line as completion of this maneuver. */
-            if(o.line_mask==0) {fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;}
+        /* Sustained loss while braking cannot re-find the node; hand over to the
+         * bounded recovery instead of letting the generic loss guard stop the
+         * run. Single lost frames are still ignored above. */
+        if(!p->short_link_active && !p->pose_mode && o.line_mask==0 &&
+           (uint32_t)(now-p->phase_ms)>=INTERFERENCE_TIMEOUT_MS) {
+            fail(p,ROUTE_FAILURE_ENTRY_SPEED);return;
+        }
+        /* Never start a pivot without any line under the sensor: a component
+         * symbol hides the wire for a few cm, so wait for it to reappear or
+         * hand over to the bounded recovery after the loss budget above. */
+        if(entry_speed_ready(p) && (o.line_mask!=0 || p->short_link_active || p->pose_mode)) {
+            if(p->short_link_active) {
+                p->state=ROUTE_EXECUTING;p->phase_ms=now;p->entry_cm=d;
+                p->turn_approaching=false;reset_evidence(p,now);
+                start_short_link_tracking(p,d,h,now);return;
+            }
+            /* Printed component symbols hide the wire for a few cm around a
+             * node, so a zero mask here is not proof the node is gone. The
+             * action's own approach/exit contracts and the bounded recovery
+             * still guard a blind pivot; do not abort on a single lost frame. */
             accept_target(p,d,h,now);
         }
         return;
@@ -624,10 +864,38 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
     if(s.action==HEXAGON && !p->passing_junction && p->state==ROUTE_EXECUTING) {
         hexagon_update(p,o,d,h,now,adjacent);return;
     }
+    if(p->state==ROUTE_EXECUTING && p->turn_approaching) {
+        if((uint32_t)(now-p->phase_ms)>=JUNCTION_APPROACH_TIMEOUT_MS) {
+            fail(p,ROUTE_FAILURE_ACTION_TIMEOUT);return;
+        }
+        if(d-p->turn_approach_origin_cm<p->turn_approach_cm) return;
+        if(p->short_link_active && !entry_speed_ready(p)) {
+            p->state=ROUTE_BRAKING;p->phase_ms=now;p->entry_cm=d;return;
+        }
+        p->turn_approaching=false;
+        /* Approach wheel inertia may already yaw the chassis; retain the
+         * action's heading reference, including for explicit short links. */
+        p->phase_ms=now;p->entry_cm=d;reset_evidence(p,now);
+        start_short_link_tracking(p,d,h,now);
+    }
     Action action=route_current_action(p);
-    float sign=action==LEFT?-1.0f:1.0f;
+    /* 角度右正左负：CUSTOM_TURN 的转向符号必须取自配置角，
+     * 不能用动作枚举推断，否则 -90° 自定义角会被当成右转。 */
+    float sign=route_turn_target_rad(p)<0.0f?-1.0f:1.0f;
     float turn=(h-p->entry_heading)*sign;
     float target=fabsf(route_turn_target_rad(p));
+    /* Pose exit: on a short leg the outgoing line can run out under the 24 cm
+     * look-ahead bar a few cm after the pivot, so the grey-only contract would
+     * time out.  When the axle has reached the pivot angle at the known corner,
+     * hand the next row over immediately. */
+    if(p->pose_mode && action!=STRAIGHT && !p->passing_junction) {
+        float gap=hypotf(axle_x_cm-p->waypoint_x_cm[p->index],
+                         axle_y_cm-p->waypoint_y_cm[p->index]);
+        if(gap<=ROUTE_WAYPOINT_EXIT_CM && turn>=target-ROUTE_WAYPOINT_EXIT_ANGLE_RAD) {
+            p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+            enter_clear(p,d,now);return;
+        }
+    }
     if(action!=STRAIGHT && (turn < -JUNCTION_WRONG_WAY_RAD ||
        turn>route_turn_threshold_rad(p,JUNCTION_TURN_MAX_RAD))) {
         fail(p,turn<0?ROUTE_FAILURE_WRONG_WAY:ROUTE_FAILURE_TURN_LIMIT);return;
@@ -650,10 +918,28 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
             return;
         }
         bool narrow=route_is_narrow_line(o);
+        bool ordinary_rewind=ordinary_right_angle(s);
+        if(!p->turn_rewind_active && ordinary_rewind) {
+            if(!narrow && turn>=target-0.03f && adjacent) {
+                if(!p->turn_rewind_pending) {p->turn_rewind_pending=true;p->turn_rewind_ms=now;}
+                if((uint32_t)(now-p->turn_rewind_ms)>=150U) p->turn_rewind_active=true;
+            } else p->turn_rewind_pending=false;
+        }
         /* Ordinary turns keep their angle/exit contract through gray loss.
          * Only the action bound aborts to RECOVERING; HEXAGON is separate. */
         if(component_recovery(p,o,d,h,now,adjacent,!narrow && p->capture_line_seen &&
            turn>=target*(1.0f-JUNCTION_EXIT_ANGLE_MARGIN_RATIO))) return;
+        /* 30–40 cm 短段：前探头在转弯途中就会越过下一个节点。这里只记录
+         * “转过 45° 之后”出现的带中心支路证据，作为下一段相邻交接的种子，
+         * 避免把本路口自身的转角读数重复计入。 */
+        if(!p->passing_junction && turn>=0.8f) {
+            uint8_t tsides=0;
+            if(junction_shape(o,&tsides)!=JUNCTION_EVIDENCE_NONE && tsides!=0) {
+                if(p->turn_branch_samples==0) p->turn_branch_sides=tsides;
+                else p->turn_branch_sides&=(uint8_t)tsides;
+                if(p->turn_branch_samples<UINT8_MAX) ++p->turn_branch_samples;
+            }
+        }
         p->turn_capturing=narrow && turn>=route_turn_threshold_rad(p,JUNCTION_CAPTURE_MIN_RAD);
         if(p->turn_capturing) {
             if(!adjacent) p->capture_line_samples=0;
@@ -670,7 +956,8 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         bool ordinary_exit=s.action!=CUSTOM_TURN ||
             fabsf(fabsf(route_turn_target_rad(p))-JUNCTION_TURN_TARGET_RAD)<0.0001f;
         bool angle_full=turn>=target;
-        bool line_ready=ordinary_exit && p->turn_capturing &&
+        float alignment=p->turn_rewind_active?fmaxf(JUNCTION_EXIT_ALIGNMENT_RAD,JUNCTION_EXIT_REWIND_RAD+0.03f):JUNCTION_EXIT_ALIGNMENT_RAD;
+        bool line_ready=ordinary_exit && turn>=target-alignment && p->turn_capturing &&
             o.white_count<=JUNCTION_STRAIGHT_EXIT_MAX_WIDTH;
         bool exit=narrow && fabsf(o.position)<=JUNCTION_CENTER_LIMIT &&
             (line_ready || angle_full || turn>=target-JUNCTION_EXIT_ANGLE_MARGIN_RATIO*target);
@@ -690,6 +977,12 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
     if((uint32_t)(now-p->phase_ms)>=JUNCTION_CLEAR_TIMEOUT_MS || d-p->clear_cm>JUNCTION_CLEAR_MAX_CM) {
         fail(p,ROUTE_FAILURE_ACTION_TIMEOUT);return;
     }
+    /* Pose mode: the corner is known, so the clearance dedup cannot gain any
+     * information; a couple of cm keeps the order without letting the outgoing
+     * line loss stop a short leg. */
+    if(p->pose_mode && d-p->clear_cm>=ROUTE_CLEAR_POSE_CM) {
+        complete_clear(p,d,now);return;
+    }
     /* A turn has already confirmed its exit, so lateral recovery is allowed.
      * Straight passage must first prove a centered exit: a diode's side edge
      * is a valid sensor region but is not the intended straight line. */
@@ -702,13 +995,26 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
         bool corridor=p->exit_candidate_pending && p->approach_center_count>=LINE_CONFIRM_SAMPLES &&
             (uint32_t)(now-p->exit_candidate_ms)>=JUNCTION_ADJACENT_EXIT_MS &&
             d-p->exit_candidate_cm>=JUNCTION_ADJACENT_EXIT_CM;
-        uint8_t sides=separated_sides(o);
-        bool branch=sides!=0;
+        /* 相邻路口也可能以单侧 T 形（中心+分支）出现，例如 30 cm 短段
+         * (245,140)->(245,170)；这里与普通路口共用同一形状分型，
+         * 仍需走廊、连续帧、侧别一致和前进位移，不直接放行。 */
+        uint8_t sides=0;
+        JunctionEvidence adjacent_kind=junction_shape(o,&sides);
+        bool branch=adjacent_kind!=JUNCTION_EVIDENCE_NONE && sides!=0;
         if(p->next_junction_samples>0 && !(p->next_junction_sides&sides)) {
             p->next_junction_samples=0;p->candidate_reject=JUNCTION_REJECT_SIDE_CHANGE;
             ++p->candidate_restarts;
         }
-        if(adjacent && branch && (corridor || p->next_junction_samples>0)) {
+        bool sensor_ready=next_segment_sensor_ready(p,d);
+        /* 转弯中已越过的节点：只要按探头距离计已到达下一段长度，就用当时的
+         * 侧别证据补齐交接样本，不再要求出口后的新走廊。 */
+        if(sensor_ready && p->next_junction_samples==0 && p->turn_branch_samples>=LINE_CONFIRM_SAMPLES &&
+           (p->turn_branch_sides&sides)) {
+            p->next_junction_ms=now;p->next_junction_cm=d;
+            p->next_junction_sides=p->turn_branch_sides;
+            p->next_junction_samples=JUNCTION_CONFIRM_SAMPLES;
+        }
+        if(adjacent && branch && (corridor || p->next_junction_samples>0 || sensor_ready)) {
             if(p->next_junction_samples==0) {
                 p->next_junction_ms=now;p->next_junction_cm=d;
                 p->next_junction_sides=sides;
@@ -724,11 +1030,12 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
                 uint8_t confirmed_sides=p->next_junction_sides;
                 if(!complete_clear(p,d,now)) return;
                 p->state=ROUTE_CANDIDATE;p->phase_ms=candidate_ms;p->entry_cm=candidate_cm;
-                p->candidate_count=JUNCTION_CONFIRM_SAMPLES;p->candidate_separated=true;
-                p->candidate_kind=JUNCTION_EVIDENCE_SEPARATED;p->candidate_sides=confirmed_sides;
+                p->candidate_count=JUNCTION_CONFIRM_SAMPLES;
+                p->candidate_separated=adjacent_kind==JUNCTION_EVIDENCE_SEPARATED;
+                p->candidate_kind=adjacent_kind;p->candidate_sides=confirmed_sides;
                 /* Consume the already recorded real samples on the new step;
                  * recursion changes state once and cannot re-enter this branch. */
-                route_update(p,o,d,h,now);return;
+                route_update_pose(p,o,d,h,now,axle_x_cm,axle_y_cm);return;
             }
         } else p->next_junction_samples=0;
         if(adjacent && route_is_narrow_line(o) && fabsf(o.position)<=JUNCTION_CENTER_LIMIT) {

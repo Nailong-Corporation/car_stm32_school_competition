@@ -1,0 +1,6 @@
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+Assertion failed: (p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0), function test_clearance_lateral_motion, file test_navigation.c, line 237.
+test/run_host_tests.sh: line 23: 39632 Abort trap: 6           "$test_binary"

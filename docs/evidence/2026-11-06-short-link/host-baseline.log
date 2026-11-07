@@ -1,0 +1,6 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+In file included from /Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_distance_node_contract.c:3:
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:372:55: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  372 |   RouteStep s[]={{1,16,mirror?LEFT:RIGHT,40,0,arc!=0,0},{1,12,STOP,40,0,false,0, 0}};
+      |                                                       ^
+1 error generated.

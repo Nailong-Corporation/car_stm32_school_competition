@@ -1,0 +1,477 @@
+--- a/include/motion_config.h
++++ b/include/motion_config.h
+@@ -287,6 +287,44 @@
+ /* ±90° 动作的轮轴接近距离：节点由 8 路杆最外通道先看到（半跨约 3.85 cm），
+  * 确认后还要滑行，因而不宜用满 24 cm。该值与仿真器 TURN_PIVOT_APPROACH_CM 同步。 */
+ #define TURN_PIVOT_APPROACH_CM         17.0f
++/* 滚动转弯（2026-11-08 原型）：90° 普通转角改为一条与两段相切的圆弧，
++ * 内轮不再刹到 0：外轮 v*(1+track/2R)、内轮 v*(1-track/2R)。
++ * 出弯切点 X = 角点 + R*出弯方向，出弯控制在到达切点前
++ * CORNER_ARC_EXIT_LEAD_S 交出，由轮速回落自然走完最后几度。
++ * CORNER_ARC_RADIUS_CM=0 关闭轴转；表内 corner_arc_enabled 逐行开启。 */
++#ifndef CORNER_ARC_RADIUS_CM
++#define CORNER_ARC_RADIUS_CM        15.0f
++#endif
++#ifndef CORNER_ARC_SPEED_CM_S
++#define CORNER_ARC_SPEED_CM_S       70.0f
++#endif
++#ifndef CORNER_ARC_HEADING_KP
++#define CORNER_ARC_HEADING_KP       22.0f
++#endif
++#ifndef CORNER_ARC_EXIT_DAMPING
++#define CORNER_ARC_EXIT_DAMPING     2.5f
++#endif
++#ifndef CORNER_ARC_DIFF_SLEW_CM_S2
++#define CORNER_ARC_DIFF_SLEW_CM_S2  900.0f
++#endif
++#ifndef CORNER_ARC_ENTER_TOL_CM
++#define CORNER_ARC_ENTER_TOL_CM     0.5f
++#endif
++#ifndef CORNER_ARC_MIN_LEG_MARGIN_CM
++#define CORNER_ARC_MIN_LEG_MARGIN_CM 4.0f
++#endif
++#ifndef CORNER_ARC_EXIT_LEAD_S
++#define CORNER_ARC_EXIT_LEAD_S      0.05f
++#endif
++#ifndef CORNER_ARC_EXIT_ANGLE_RAD
++#define CORNER_ARC_EXIT_ANGLE_RAD   0.05f
++#endif
++#ifndef CORNER_ARC_EXIT_TOL_CM
++#define CORNER_ARC_EXIT_TOL_CM      3.0f
++#endif
++#ifndef CORNER_ARC_EXIT_ALONG_TOL_CM
++#define CORNER_ARC_EXIT_ALONG_TOL_CM 6.0f
++#endif
+ 
+ /* 转弯已确认出口后再次丢线时，把保持航向向弯内侧回一点：枢轴可能早于真实
+  * 转角数厘米，出口线会落在 8 路杆半跨之外。与仿真器 JUNCTION_EXIT_REWIND_RAD 同步。 */
+@@ -389,7 +427,7 @@
+ #define ROUTE_WAYPOINT_MARGIN_CM 5.0f
+ #define ROUTE_WAYPOINT_CONFIRM_CM 2.5f /* bar-to-corner radius that confirms a row */
+ #define ROUTE_WAYPOINT_FALLBACK_CM 18.0f /* odometry overrun that still hands the row over */
+-#define ROUTE_WAYPOINT_RING_CONFIRM_CM 3.0f /* ring vertex: axle, not the look-ahead bar */
++#define ROUTE_WAYPOINT_RING_CONFIRM_CM 6.0f /* ring vertex: axle, not the look-ahead bar */
+ #define ROUTE_WAYPOINT_GATE_CM 12.0f /* grey node must be this close to the row corner */
+ #define ROUTE_WAYPOINT_EXIT_CM 14.0f /* pose turn hand-off distance from the corner */
+ #define ROUTE_WAYPOINT_EXIT_ANGLE_RAD 0.12f /* looser hand-off covers a faster pivot's residual */
+--- a/include/route.h
++++ b/include/route.h
+@@ -102,6 +102,24 @@
+     bool have_approach_center;
+     bool valid, stop_pending, callback_dispatched;
+     bool corner_arc_complete; /* 90° 轨迹完成后保持捕线，避免纠偏回落时重进圆弧。 */
++    /* 滚动转弯（位姿模式）状态：圆弧几何由行内角点与入弯段方向重建。 */
++    bool arc_active;          /* 轴已到达入弯切点，开始走圆弧 */
++    bool arc_just_exited;     /* 圆弧交出后到下一行动作开始前：保持出弯轮速并押制残余横摆速度 */
++    float arc_roll_cm;        /* 距入弯切点的剩余直走距离（>0 = 还没到） */
++    float arc_progress_rad;   /* 已走过的圆弧角度 0..pi/2 */
++    float arc_radius_err_cm;  /* 实测半径 - R（>0 = 轴在圆外） */
++    float arc_desired_heading_rad; /* 圆弧切线目标航向（直走阶段为入弯段航向） */
++    float arc_outer_cm_s;     /* 外轮目标速度 */
++    float arc_diff_cm_s;      /* 已限幅的差速（正 = 外轮在左） */
++    float arc_diff_slew_cm_s;
++    float arc_lateral_cm;     /* 轴偏离入弯段线的横向距离 */
++    float arc_along_cm;       /* 轴在出弯段方向上的投影（距角点） */
++    float arc_across_cm;      /* 轴偏离出弯段线的横向距离（带符号） */
++    float arc_heading_err_rad;
++    float arc_yaw_rate_rad_s;
++    float arc_last_heading;
++    float arc_exit_lead_rad;
++    uint32_t last_arc_ms;
+     bool turn_capturing, lap_boundary; /* 出口线捕获 / 非末轮 STOP 的闭合动作。 */
+     bool capture_line_seen, line_exit_confirmed;
+     uint8_t capture_line_samples;
+--- a/src/route.c
++++ b/src/route.c
+@@ -16,6 +16,20 @@
+     return !s.corner_arc_enabled && (s.action==LEFT || s.action==RIGHT ||
+         (s.action==CUSTOM_TURN && fabsf(fabsf(s.angle_deg)-90.0f)<0.001f));
+ }
++/* 滚动转弯适用行：仅普通 90° 转角，且本段与下一段都不是显式短连接（短连接仍用枢轴）；
++ * 出弯切点在角点后 R 处，下一行的 24 cm 前伸会提前 ~21 cm 响应，
++ * 因此出弯段至少要留出 2R+margin 的直线。 */
++static bool corner_arc_row(const RouteStep *s,const RouteStep *next)
++{
++    if(!s || !s->corner_arc_enabled) return false;
++    if(s->short_link_cm>0.0f) return false;
++    if(next && next->short_link_cm>0.0f) return false;
++    if(next && next->segment_length_cm+ROUTE_WAYPOINT_MARGIN_CM <
++       2.0f*CORNER_ARC_RADIUS_CM+CORNER_ARC_MIN_LEG_MARGIN_CM) return false;
++    if(s->action==LEFT || s->action==RIGHT) return true;
++    return s->action==CUSTOM_TURN && fabsf(fabsf(s->angle_deg)-90.0f)<0.001f;
++}
++static float wrap_rad(float a) { return atan2f(sinf(a),cosf(a)); }
+ static void fail(RoutePlanner *p, RouteFailure reason)
+ {
+     if (p->failure == ROUTE_FAILURE_NONE) p->failure = reason;
+@@ -90,6 +104,13 @@
+     p->candidate_count=p->exit_count=p->approach_center_count=0;
+     p->have_approach_center=p->exit_candidate_pending=false;
+     p->turn_capturing=p->corner_arc_complete=false;
++    p->arc_active=false;p->arc_roll_cm=0.0f;p->arc_progress_rad=0.0f;
++    p->arc_radius_err_cm=0.0f;p->arc_diff_slew_cm_s=0.0f;
++    p->arc_desired_heading_rad=p->entry_heading;
++    p->arc_outer_cm_s=CORNER_ARC_SPEED_CM_S;p->arc_diff_cm_s=0.0f;
++    p->arc_lateral_cm=0.0f;p->arc_along_cm=0.0f;p->arc_across_cm=0.0f;
++    p->arc_heading_err_rad=0.0f;p->arc_yaw_rate_rad_s=0.0f;
++    p->arc_last_heading=p->entry_heading;p->arc_exit_lead_rad=0.0f;
+     p->turn_rewind_active=p->turn_rewind_pending=false;
+     p->line_exit_confirmed=p->turn_ended_on_line=p->capture_line_seen=false;
+     p->capture_line_samples=0;
+@@ -127,10 +148,12 @@
+              fabsf(s.angle_deg)>=60.0f && fabsf(s.angle_deg)<=HEXAGON_MAX_ANGLE_DEG &&
+              !s.corner_arc_enabled)) &&
+             (s.action!=STOP || i==count-1) &&
+-            (!s.corner_arc_enabled || (isfinite(CORNER_RADIUS_CM) && CORNER_RADIUS_CM>WHEEL_TRACK_CM*.5f)) &&
++            (!s.corner_arc_enabled ||
++             (isfinite(CORNER_ARC_RADIUS_CM) && CORNER_ARC_RADIUS_CM>WHEEL_TRACK_CM*.5f)) &&
+             isfinite(s.short_link_cm) && (s.short_link_cm==0 ||
+              (i>0 && s.short_link_cm>=SHORT_LINK_MIN_CM && s.short_link_cm<=SHORT_LINK_MAX_CM &&
+-              ordinary_right_angle(s) && ordinary_right_angle(steps[i-1])));
++              ordinary_right_angle(s) &&
++              (ordinary_right_angle(steps[i-1]) || steps[i-1].corner_arc_enabled)));
+     }
+     if(p->valid && steps[count-1].action!=STOP) p->valid=false;
+     p->state=p->valid?ROUTE_FOLLOW:ROUTE_FAILED;
+@@ -140,6 +163,7 @@
+ {
+     p->short_link_tracking=p->short_link_active=p->turn_approaching=false;
+     p->post_turn_slow=false;p->post_turn_samples=0;
++    p->arc_just_exited=false;p->arc_active=false;
+     /* Absolute corner waypoints: anchored start pose plus the cumulative table
+      * chain (the table already subtracts the 5 cm margin, added back here). */
+     {
+@@ -183,7 +207,8 @@
+ /* 普通左右转、闭合左右转及显式 ±90° 共用切角；其他自定义角度保持原策略。 */
+ bool route_uses_corner_arc(const RoutePlanner *p)
+ {
+-    return p->steps[p->index].action!=HEXAGON && p->steps[p->index].corner_arc_enabled &&
++    return !p->passing_junction &&
++        corner_arc_row(&p->steps[p->index], p->index+1<p->count ? &p->steps[p->index+1] : NULL) &&
+         fabsf(fabsf(route_turn_target_rad(p)) - JUNCTION_TURN_TARGET_RAD) < 0.0001f;
+ }
+ 
+@@ -240,6 +265,7 @@
+           fabsf(fabsf(route_turn_target_rad(p))-JUNCTION_TURN_TARGET_RAD)<0.0001f &&
+           p->steps[p->index].action!=HEXAGON));
+     reset_evidence(p,now);
++    p->last_arc_ms=now;p->arc_just_exited=false;
+     if(p->steps[p->index].action==HEXAGON && !p->passing_junction) {
+         p->hexagon=(HexagonNavigation){.state=HEXAGON_ENTERING,
+             .phase_ms=now,.action_ms=now,.line_ms=now,.phase_cm=d,.line_cm=d,.branch_cm=d,
+@@ -253,6 +279,9 @@
+         (a==STOP && ((active_action && p->lap_boundary) || another_lap(p)) && p->repeat_action!=STRAIGHT);
+     float limit=p->steps[index].turn_speed;
+     if(a==HEXAGON) limit=fminf(limit,HEXAGON_SPEED_CM_S);
++    /* 滚动转弯不刹内轮，入弯门槛用圆弧轴速而不是枢轴 settle 速度。 */
++    if(turn && corner_arc_row(&p->steps[index], index+1<p->count ? &p->steps[index+1] : NULL))
++        return CORNER_ARC_SPEED_CM_S;
+     return turn?fminf(limit,JUNCTION_SETTLE_SPEED_CM_S):limit;
+ }
+ float route_entry_speed_limit(const RoutePlanner *p)
+@@ -599,7 +628,75 @@
+     p->state=ROUTE_RECOVERING;p->phase_ms=now;p->clear_cm=d;p->entry_heading=h;
+     p->capture_line_ms=now;p->capture_line_cm=d;
+     return true;
++}
++/* \u6eda\u52a8\u8f6c\u5f2f\u51e0\u4f55\uff1a\u89d2\u70b9 K \u4e0e\u5165\u5f2f\u6bb5\u65b9\u5411 u \u51b3\u5b9a\u4e00\u6761\u4e0e\u4e24\u6bb5\u76f8\u5207\u7684\u5706\u5f27
++ *   \u5165\u5f2f\u5207\u70b9 E = K - R*u
++ *   \u51fa\u5f2f\u5207\u70b9 X = K + R*o        o = u \u6309\u8f6c\u5411\u65cb\u8f6c 90\u00b0
++ *   \u5706\u5fc3     C = K - R*u + R*o
++ * \u8f74\u8ddf\u8fd9\u4e2a\u5706\uff1b\u76ee\u6807\u822a\u5411\u53d6\u5207\u7ebf\uff0c\u6240\u4ee5\u5b83\u662f\u771f\u6b63\u7684\u8def\u5f84\u8ddf\u968f\u800c\u4e0d\u662f\u5e03\u5c14\u67a2\u8f74\u3002 */
++static void corner_arc_update(RoutePlanner *p,float h,float px,float py,float dt)
++{
++    float dir=route_turn_target_rad(p)<0.0f?-1.0f:1.0f;
++    const float R=CORNER_ARC_RADIUS_CM, track=WHEEL_TRACK_CM;
++    float Kx=p->waypoint_x_cm[p->index], Ky=p->waypoint_y_cm[p->index];
++    float Px=p->index>0?p->waypoint_x_cm[p->index-1]:p->start_x_cm;
++    float Py=p->index>0?p->waypoint_y_cm[p->index-1]:p->start_y_cm;
++    float ux=Kx-Px, uy=Ky-Py;
++    float len=hypotf(ux,uy);
++    if(len>1e-3f) { ux/=len; uy/=len; }
++    else { float w=p->entry_heading-(float)M_PI*.5f; ux=cosf(w); uy=sinf(w); }
++    float ox=dir>0.0f?-uy:uy, oy=dir>0.0f?ux:-ux;
++    float Cx=Kx-R*ux+R*ox, Cy=Ky-R*uy+R*oy;
++    float Ex=Kx-R*ux, Ey=Ky-R*uy;
++    float proj=(Kx-px)*ux+(Ky-py)*uy;
++    p->arc_roll_cm=proj-R;
++    p->arc_lateral_cm=(px-Ex)*ox+(py-Ey)*oy;
++    if(!p->arc_active && proj<=R+CORNER_ARC_ENTER_TOL_CM &&
++       fabsf(p->arc_lateral_cm)<=CORNER_ARC_EXIT_TOL_CM*4.0f) {
++        p->arc_active=true;
++        p->arc_last_heading=h;
++        p->arc_yaw_rate_rad_s=0.0f;
++    }
++    float rx=px-Cx, ry=py-Cy;
++    float alpha=atan2f(ry,rx);
++    float alpha_in=atan2f(Ey-Cy,Ex-Cx);
++    p->arc_radius_err_cm=hypotf(rx,ry)-R;
++    float dphi=wrap_rad(alpha-alpha_in)*dir;
++    p->arc_progress_rad=dphi<0.0f?0.0f:(dphi>(float)M_PI*.5f?(float)M_PI*.5f:dphi);
++    float seg_heading=atan2f(uy,ux)+(float)M_PI*.5f;
++    p->arc_desired_heading_rad=p->arc_active
++        ? alpha+dir*(float)M_PI*.5f+(float)M_PI*.5f
++        : seg_heading;
++    float v=CORNER_ARC_SPEED_CM_S;
++    p->arc_outer_cm_s=p->arc_active?v*(1.0f+track/(2.0f*R)):v;
++    float diff_target=p->arc_active?(v*track)/(2.0f*R):0.0f;
++    float step=CORNER_ARC_DIFF_SLEW_CM_S2*dt;
++    if(diff_target>p->arc_diff_slew_cm_s)
++        p->arc_diff_slew_cm_s=fminf(diff_target,p->arc_diff_slew_cm_s+step);
++    else
++        p->arc_diff_slew_cm_s=fmaxf(diff_target,p->arc_diff_slew_cm_s-step);
++    p->arc_diff_cm_s=p->arc_diff_slew_cm_s;
++    float target=fabsf(route_turn_target_rad(p));
++    p->arc_along_cm=(px-Kx)*ox+(py-Ky)*oy;
++    p->arc_across_cm=(px-Kx)*ux+(py-Ky)*uy;
++    float out_heading=atan2f(oy,ox)+(float)M_PI*.5f;
++    p->arc_heading_err_rad=wrap_rad(h-out_heading);
++    if(dt>0.0f) {
++        float raw=wrap_rad(h-p->arc_last_heading)/dt;
++        float a=dt/(JUNCTION_YAW_FILTER_TAU_S+dt);
++        p->arc_yaw_rate_rad_s+=a*(raw-p->arc_yaw_rate_rad_s);
++    }
++    p->arc_last_heading=h;
++    p->arc_exit_lead_rad=p->arc_yaw_rate_rad_s*CORNER_ARC_EXIT_LEAD_S;
++    float predicted=wrap_rad(p->arc_heading_err_rad+p->arc_exit_lead_rad);
++    if(p->arc_active && fabsf(predicted)<=CORNER_ARC_EXIT_ANGLE_RAD &&
++       p->arc_along_cm>=R-CORNER_ARC_EXIT_ALONG_TOL_CM &&
++       fabsf(p->arc_across_cm)<=CORNER_ARC_EXIT_TOL_CM) {
++        p->corner_arc_complete=true;
++    }
++    (void)target;
+ }
++
+ void route_update_pose(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now,
+                        float axle_x_cm,float axle_y_cm)
+ {
+@@ -888,12 +985,31 @@
+      * look-ahead bar a few cm after the pivot, so the grey-only contract would
+      * time out.  When the axle has reached the pivot angle at the known corner,
+      * hand the next row over immediately. */
++    bool arc_row=p->pose_mode && action!=STRAIGHT && !p->passing_junction &&
++        route_uses_corner_arc(p);
++    if(arc_row && p->state==ROUTE_EXECUTING) {
++        float arc_dt=(float)(uint32_t)(now-p->last_arc_ms)/1000.0f;
++        if(arc_dt<0.001f) arc_dt=0.001f;
++        if(arc_dt>0.020f) arc_dt=0.020f;
++        corner_arc_update(p,h,axle_x_cm,axle_y_cm,arc_dt);
++        p->last_arc_ms=now;
++    }
+     if(p->pose_mode && action!=STRAIGHT && !p->passing_junction) {
+-        float gap=hypotf(axle_x_cm-p->waypoint_x_cm[p->index],
+-                         axle_y_cm-p->waypoint_y_cm[p->index]);
+-        if(gap<=ROUTE_WAYPOINT_EXIT_CM && turn>=target-ROUTE_WAYPOINT_EXIT_ANGLE_RAD) {
+-            p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+-            enter_clear(p,d,now);return;
++        if(arc_row) {
++            /* 滚动转弯按自己的切线交出，不用“轴距角点 14 cm”的枢轴交接
++             * （那个会提前 ~7° 接管）；且只在 EXECUTING 内，否则会每帧重置 CLEARING 计时。 */
++            if(p->state==ROUTE_EXECUTING && p->corner_arc_complete) {
++                p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
++                p->arc_just_exited=true;
++                enter_clear(p,d,now);return;
++            }
++        } else {
++            float gap=hypotf(axle_x_cm-p->waypoint_x_cm[p->index],
++                             axle_y_cm-p->waypoint_y_cm[p->index]);
++            if(gap<=ROUTE_WAYPOINT_EXIT_CM && turn>=target-ROUTE_WAYPOINT_EXIT_ANGLE_RAD) {
++                p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
++                enter_clear(p,d,now);return;
++            }
+         }
+     }
+     if(action!=STRAIGHT && (turn < -JUNCTION_WRONG_WAY_RAD ||
+--- a/src/line_follow.c
++++ b/src/line_follow.c
+@@ -695,16 +695,21 @@
+      * pre-slow before the known corner so the brake phase does not eat the
+      * pivot approach distance. The window grows with v^2/(2*a_safe). */
+     if(f->route.pose_mode) {
+-        if(f->route.post_turn_slow)
++        /* 滚动转弯出弯后保持圆弧轮速：从 70 降到 20 的不对称减速会在圆弧
++         * 自身回落之外再多转几度，而出弯切点本来就在出弯线上。 */
++        bool rolled_corner=route_uses_corner_arc(&f->route) || f->route.arc_just_exited;
++        if(f->route.post_turn_slow && !rolled_corner)
+             base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
+         float brake_w=(f->odometry.left_speed_cm_s*f->odometry.left_speed_cm_s)/
+             (2.0f*BRAKING_SAFE_DECEL_CM_S2);
+         if(f->route.pose_gap_bar_cm<=fmaxf(ROUTE_WAYPOINT_SLOW_CM,brake_w+8.0f))
+             base_speed=fminf(base_speed,entry_speed_limit);
+     }
+-    /* Exit handoff stays slow even while previewing the next distance envelope. */
++    /* Exit handoff stays slow even while previewing the next distance envelope;
++     * a rolling corner keeps its arc speed instead. */
+     if(f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
+-        base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
++        base_speed=fminf(base_speed,(route_uses_corner_arc(&f->route)||f->route.arc_just_exited)
++            ? CORNER_ARC_SPEED_CM_S : fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
+     if (f->route.state==ROUTE_CANDIDATE &&
+         route_target_ready(&f->route,f->odometry.distance_cm,true))
+         base_speed=fminf(base_speed,entry_speed_limit);
+@@ -751,6 +756,9 @@
+         float desired=f->route.pose_seg_heading_rad+atan2f(-cross,POSE_PURSUIT_LOOKAHEAD_CM);
+         float corr=HEADING_KP_CM_S_PER_RAD*atan2f(sinf(desired-f->odometry.heading_rad),
+                                                   cosf(desired-f->odometry.heading_rad));
++        /* 滚动转弯刚交出时差速仍在回落，按实测横摆角速度押制漂移。 */
++        if(f->route.arc_just_exited || f->route.state==ROUTE_CLEARING)
++            corr-=CORNER_ARC_EXIT_DAMPING*f->turn_yaw_rate_rad_s;
+         float cap=.5f*fmaxf(base_speed,1.0f);
+         corr=fmaxf(-cap,fminf(cap,corr));
+         f->state=usable?LINE_TRACKING:LINE_GAP_HOLD;
+@@ -857,6 +865,24 @@
+             straight_targets(f,pass,HEADING_KP_CM_S_PER_RAD*
+                 (f->route.entry_heading-f->odometry.heading_rad),dt);
+         } else {
++            if(f->route.pose_mode && route_uses_corner_arc(&f->route)) {
++                /* 滚动转弯：轴速恒定在圆弧速度，轮差 = v*track/(2R) 做曲率，
++                 * 对切线航向的误差做反馈（目标航向由圆弧几何给出，
++                 * 所以是真正的路径跟随）。内轮不刹到 0。 */
++                pid_reset(&f->pid);
++                float axle=CORNER_ARC_SPEED_CM_S;
++                float err=atan2f(sinf(f->route.arc_desired_heading_rad-f->odometry.heading_rad),
++                                 cosf(f->route.arc_desired_heading_rad-f->odometry.heading_rad));
++                float differential=direction*f->route.arc_diff_cm_s+CORNER_ARC_HEADING_KP*err;
++                differential=fmaxf(-0.9f*axle,fminf(0.9f*axle,differential));
++                f->left_target_cm_s=fmaxf(0.0f,fminf(WHEEL_TARGET_MAX_CM_S,axle+differential));
++                f->right_target_cm_s=fmaxf(0.0f,fminf(WHEEL_TARGET_MAX_CM_S,axle-differential));
++                f->base=.5f*(f->left_target_cm_s+f->right_target_cm_s);
++                f->correction=.5f*(f->left_target_cm_s-f->right_target_cm_s);
++                f->startup_elapsed_s=fminf(STARTUP_RAMP_TIME_S,f->startup_elapsed_s+dt);
++                f->exit_accelerating=true;
++                goto arc_targets_done;
++            }
+             if(f->route.pose_mode) {
+                 /* Pose-mode pivot: saturated heading feedback towards the exact
+                  * corner heading. The grey line is deliberately not used inside
+@@ -899,6 +925,7 @@
+                 correction-=JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
+             } else pid_reset(&f->pid);
+             turn_targets(f,outer,correction,dt);
++            arc_targets_done: ;
+         }
+     } else if(f->route.state==ROUTE_CLEARING && f->route.next_junction_samples>0) {
+         /* Bounded new-graphic confirmation after a proven turn exit: freeze
+--- a/src/route_table.c
++++ b/src/route_table.c
+@@ -17,81 +17,81 @@
+ 
+ const RouteStep route[] = {
+ #if (ROUTE_SCHEME_SELECT == 0)
+-    { 1, 50.0f, CUSTOM_TURN,  50,   -90.0f, false,   55.0f, 0.0f}, /* 调试 0；几何 60 - 5 = 55 cm */
+-    { 4, 50.0f, CUSTOM_TURN, 200,   -90.0f, false,  175.0f, 0.0f}, /* 调试 1；几何 180 - 5 = 175 cm */
+-    { 2, 50.0f, CUSTOM_TURN, 200,   -90.0f, false,   55.0f, 0.0f}, /* 调试 2；几何 60 - 5 = 55 cm */
++    { 1, 50.0f, CUSTOM_TURN,  50,   -90.0f,true ,   55.0f, 0.0f}, /* 调试 0；几何 60 - 5 = 55 cm */
++    { 4, 50.0f, CUSTOM_TURN, 200,   -90.0f,true ,  175.0f, 0.0f}, /* 调试 1；几何 180 - 5 = 175 cm */
++    { 2, 50.0f, CUSTOM_TURN, 200,   -90.0f,true ,   55.0f, 0.0f}, /* 调试 2；几何 60 - 5 = 55 cm */
+     { 3, 50.0f, STOP       , 200,     0.0f, false,  195.0f, 0.0f}, /* 调试 3；几何 200 - 5 = 195 cm */
+ 
+ #elif (ROUTE_SCHEME_SELECT == 1)
+     /* 正式赛道：走虚线、全元件（调试中） */
+-    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  105.0f, 0.0f}, /* 0: P 北上至 (0,0)；几何 110 - 5 = 105 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   50.0f, 0.0f}, /* 1: 顶边东至 (55,0)；R2 在上一转弯传感器扫过区内，不再计数；几何 55 - 5 = 50 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  135.0f, 0.0f}, /* 2: x55 南下至 (55,140)，过 R3；几何 140 - 5 = 135 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,  105.0f, 0.0f}, /* 0: P 北上至 (0,0)；几何 110 - 5 = 105 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   50.0f, 0.0f}, /* 1: 顶边东至 (55,0)；R2 在上一转弯传感器扫过区内，不再计数；几何 55 - 5 = 50 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  135.0f, 0.0f}, /* 2: x55 南下至 (55,140)，过 R3；几何 140 - 5 = 135 cm */
+     { 2, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  185.0f, 0.0f}, /* 3: y140 东至 Q6(245,140)，右转南下；Q4 位于上一转弯传感器扫过区，计 R5/目标；几何 190 - 5 = 185 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   25.0f, 30.0f}, /* 4: x245 南下至 (245,170)；几何 30 - 5 = 25 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  145.0f, 0.0f}, /* 5: y170 西至 (95,170)，过 Q11；几何 150 - 5 = 145 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   45.0f, 0.0f}, /* 6: x95 南下至 (95,220)；几何 50 - 5 = 45 cm */
+-    { 5, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  275.0f, 0.0f}, /* 7: 底边东至 (375,220)，过 R8/R9/R10；几何 280 - 5 = 275 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  145.0f, 0.0f}, /* 5: y170 西至 (95,170)，过 Q11；几何 150 - 5 = 145 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   45.0f, 0.0f}, /* 6: x95 南下至 (95,220)；几何 50 - 5 = 45 cm */
++    { 5, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  275.0f, 0.0f}, /* 7: 底边东至 (375,220)，过 R8/R9/R10；几何 280 - 5 = 275 cm */
+     { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  105.0f, 0.0f}, /* 8: x375 北上至 (375,110)，过 R12；几何 110 - 5 = 105 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   25.0f, 30.0f}, /* 9: y110 西至 Q13(345,110)；几何 30 - 5 = 25 cm */
+     { 1, 28.0f, HEXAGON    , 100,   360.0f, false,   50.0f, 0.0f}, /* 10: HEXAGON：x345 南下入环（北进），绕环一周后从南侧 x345 出环到 (345,220)；几何 55 - 5 = 50 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   50.0f, 0.0f}, /* 11: x345 南下至 (345,220)；几何 55 - 5 = 50 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   25.0f, 0.0f}, /* 12: 底边东至 (375,220)，左转北上；几何 30 - 5 = 25 cm */
+-    { 6, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  215.0f, 0.0f}, /* 13: x375 北上至 (375,0)，过 R12/R15/y110/y50；几何 220 - 5 = 215 cm */
+-    { 3, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   95.0f, 0.0f}, /* 14: 顶边西至 (275,0)，过 Q16/R17；几何 100 - 5 = 95 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   45.0f, 0.0f}, /* 15: x275 南下至 Q18(275,50)；几何 50 - 5 = 45 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   65.0f, 0.0f}, /* 16: y50 东至 (345,50)，过 R19；几何 70 - 5 = 65 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   45.0f, 0.0f}, /* 17: x345 北上至 Q16(345,0)；几何 50 - 5 = 45 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   50.0f, 0.0f}, /* 11: x345 南下至 (345,220)；几何 55 - 5 = 50 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   25.0f, 0.0f}, /* 12: 底边东至 (375,220)，左转北上；几何 30 - 5 = 25 cm */
++    { 6, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  215.0f, 0.0f}, /* 13: x375 北上至 (375,0)，过 R12/R15/y110/y50；几何 220 - 5 = 215 cm */
++    { 3, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   95.0f, 0.0f}, /* 14: 顶边西至 (275,0)，过 Q16/R17；几何 100 - 5 = 95 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   45.0f, 0.0f}, /* 15: x275 南下至 Q18(275,50)；几何 50 - 5 = 45 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   65.0f, 0.0f}, /* 16: y50 东至 (345,50)，过 R19；几何 70 - 5 = 65 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   45.0f, 0.0f}, /* 17: x345 北上至 Q16(345,0)；几何 50 - 5 = 45 cm */
+     { 6, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  245.0f, 0.0f}, /* 18: 顶边西至 Q22(95,0)，过 R17/x275/x245/R20/R21；几何 250 - 5 = 245 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   35.0f, 40.0f}, /* 19: x95 南下至 (95,40)；几何 40 - 5 = 35 cm */
+     { 2, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   65.0f, 0.0f}, /* 20: y40 东至 (165,40)，过 R23；几何 70 - 5 = 65 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   35.0f, 40.0f}, /* 21: x165 南下至 (165,80)；几何 40 - 5 = 35 cm */
+     { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   75.0f, 0.0f}, /* 22: y80 东至 (245,80)，过 R24；几何 80 - 5 = 75 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   35.0f, 40.0f}, /* 23: x245 北上至 (245,40)；几何 40 - 5 = 35 cm */
+-    { 4, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  145.0f, 0.0f}, /* 24: y40 西至 (95,40)，过 R25/x165/R23；几何 150 - 5 = 145 cm */
++    { 4, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  145.0f, 0.0f}, /* 24: y40 西至 (95,40)，过 R25/x165/R23；几何 150 - 5 = 145 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   95.0f, 0.0f}, /* 25: x95 南下至 Q4(95,140)；几何 100 - 5 = 95 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   35.0f, 40.0f}, /* 26: y140 西至 (55,140)，左转进入虚线；几何 40 - 5 = 35 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   75.0f, 0.0f}, /* 27: x55 虚线仅南下至 (55,220)，过 R26；几何 80 - 5 = 75 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   50.0f, 0.0f}, /* 28: 底边西至 (0,220)；几何 55 - 5 = 50 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   75.0f, 0.0f}, /* 27: x55 虚线仅南下至 (55,220)，过 R26；几何 80 - 5 = 75 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   50.0f, 0.0f}, /* 28: 底边西至 (0,220)；几何 55 - 5 = 50 cm */
+     { 2, 28.0f, STOP       , 100,     0.0f, false,  105.0f, 0.0f}, /* 29: STOP：x0 北上过 R27 至 P；几何 110 - 5 = 105 cm */
+ 
+ #elif (ROUTE_SCHEME_SELECT == 2)
+     /* 正式赛道：不走虚线（调试中） */
+-    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  105.0f, 0.0f}, /* 0: P 北上至 (0,0)；几何 110 - 5 = 105 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   50.0f, 0.0f}, /* 1: 顶边东至 (55,0)；R2 已在上一动作扫过，不再计数；几何 55 - 5 = 50 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  135.0f, 0.0f}, /* 2: x55 南下至 (55,140)；几何 140 - 5 = 135 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,  185.0f, 0.0f}, /* 3: y140 东至 Q6(245,140)，左转北上；Q4 已被上一动作扫过，计 R5/目标；几何 190 - 5 = 185 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   95.0f, 0.0f}, /* 4: x245 北上过 y80 至 (245,40)；几何 100 - 5 = 95 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,  105.0f, 0.0f}, /* 0: P 北上至 (0,0)；几何 110 - 5 = 105 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   50.0f, 0.0f}, /* 1: 顶边东至 (55,0)；R2 已在上一动作扫过，不再计数；几何 55 - 5 = 50 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  135.0f, 0.0f}, /* 2: x55 南下至 (55,140)；几何 140 - 5 = 135 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,  185.0f, 0.0f}, /* 3: y140 东至 Q6(245,140)，左转北上；Q4 已被上一动作扫过，计 R5/目标；几何 190 - 5 = 185 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f,true ,   95.0f, 0.0f}, /* 4: x245 北上过 y80 至 (245,40)；几何 100 - 5 = 95 cm */
+     { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   75.0f, 0.0f}, /* 5: y40 西过 R25 至 (165,40)；几何 80 - 5 = 75 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   35.0f, 40.0f}, /* 6: x165 南下至 (165,80)；几何 40 - 5 = 35 cm */
+     { 2, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   75.0f, 0.0f}, /* 7: y80 东过 R24 至 (245,80)；几何 80 - 5 = 75 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,   -90.0f, false,   35.0f, 40.0f}, /* 8: x245 北上至 (245,40)；几何 40 - 5 = 35 cm */
+     { 3, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  145.0f, 0.0f}, /* 9: y40 西过 x165/R23 至 (95,40)，右转北上；R25在上一动作扫过，60/16回放计3口；几何 150 - 5 = 145 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   35.0f, 40.0f}, /* 10: x95 北上至 Q22(95,0)；几何 40 - 5 = 35 cm */
+-    { 6, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  245.0f, 0.0f}, /* 11: 顶边东至 Q16(345,0)，过 R21/R20/x245/x275/R17；几何 250 - 5 = 245 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   45.0f, 0.0f}, /* 12: x345 南下至 (345,50)；几何 50 - 5 = 45 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   65.0f, 0.0f}, /* 13: y50 西至 Q18(275,50)；R19 在上一转弯扫过区内；几何 70 - 5 = 65 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   45.0f, 0.0f}, /* 14: x275 北上至 (275,0)；几何 50 - 5 = 45 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   95.0f, 0.0f}, /* 15: 顶边东过 Q16 至 (375,0)；R17 已扫过，Q16 仅短候选未确认，实跑计目标1；几何 100 - 5 = 95 cm */
++    { 6, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,  245.0f, 0.0f}, /* 11: 顶边东至 Q16(345,0)，过 R21/R20/x245/x275/R17；几何 250 - 5 = 245 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   45.0f, 0.0f}, /* 12: x345 南下至 (345,50)；几何 50 - 5 = 45 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   65.0f, 0.0f}, /* 13: y50 西至 Q18(275,50)；R19 在上一转弯扫过区内；几何 70 - 5 = 65 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   45.0f, 0.0f}, /* 14: x275 北上至 (275,0)；几何 50 - 5 = 45 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   95.0f, 0.0f}, /* 15: 顶边东过 Q16 至 (375,0)；R17 已扫过，Q16 仅短候选未确认，实跑计目标1；几何 100 - 5 = 95 cm */
+     { 5, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  215.0f, 0.0f}, /* 16: x375 南下至 (375,220)，过 y50/R15/y110/R12；几何 220 - 5 = 215 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   25.0f, 30.0f}, /* 17: 底边西至 (345,220)；几何 30 - 5 = 25 cm */
+     { 1, 28.0f, HEXAGON    , 100,  -360.0f, false,   50.0f, 0.0f}, /* 18: HEXAGON：x345 北上入环（南进），逆时针绕环一周后从北侧 x345 出环到 (345,110)；几何 55 - 5 = 50 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   50.0f, 0.0f}, /* 19: x345 北上至 Q13(345,110)；几何 55 - 5 = 50 cm */
+     { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   25.0f, 30.0f}, /* 20: y110 东至 (375,110)；几何 30 - 5 = 25 cm */
+-    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  105.0f, 0.0f}, /* 21: x375 南下过 R12 至 (375,220)；几何 110 - 5 = 105 cm */
+-    { 5, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  275.0f, 0.0f}, /* 22: 底边西至 (95,220)，过 x345/R10/R9/x150/R8；几何 280 - 5 = 275 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   45.0f, 0.0f}, /* 23: x95 北上至 (95,170)；几何 50 - 5 = 45 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   50.0f, 0.0f}, /* 24: y170 东至 Q11(150,170)；几何 55 - 5 = 50 cm */
+-    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f, false,   45.0f, 0.0f}, /* 25: x150 南下至 (150,220)；几何 50 - 5 = 45 cm */
+-    { 4, 28.0f, CUSTOM_TURN, 100,    90.0f, false,  145.0f, 0.0f}, /* 26: 底边西过 R8/x95/x55 至 (0,220)；几何 150 - 5 = 145 cm */
++    { 2, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,  105.0f, 0.0f}, /* 21: x375 南下过 R12 至 (375,220)；几何 110 - 5 = 105 cm */
++    { 5, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,  275.0f, 0.0f}, /* 22: 底边西至 (95,220)，过 x345/R10/R9/x150/R8；几何 280 - 5 = 275 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   45.0f, 0.0f}, /* 23: x95 北上至 (95,170)；几何 50 - 5 = 45 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   50.0f, 0.0f}, /* 24: y170 东至 Q11(150,170)；几何 55 - 5 = 50 cm */
++    { 1, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,   45.0f, 0.0f}, /* 25: x150 南下至 (150,220)；几何 50 - 5 = 45 cm */
++    { 4, 28.0f, CUSTOM_TURN, 100,    90.0f,true ,  145.0f, 0.0f}, /* 26: 底边西过 R8/x95/x55 至 (0,220)；几何 150 - 5 = 145 cm */
+     { 2, 28.0f, STOP       , 100,     0.0f, false,  105.0f, 0.0f}, /* 27: STOP：x0 北上过 R27 至 P；几何 110 - 5 = 105 cm */
+ 
+ #elif (ROUTE_SCHEME_SELECT == 3)
+     /* 外框测试圈，保留用于基本回归。 */
+-    { 2, 16.0f, CUSTOM_TURN,  60,    90.0f, false,  105.0f, 0.0f}, /* 外框 0；几何 110 - 5 = 105 cm */
+-    { 11, 16.0f, CUSTOM_TURN,  60,    90.0f, false,  370.0f, 0.0f}, /* 外框 1；几何 375 - 5 = 370 cm */
+-    { 5, 16.0f, CUSTOM_TURN,  60,    90.0f, false,  215.0f, 0.0f}, /* 外框 2；几何 220 - 5 = 215 cm */
+-    { 6, 16.0f, CUSTOM_TURN,  60,    90.0f, false,  370.0f, 0.0f}, /* 外框 3；几何 375 - 5 = 370 cm */
++    { 2, 16.0f, CUSTOM_TURN,  60,    90.0f,true ,  105.0f, 0.0f}, /* 外框 0；几何 110 - 5 = 105 cm */
++    { 11, 16.0f, CUSTOM_TURN,  60,    90.0f,true ,  370.0f, 0.0f}, /* 外框 1；几何 375 - 5 = 370 cm */
++    { 5, 16.0f, CUSTOM_TURN,  60,    90.0f,true ,  215.0f, 0.0f}, /* 外框 2；几何 220 - 5 = 215 cm */
++    { 6, 16.0f, CUSTOM_TURN,  60,    90.0f,true ,  370.0f, 0.0f}, /* 外框 3；几何 375 - 5 = 370 cm */
+     { 2, 16.0f, STOP       ,  60,     0.0f, false,  105.0f, 0.0f}, /* 外框 4；几何 110 - 5 = 105 cm */
+ 
+ #endif

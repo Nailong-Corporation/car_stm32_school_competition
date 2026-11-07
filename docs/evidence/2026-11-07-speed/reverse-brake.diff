@@ -1,0 +1,203 @@
+--- a/src/sim/config.ts
++++ b/src/sim/config.ts
+@@ -46,6 +46,41 @@
+ export const MOTOR_MAX_ACCEL_CM_S2 = 250.0;
+ export const MOTOR_MAX_DECEL_CM_S2 = 300.0;
+ 
++/* ---- Reverse (negative-PWM) approach braking: mirrors motion_config.h ----
++ * MOTOR_REVERSE_BRAKE_ENABLED     = firmware motor/speed_control switch (0 default)
++ * BRAKING_REVERSE_HARDWARE_CONFIRMED = firmware line_follow arming switch (0 default)
++ * Both must be 1 for the route controller to arm reverse braking. They are read
++ * from the environment only so experiments can flip them without editing files:
++ *   SIM_MOTOR_REVERSE_BRAKE=1 SIM_BRAKING_REVERSE_HW=1 node tests/...
++ * The browser build has no `process`, so the production defaults (0) apply.
++ * Reverse torque is applied as a bounded negative PWM command; wheel speed
++ * targets stay non-negative, so this can never command reverse driving. */
++const simEnvNum = (name: string, fallback: number): number => {
++  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
++  const raw = env?.[name];
++  if (raw === undefined || raw === '') return fallback;
++  const value = Number(raw);
++  return Number.isFinite(value) ? value : fallback;
++};
++const simEnvInt = (name: string, fallback: number): number => simEnvNum(name, fallback);
++export const MOTOR_REVERSE_BRAKE_ENABLED = simEnvInt('SIM_MOTOR_REVERSE_BRAKE', 0);
++export const BRAKING_REVERSE_HARDWARE_CONFIRMED = simEnvInt('SIM_BRAKING_REVERSE_HW', 0);
++export const REVERSE_BRAKE_ARMED =
++  MOTOR_REVERSE_BRAKE_ENABLED === 1 && BRAKING_REVERSE_HARDWARE_CONFIRMED === 1;
++export const BRAKING_REVERSE_MAX_MS = 250;
++export const BRAKING_REVERSE_MIN_SPEED_CM_S = 8.0;
++export const BRAKING_REVERSE_GUARD_CM = 3.0;
++export const REVERSE_BRAKE_MARGIN_CM_S = 3.0;
++export const REVERSE_BRAKE_KP = 4.0;
++export const REVERSE_BRAKE_MAX_PWM = 60.0;
++/* Negative-duty plant model. The zero-output coast/short-brake taus above do
++ * not describe a driven reverse torque, so the reverse branch uses its own
++ * traction-limited deceleration: torque rises with |duty| up to a tyre grip
++ * limit, and the wheel is never driven backwards. Assumptions, not calibration. */
++export const MOTOR_REVERSE_BRAKE_TAU_S = simEnvNum('SIM_REVERSE_BRAKE_TAU_S', 0.045);
++export const MOTOR_REVERSE_TORQUE_FULL_CM_S2 = simEnvNum('SIM_REVERSE_TORQUE_FULL_CM_S2', 2550.0);
++export const MOTOR_REVERSE_MAX_DECEL_CM_S2 = simEnvNum('SIM_REVERSE_MAX_DECEL_CM_S2', 600.0);
++
+ /* Stall & Reverse Protection */
+ export const SPEED_STALL_TARGET_CM_S = 3.0;
+ export const SPEED_STALL_MEASURED_CM_S = 0.5;
+@@ -125,6 +160,7 @@
+ export const BRAKING_SAFE_DECEL_CM_S2 = 120.0;
+ export const BRAKING_DISTANCE_MARGIN_CM = 2.0;
+ export const BRAKING_TARGET_JERK_CM_S3 = 800.0;
++export const BRAKING_ACCEL_FILTER_TAU_S = 0.080;
+ export const JUNCTION_SEARCH_TIMEOUT_MS = 2000;
+ export const JUNCTION_SEARCH_MAX_CM = 12.0;
+ export const JUNCTION_ENTRY_BRAKE_TIMEOUT_MS = 2000;
+--- a/src/sim/speed_control.ts
++++ b/src/sim/speed_control.ts
+@@ -17,6 +17,10 @@
+   SPEED_REVERSE_CONFIRM_CM,
+   SPEED_REVERSE_IMMEDIATE_CM_S,
+   CONTROL_MAX_INTERVAL_MS,
++  MOTOR_REVERSE_BRAKE_ENABLED,
++  BRAKING_REVERSE_MIN_SPEED_CM_S,
++  REVERSE_BRAKE_MARGIN_CM_S,
++  REVERSE_BRAKE_MAX_PWM,
+ } from './config';
+ 
+ export enum SpeedFault {
+@@ -73,7 +77,8 @@
+     target: number,
+     measured: number,
+     dt: number,
+-    which: 'left' | 'right'
++    which: 'left' | 'right',
++    reverse_brake: boolean
+   ): { fault: SpeedFault; pwm: number } {
+     if (
+       !Number.isFinite(target) ||
+@@ -103,6 +108,28 @@
+       return { fault: SpeedFault.SPEED_FAULT_STALL, pwm: 0.0 };
+     }
+ 
++    if (
++      MOTOR_REVERSE_BRAKE_ENABLED === 1 &&
++      reverse_brake &&
++      measured > BRAKING_REVERSE_MIN_SPEED_CM_S &&
++      measured > target + REVERSE_BRAKE_MARGIN_CM_S
++    ) {
++      /* Same speed error and anti-windup as forward drive: a bounded negative
++       * PWM is torque against forward motion, never a reverse speed target.
++       * The target itself stays non-negative. */
++      const brake = pid.updateBounded(
++        target - measured,
++        dt,
++        -REVERSE_BRAKE_MAX_PWM,
++        0.0,
++        0.0
++      );
++      return {
++        fault: brake.success ? SpeedFault.SPEED_FAULT_NONE : SpeedFault.SPEED_FAULT_PID,
++        pwm: brake.output,
++      };
++    }
++
+     const res = pid.updateBounded(
+       target - measured,
+       dt,
+@@ -157,7 +184,8 @@
+     rt: number,
+     lm: number,
+     rm: number,
+-    dt: number
++    dt: number,
++    reverse_brake = false
+   ): { success: boolean; command: MotorCommand } {
+     const emptyCommand: MotorCommand = {
+       left_pwm: 0,
+@@ -204,13 +232,13 @@
+     let l = 0;
+     let r = 0;
+     if (fault === SpeedFault.SPEED_FAULT_NONE) {
+-      const res = this.wheel(this.left, lt, lm, dt, 'left');
++      const res = this.wheel(this.left, lt, lm, dt, 'left', reverse_brake);
+       fault = res.fault;
+       l = res.pwm;
+       failed_wheel = 1;
+     }
+     if (fault === SpeedFault.SPEED_FAULT_NONE) {
+-      const res = this.wheel(this.right, rt, rm, dt, 'right');
++      const res = this.wheel(this.right, rt, rm, dt, 'right', reverse_brake);
+       fault = res.fault;
+       r = res.pwm;
+       failed_wheel = 2;
+@@ -224,10 +252,10 @@
+     }
+ 
+     const command: MotorCommand = {
+-      left_pwm: l,
+-      right_pwm: r,
+-      left_forward: true,
+-      right_forward: true,
++      left_pwm: Math.abs(l),
++      right_pwm: Math.abs(r),
++      left_forward: l >= 0.0,
++      right_forward: r >= 0.0,
+       standby: lt > 0.0 || rt > 0.0,
+     };
+ 
+--- a/src/sim/physics.ts
++++ b/src/sim/physics.ts
+@@ -17,6 +17,9 @@
+   MOTOR_BRAKE_TAU_S,
+   MOTOR_MAX_ACCEL_CM_S2,
+   MOTOR_MAX_DECEL_CM_S2,
++  MOTOR_REVERSE_BRAKE_ENABLED,
++  MOTOR_REVERSE_TORQUE_FULL_CM_S2,
++  MOTOR_REVERSE_MAX_DECEL_CM_S2,
+ } from './config';
+ import { LineState, type EncoderCounts, type GrayObservation } from './types';
+ 
+@@ -35,6 +38,16 @@
+ 
+ /** Lumped wheel + chassis inertia under rolling contact, all units cm/s. */
+ export function advanceWheel(speed: number, pwmFreeSpeed: number, enabled: boolean, dt: number): number {
++  /* Negative duty is a driven reverse torque, not a coast or a short brake:
++   * it has its own traction-limited deceleration and must never spin the wheel
++   * backwards. With the switch off a negative duty degrades to a short brake. */
++  if (enabled && pwmFreeSpeed < 0) {
++    if (MOTOR_REVERSE_BRAKE_ENABLED === 1) {
++      const decel = reverseBrakeDecelCmS2(pwmFreeSpeed);
++      return Math.max(0, speed - decel * dt);
++    }
++    pwmFreeSpeed = 0;
++  }
+   const tau = !enabled ? MOTOR_COAST_TAU_S : pwmFreeSpeed === 0 ? MOTOR_BRAKE_TAU_S : MOTOR_RESPONSE_TAU_S;
+   const equilibrium = enabled ? pwmFreeSpeed : 0;
+   const change = (equilibrium - speed) * (1 - Math.exp(-dt / tau));
+@@ -42,6 +55,13 @@
+   return Math.max(0, speed + Math.max(-limit, Math.min(limit, change)));
+ }
+ 
++/** Traction-limited reverse-torque deceleration for a commanded reverse drive.
++ *  Input is the negative PWM free-run speed (cm/s), i.e. (pwm/255)*VMAX. */
++export function reverseBrakeDecelCmS2(pwmFreeSpeed: number): number {
++  const duty = Math.min(1, Math.abs(pwmFreeSpeed) / VEHICLE_MAX_SPEED_CM_S);
++  return Math.min(MOTOR_REVERSE_MAX_DECEL_CM_S2, MOTOR_REVERSE_TORQUE_FULL_CM_S2 * duty);
++}
++
+ export class VehicleSimulator {
+   public pose: CarPose = {
+     x: START_POINT.x,
+@@ -178,8 +198,12 @@
+ 
+     // 5. Convert motor PWM to physical response
+     const cmd = this.follow.command;
+-    const target_v_left = cmd.standby ? (cmd.left_pwm / 255.0) * VEHICLE_MAX_SPEED_CM_S : 0;
+-    const target_v_right = cmd.standby ? (cmd.right_pwm / 255.0) * VEHICLE_MAX_SPEED_CM_S : 0;
++    // Direction flags now carry negative-PWM reverse braking; magnitude stays
++    // 0..255 so the existing displays/tests keep their meaning.
++    const signedLeftPwm = cmd.left_forward ? cmd.left_pwm : -cmd.left_pwm;
++    const signedRightPwm = cmd.right_forward ? cmd.right_pwm : -cmd.right_pwm;
++    const target_v_left = cmd.standby ? (signedLeftPwm / 255.0) * VEHICLE_MAX_SPEED_CM_S : 0;
++    const target_v_right = cmd.standby ? (signedRightPwm / 255.0) * VEHICLE_MAX_SPEED_CM_S : 0;
+ 
+     // The plant knows only the driver outputs, never the route phase or map.
+     // Both-zero output means STBY low (coast); one zero wheel with STBY high

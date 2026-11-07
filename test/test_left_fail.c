@@ -9,7 +9,7 @@ static float outer_speed(const LineFollow *f)
 static void capped(const LineFollow *f)
 {
  CHECK(f->state!=LINE_STOPPED);
- CHECK(outer_speed(f)<=16.001f);
+ CHECK(outer_speed(f)<=JUNCTION_SETTLE_SPEED_CM_S+0.001f);
 }
 static void unchanged(const LineFollow *f,const RouteStep *s,const RouteStep *copy,
                       size_t n,uint16_t seen,RouteState state,float origin)
@@ -25,32 +25,45 @@ static void direction(const LineFollow *f,float position)
  if(position>0) CHECK(f->left_target_cm_s>f->right_target_cm_s);
  else CHECK(f->right_target_cm_s>f->left_target_cm_s);
 }
-/* Startup and normal steering, mirrored action and position. */
+/* Authorized short-segment behavior: a <=100 cm segment cruises at
+ * ROUTE_SHORT_SPEED_CM_S early; only the measured entry envelope and the
+ * 16 cm/s turn gate slow it near the node. There is no whole-segment 16 cap. */
 static void test_short_turn_cap(void)
 {
  for(unsigned side=0;side<2;++side) for(unsigned pos=0;pos<4;++pos) {
   const uint8_t observations[]={0x10,0x20,0x08,0x04}; /* +1,+3,-1,-3 */
-  RouteStep s[]={{1,50,side?RIGHT:LEFT,200,0,false,65},{1,50,STOP,200,0,false,70}};
+  RouteStep s[]={{1,50,side?RIGHT:LEFT,200,0,false,65, 0},{1,50,STOP,200,0,false,70, 0}};
   RouteStep copy[2];memcpy(copy,s,sizeof(s));
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
   float origin=f.route.origin_cm;
-  for(unsigned i=0;i<220;++i) {
-   tick(&f,&c,&t,4,4,observations[pos],false);
-   unchanged(&f,s,copy,2,0,ROUTE_FOLLOW,origin);
-   direction(&f,mask(observations[pos]).position);capped(&f);
-  }
-  CHECK(f.startup_elapsed_s>=1.0f);
-  f.base=f.left_target_cm_s=f.right_target_cm_s=80;
-  tick(&f,&c,&t,40,40,observations[pos],false);
+  f.startup_elapsed_s=1;
+  f.braking_active=false;
+  f.base=f.left_target_cm_s=f.right_target_cm_s=60;
+  tick(&f,&c,&t,0,0,observations[pos],false);
   unchanged(&f,s,copy,2,0,ROUTE_FOLLOW,origin);
-  direction(&f,mask(observations[pos]).position);capped(&f);
+  direction(&f,mask(observations[pos]).position);
+  CHECK(outer_speed(&f)>50); /* short segment is not globally capped at 16 */
+  CHECK(outer_speed(&f)<=ROUTE_SHORT_SPEED_CM_S+.001f);
+  /* Mid-segment still plans the short-segment cruise speed. */
+  f.odometry.distance_cm=origin+15;
+  tick(&f,&c,&t,0,0,observations[pos],false);
+  unchanged(&f,s,copy,2,0,ROUTE_FOLLOW,origin);
+  direction(&f,mask(observations[pos]).position);
+  CHECK(outer_speed(&f)>50);
+  /* Near the measured node the speed envelope reaches the 16 cm/s turn gate. */
+  f.odometry.distance_cm=origin+65-GRAY_FORWARD_OFFSET_CM;
+  tick(&f,&c,&t,0,0,observations[pos],false);
+  unchanged(&f,s,copy,2,0,ROUTE_FOLLOW,origin);
+  direction(&f,mask(observations[pos]).position);
+  CHECK(f.base<=JUNCTION_SETTLE_SPEED_CM_S+.001f);
+  CHECK(outer_speed(&f)<=JUNCTION_SETTLE_SPEED_CM_S+.001f);
  }
 }
 static void test_long_turn_cap(void)
 {
  for(unsigned side=0;side<2;++side) for(unsigned pos=0;pos<4;++pos) {
   const uint8_t observations[]={0x10,0x20,0x08,0x04};
-  RouteStep s[]={{1,50,side?RIGHT:LEFT,200,0,false,219},{1,50,STOP,200,0,false,70}};
+  RouteStep s[]={{1,50,side?RIGHT:LEFT,200,0,false,219, 0},{1,50,STOP,200,0,false,70, 0}};
   RouteStep copy[2];memcpy(copy,s,sizeof(s));
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
   for(unsigned i=0;i<220;++i) tick(&f,&c,&t,40,40,0x18,false);
@@ -81,7 +94,7 @@ static void test_pass_cap(bool recovery)
 {
  const uint8_t observations[]={0,0xff,0x99};
  for(unsigned side=0;side<2;++side) for(unsigned obs=0;obs<3;++obs) {
-  RouteStep s[]={{4,50,side?RIGHT:LEFT,200,0,false,219},{1,50,STOP,200,0,false,70}};
+  RouteStep s[]={{4,50,side?RIGHT:LEFT,200,0,false,219, 0},{1,50,STOP,200,0,false,70, 0}};
   RouteStep copy[2];memcpy(copy,s,sizeof(s));
   LineFollow f;EncoderCounts c;uint32_t t;seed_pass(&f,&c,&t,s);
   float origin=f.route.origin_cm;
@@ -103,7 +116,7 @@ static void test_pass_cap(bool recovery)
 static void test_reliable_pass_speed(void)
 {
  for(unsigned side=0;side<2;++side) {
-  RouteStep s[]={{4,50,side?RIGHT:LEFT,200,0,false,219},{1,50,STOP,200,0,false,70}};
+  RouteStep s[]={{4,50,side?RIGHT:LEFT,200,0,false,219, 0},{1,50,STOP,200,0,false,70, 0}};
   RouteStep copy[2];memcpy(copy,s,sizeof(s));
   LineFollow f;EncoderCounts c;uint32_t t;seed_pass(&f,&c,&t,s);
   float origin=f.route.origin_cm;
@@ -119,8 +132,8 @@ static void test_reliable_pass_speed(void)
 static void test_gap_and_entry(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,219},
-                 {1,50,STOP,200,0,false,70}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,219, 0},
+                 {1,50,STOP,200,0,false,70, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
   f.startup_elapsed_s=1;f.base=f.left_target_cm_s=f.right_target_cm_s=16;
   f.route.origin_cm=f.route.final_segment_origin_cm=f.odometry.distance_cm-220;
@@ -137,6 +150,11 @@ static void test_gap_and_entry(void)
   tick(&f,&c,&t,6,6,mirror?0xf8:0x1f,false);
   CHECK(f.route.state==ROUTE_EXECUTING && f.route.junctions_seen==1);
   CHECK(!f.route.navigation_recoveries && f.state!=LINE_STOPPED);
+  /* Front detection precedes the pivot by the sensor-offset track turn-in. */
+  CHECK(f.route.turn_approaching);
+  CHECK(fabsf(f.left_target_cm_s-f.right_target_cm_s)<.01f);
+  f.route.turn_approaching=false;
+  tick(&f,&c,&t,6,6,mirror?0xf8:0x1f,false);
   if(mirror) CHECK(f.left_target_cm_s>f.right_target_cm_s);
   else CHECK(f.right_target_cm_s>f.left_target_cm_s);
  }

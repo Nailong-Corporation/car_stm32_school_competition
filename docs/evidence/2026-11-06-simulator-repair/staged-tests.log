@@ -1,0 +1,10 @@
+PASS: one START moves the car 44.9 cm after one second
+PASS: pause / continue preserves controller progress
+PASS: single-step advances exactly 5 ms and starts after confirmation
+PASS: START works after time has already advanced in idle
+PASS: reset cancels stale START and a new click starts normally
+PASS: stable-line guard remains enforced; rejected START is not retried
+PASS: smooth center+branch drift is not a second junction in either polarity
+PASS: captured exit keeps the PID steering direction
+PASS: ordinary FOLLOW stops after bounded gray loss
+PASS: first corners follow the top edge (index=3, x=187.7, y=120.2)

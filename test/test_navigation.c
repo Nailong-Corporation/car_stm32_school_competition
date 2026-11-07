@@ -29,6 +29,16 @@ static void init(RoutePlanner *p,const RouteStep *s,size_t n)
 {route_init(p,s,n,NULL,NULL);p->repeat_count=1;route_start(p,0,0);CHECK(p->valid);}
 static void junction(RoutePlanner *p,float *d,uint32_t *t,uint8_t branch,float h)
 {update(p,d,t,0x18,h,4);update(p,d,t,branch,h,(branch&0x18U)?3:4);}
+/* Confirm a junction and consume the 17 cm wheel-axle approach stage, which the
+ * firmware now runs before any pivot (sensor 24 cm - half track 7 cm). */
+static void junction_approach(RoutePlanner *p,float *d,uint32_t *t,uint8_t branch,float h)
+{
+ junction(p,d,t,branch,h);
+ if(p->state==ROUTE_EXECUTING && p->turn_approaching) {
+  *d=p->turn_approach_origin_cm+GRAY_FORWARD_OFFSET_CM-WHEEL_TRACK_CM*.5f+.1f;
+  *t+=5;route_update(p,mask(0x18),*d,h,*t);
+ }
+}
 static void clear(RoutePlanner *p,float *d,uint32_t *t,float h)
 {update(p,d,t,0x18,h,40);} /* 2.0 cm + 50 ms 离口去重证据（JUNCTION_COUNT_CLEAR_*）。 */
 static void stop_callback(size_t i,void *c)
@@ -36,7 +46,7 @@ static void stop_callback(size_t i,void *c)
 static void test_counts(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{2,6,mirror?LEFT:RIGHT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+  RouteStep s[]={{2,6,mirror?LEFT:RIGHT,40,0,false,0, 0},{1,6,STOP,40,0,false,0, 0}};
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
   /* Opposite-side first junction counts despite waiting for the other direction. */
   junction(&p,&d,&t,mirror?0xf8:0x1f,0);
@@ -48,12 +58,17 @@ static void test_counts(void)
   CHECK(route_current_action(&p)==(mirror?LEFT:RIGHT));
   /* An ordinary turn hands control to a proven line before estimated 90deg. */
   float sign=mirror?-1:1;
-  update(&p,&d,&t,0x18,sign*.8f,20);CHECK(p.state==ROUTE_CLEARING);
+  CHECK(p.turn_approaching);
+  d+=GRAY_FORWARD_OFFSET_CM-WHEEL_TRACK_CM*.5f+.1f;
+  route_update(&p,mask(0x18),d,0,t);
+  CHECK(!p.turn_approaching && p.state==ROUTE_EXECUTING);
+  update(&p,&d,&t,0x18,sign*.8f,20);CHECK(p.state==ROUTE_EXECUTING);
+  update(&p,&d,&t,0x18,sign*(JUNCTION_TURN_TARGET_RAD-.01f),15);CHECK(p.state==ROUTE_CLEARING);
   update(&p,&d,&t,0x18,sign*(JUNCTION_TURN_TARGET_RAD+.01f),15);
   CHECK(p.state==ROUTE_CLEARING);
   clear(&p,&d,&t,sign*(JUNCTION_TURN_TARGET_RAD+.01f));
   CHECK(p.index==1 && p.state==ROUTE_FOLLOW && p.junctions_seen==0);
-  CHECK(d<10); /* Short next junction is not gated by old distances. */
+  CHECK(d<GRAY_FORWARD_OFFSET_CM+10.0f); /* Axle approach may consume the sensor-offset leg. */
   junction(&p,&d,&t,0xff,sign*(JUNCTION_TURN_TARGET_RAD+.01f));
   CHECK(p.state==ROUTE_FINISHED && p.stop_pending);
   p.stop_callback=stop_callback;route_dispatch_stop_callback(&p);route_dispatch_stop_callback(&p);
@@ -62,7 +77,7 @@ static void test_counts(void)
 }
 static void test_noise_and_straight(void)
 {
- RouteStep s[]={{1,6,STRAIGHT,20,0,false,0},{1,6,STOP,20,0,false,0}};
+ RouteStep s[]={{1,6,STRAIGHT,20,0,false,0, 0},{1,6,STOP,20,0,false,0, 0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
  update(&p,&d,&t,0x18,0,4);
  update(&p,&d,&t,0,0,2);CHECK(p.junctions_seen==0 && p.state==ROUTE_FOLLOW);
@@ -80,11 +95,13 @@ static void test_noise_and_straight(void)
 }
 static void test_l_edges_and_confirmation(void)
 {
- RouteStep s[]={{1,12,LEFT,40,0,false,0},{1,12,STOP,40,0,false,0}};
+ RouteStep s[]={{1,12,LEFT,40,0,false,0, 0},{1,12,STOP,40,0,false,0, 0}};
+ /* 2026-11-06 新赛道：印刷元件符号的 V 形臂/单侧外边不再是路口证据；
+  * 只有带中心两路的 T 形/转角（0xf8/0x1f 等）才计数。 */
  for(unsigned side=0;side<2;++side) {
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
   junction(&p,&d,&t,side?0xc0:0x03,0);
-  CHECK(p.state==ROUTE_EXECUTING && p.junctions_seen==1);
+  CHECK(p.state==ROUTE_FOLLOW && p.junctions_seen==0);
  }
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
  update(&p,&d,&t,0x18,0,4);
@@ -100,7 +117,7 @@ static void test_l_edges_and_confirmation(void)
 }
 static void test_entry_brake(void)
 {
- RouteStep s[]={{1,6,LEFT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+ RouteStep s[]={{1,6,LEFT,40,0,false,0, 0},{1,6,STOP,40,0,false,0, 0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
  route_set_speed(&p,20,7);junction(&p,&d,&t,0xff,0);
  CHECK(p.state==ROUTE_BRAKING && p.junctions_seen==1);
@@ -116,17 +133,21 @@ static void test_entry_brake(void)
 static void test_angles_and_failures(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) for(unsigned degrees=60;degrees<=360;degrees+=60) {
-  RouteStep s[]={{1,6,CUSTOM_TURN,20,mirror?-(float)degrees:(float)degrees,false,0},{1,6,STOP,20,0,false,0}};
+  RouteStep s[]={{1,6,CUSTOM_TURN,20,mirror?-(float)degrees:(float)degrees,false,0, 0},{1,6,STOP,20,0,false,0, 0}};
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;float sign=mirror?-1:1;
-  junction(&p,&d,&t,0xff,0);float target=route_turn_target_rad(&p);
+  junction_approach(&p,&d,&t,0xff,0);float target=route_turn_target_rad(&p);
   NEAR(target,sign*degrees*JUNCTION_TURN_TARGET_RAD/90);
   update(&p,&d,&t,0x18,target*.9f,20);CHECK(p.state==ROUTE_EXECUTING);
   update(&p,&d,&t,0x18,target+sign*.01f,15);CHECK(p.state==ROUTE_CLEARING);
  }
- RouteStep s[]={{1,6,LEFT,20,0,false,0},{1,6,STOP,20,0,false,0}};
+ RouteStep s[]={{1,6,LEFT,20,0,false,0, 0},{1,6,STOP,20,0,false,0, 0}};
  RoutePlanner p;float d=0;uint32_t t=0;init(&p,s,2);junction(&p,&d,&t,0xff,0);
+ /* 首段有 17 cm 轮轴接近阶段；先走完接近段再检查转角保护。 */
+ d+=GRAY_FORWARD_OFFSET_CM-WHEEL_TRACK_CM*.5f+.1f;route_update(&p,mask(0x18),d,0,t+5);
+ CHECK(!p.turn_approaching);
  update(&p,&d,&t,0,1,1);CHECK(p.failure==ROUTE_FAILURE_WRONG_WAY);
  init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);
+ d+=GRAY_FORWARD_OFFSET_CM-WHEEL_TRACK_CM*.5f+.1f;route_update(&p,mask(0x18),d,0,t+5);
  update(&p,&d,&t,0,-4,1);CHECK(p.failure==ROUTE_FAILURE_TURN_LIMIT);
  init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);
  t+=JUNCTION_ACTION_TIMEOUT_MS;route_update(&p,mask(0x18),d,-.5f,t);
@@ -137,16 +158,16 @@ static void test_angles_and_failures(void)
 static void test_fast_exit(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
   RoutePlanner p;float d=0;uint32_t t=0;float sign=mirror?1:-1;
-  init(&p,s,2);junction(&p,&d,&t,0xff,0);
+  init(&p,s,2);junction_approach(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x18,sign*1.76f,2);
   CHECK(p.state==ROUTE_EXECUTING && p.exit_count==2);
   update(&p,&d,&t,0x18,sign*1.80f,1);
   CHECK(p.state==ROUTE_CLEARING && p.index==0 && p.line_exit_confirmed);
   CHECK(p.clear_cm==d);
   clear(&p,&d,&t,sign*1.80f);CHECK(p.state==ROUTE_FOLLOW && p.index==1);
-  init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);
+  init(&p,s,2);d=0;t=0;junction_approach(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x18,sign*1.76f,2);
   update(&p,&d,&t,0,sign*1.76f,1);
   update(&p,&d,&t,0x18,sign*1.76f,2);CHECK(p.state==ROUTE_EXECUTING);
@@ -156,7 +177,7 @@ static void test_fast_exit(void)
   update(&p,&d,&t,0x18,sign*1.76f,1);
   CHECK(p.state==ROUTE_EXECUTING && p.component_recovery_active &&
         p.component_recovery_line_samples==0); /* gap breaks recovery confirmation */
-  init(&p,s,2);d=0;t=0;junction(&p,&d,&t,0xff,0);
+  init(&p,s,2);d=0;t=0;junction_approach(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x18,sign*JUNCTION_TURN_TARGET_RAD*.96f,4);
   CHECK(p.state==ROUTE_CLEARING); /* Ordinary turn: the line completes capture. */
  }
@@ -166,10 +187,10 @@ static void test_fast_exit(void)
 static void test_clearance_lateral_motion(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},
-                 {4,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0, 0},
+                 {4,50,LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
   RoutePlanner p;float d=0;uint32_t t=0;float h=mirror?1.84f:-1.84f;
-  init(&p,s,3);junction(&p,&d,&t,0xff,0);
+  init(&p,s,3);junction_approach(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x08,h,3);
   CHECK(p.state==ROUTE_CLEARING && p.line_exit_confirmed && p.index==0);
   /* Sweep through center and both edges, as seen after the real first turn. */
@@ -191,7 +212,7 @@ static void test_clearance_lateral_motion(void)
   /* Loss, ambiguity and a missing sample still break clearance continuity. */
   const uint8_t invalid[]={0x00,0xff,0x81};
   for(unsigned i=0;i<3;++i) {
-   init(&p,s,3);d=0;t=0;junction(&p,&d,&t,0xff,0);
+   init(&p,s,3);d=0;t=0;junction_approach(&p,&d,&t,0xff,0);
    update(&p,&d,&t,0x08,h,3);
    update(&p,&d,&t,0x04,h,20);
    update(&p,&d,&t,invalid[i],h,1);
@@ -209,12 +230,12 @@ static void test_clearance_lateral_motion(void)
    update(&p,&d,&t,0x04,h,40);
    CHECK(p.index==1 && p.state==ROUTE_FOLLOW);
   }
-  init(&p,s,3);d=0;t=0;junction(&p,&d,&t,0xff,0);
+  init(&p,s,3);d=0;t=0;junction_approach(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x08,h,3);
   t+=JUNCTION_CLEAR_TIMEOUT_MS;
   route_update(&p,mask(0x04),d,h,t);
   CHECK(p.failure==ROUTE_FAILURE_ACTION_TIMEOUT && p.index==0);
-  init(&p,s,3);d=0;t=0;junction(&p,&d,&t,0xff,0);
+  init(&p,s,3);d=0;t=0;junction_approach(&p,&d,&t,0xff,0);
   update(&p,&d,&t,0x08,h,3);
   d=p.clear_cm+JUNCTION_CLEAR_MAX_CM+.01f;
   update(&p,&d,&t,0x04,h,1);
@@ -239,7 +260,7 @@ static void test_braking(void)
  CHECK(!braking_plan(40,6,20,0,0,0,2,false).valid);
  CHECK(!braking_plan(40,6,NAN,0,0,30,2,true).valid);
  CHECK(braking_plan(40,6,0,1000,0,0,2,false).allowed_speed==40);
- RouteStep s[]={{1,6,LEFT,20,0,false,10},{1,6,STOP,20,0,false,0}};
+ RouteStep s[]={{1,6,LEFT,20,0,false,10, 0},{1,6,STOP,20,0,false,0, 0}};
  RoutePlanner r;route_init(&r,s,2,NULL,NULL);
 #if !BRAKING_CALIBRATION_CONFIRMED
  CHECK(!r.valid); /* Never pretend the safe deceleration was measured. */
@@ -252,7 +273,7 @@ static void test_search_and_slew(void)
  NEAR(v,.01f);NEAR(slew.acceleration,1);
  CHECK(braking_slew(&slew,0,.01f,20,100)==0 && slew.acceleration==0);
 #if BRAKING_CALIBRATION_CONFIRMED
- RouteStep s[]={{2,6,LEFT,200,0,false,1000},{1,6,STOP,40,0,false,0}};
+ RouteStep s[]={{2,6,LEFT,200,0,false,1000, 0},{1,6,STOP,40,0,false,0, 0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
  d=500;update(&p,&d,&t,0x18,0,4);CHECK(p.final_segment_active && !p.search_pending);
  junction(&p,&d,&t,0xff,0);clear(&p,&d,&t,0);
@@ -285,7 +306,7 @@ static void test_search_and_slew(void)
 #if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
 static void test_bounded_approach_reverse(void)
 {
- RouteStep steps[]={{1,50,LEFT,200,0,false,101},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{1,50,LEFT,200,0,false,101, 0},{1,50,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts counts;uint32_t now;
  start(&f,&counts,&now,steps,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;
@@ -321,7 +342,7 @@ static void test_bounded_approach_reverse(void)
 #endif
 static void test_loops(void)
 {
- RouteStep s[]={{1,6,STOP,20,0,false,0}};
+ RouteStep s[]={{1,6,STOP,20,0,false,0, 0}};
  RoutePlanner p;init(&p,s,1);p.repeat_count=2;p.repeat_action=STRAIGHT;
  float d=0;uint32_t t=0;junction(&p,&d,&t,0xff,0);
  CHECK(p.completed_laps==1 && p.state==ROUTE_EXECUTING);
@@ -332,7 +353,7 @@ static void test_loops(void)
 }
 static void test_control(void)
 {
- RouteStep s[]={{1,6,RIGHT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+ RouteStep s[]={{1,6,RIGHT,40,0,false,0, 0},{1,6,STOP,40,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
  for(unsigned i=0;i<20;++i) tick(&f,&c,&t,1,1,0x30,false);
  CHECK(f.left_target_cm_s>f.right_target_cm_s);
@@ -348,7 +369,7 @@ static void test_control(void)
 static void test_closed_turns(void)
 {
  for(unsigned arc=0;arc<2;++arc) for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{1,16,mirror?LEFT:RIGHT,40,0,arc!=0,0},{1,12,STOP,40,0,false,0}};
+  RouteStep s[]={{1,16,mirror?LEFT:RIGHT,40,0,arc!=0,0,0},{1,12,STOP,40,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
   f.odometry.calibration.track_cm=WHEEL_TRACK_CM;
   f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;f.route.entry_cm=f.odometry.distance_cm;
@@ -380,13 +401,13 @@ static void test_closed_turns(void)
  * 车辆无法加速、PWM 太低甚至触发堵转保护。修正后应能继续升到包络。 */
 static void test_adjacent_graphic_guards(void)
 {
- RouteStep s[]={{1,50,LEFT,50,0,false,0},{2,50,LEFT,200,0,false,0},
-                {1,50,STOP,200,0,false,0}};
+ RouteStep s[]={{1,50,LEFT,50,0,false,0, 0},{2,50,LEFT,200,0,false,0, 0},
+                {1,50,STOP,200,0,false,0, 0}};
  /* No corridor, one separated sample, three isolated regions, a gap,
   * no forward progress and interrupted branch evidence cannot hand off. */
  for(unsigned scenario=0;scenario<6;++scenario) {
   RoutePlanner p;init(&p,s,3);float d=0;uint32_t t=0;float h=-1.65f;
-  junction(&p,&d,&t,0xff,0);update(&p,&d,&t,0x18,h,3);
+  junction_approach(&p,&d,&t,0xff,0);update(&p,&d,&t,0x18,h,3);
   CHECK(p.state==ROUTE_CLEARING && p.line_exit_confirmed);
   if(scenario!=0) update(&p,&d,&t,0x18,h,8);
   if(scenario==3) t+=CONTROL_MAX_INTERVAL_MS+1;
@@ -399,7 +420,7 @@ static void test_adjacent_graphic_guards(void)
  }
  /* A stationary new branch expires instead of extending the old action. */
  RoutePlanner p;init(&p,s,3);float d=0;uint32_t t=0;
- junction(&p,&d,&t,0xff,0);update(&p,&d,&t,0x18,-1.65f,3);
+ junction_approach(&p,&d,&t,0xff,0);update(&p,&d,&t,0x18,-1.65f,3);
  update(&p,&d,&t,0x18,-1.65f,8);
  for(unsigned i=0;i<22 && p.state!=ROUTE_FAILED;++i) {
   t+=5;route_update(&p,mask(0x31),d,-1.65f,t);
@@ -410,29 +431,32 @@ static void test_line_exit_guards(void)
 {
  const uint8_t rejected[]={0,0xff,0x31,0x01,0x3f};
  for(unsigned i=0;i<sizeof(rejected);++i) {
-  RouteStep s[]={{1,50,LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
   junction(&p,&d,&t,0xff,0);update(&p,&d,&t,rejected[i],-.736f,4);
   CHECK(p.state==ROUTE_EXECUTING && !p.line_exit_confirmed);
  }
  for(unsigned custom=0;custom<2;++custom) {
-  RouteStep s[]={{1,50,custom?CUSTOM_TURN:LEFT,50,custom?-90.0f:0,false,0},
-                 {1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,custom?CUSTOM_TURN:LEFT,50,custom?-90.0f:0,false,0, 0},
+                 {1,50,STOP,50,0,false,0, 0}};
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
-  junction(&p,&d,&t,0xff,0);
+  junction_approach(&p,&d,&t,0xff,0);
+  /* ±90°（含自定义 -90°）先进入 EXECUTING；只有接近目标角并捕获出口线
+   * 才进入 CLEARING，半程角度不足以提前完成。 */
   update(&p,&d,&t,0x08,custom?-.736f:-.6f,4);
-  if(custom) CHECK(p.state==ROUTE_CLEARING && p.line_exit_confirmed);
-  else CHECK(p.state==ROUTE_EXECUTING); /* Pre-capture angle stays gated. */
+  CHECK(p.state==ROUTE_EXECUTING && !p.line_exit_confirmed);
+  update(&p,&d,&t,0x08,custom?-1.50f:-1.50f,6);
+  CHECK(p.state==ROUTE_CLEARING && p.line_exit_confirmed);
  }
  /* Non-90 custom angles keep the exact-angle exit contract. */
- RouteStep c135[]={{1,50,CUSTOM_TURN,50,-135.0f,false,0},{1,50,STOP,50,0,false,0}};
+ RouteStep c135[]={{1,50,CUSTOM_TURN,50,-135.0f,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
  RoutePlanner q;float qd=0;uint32_t qt=0;init(&q,c135,2);
- junction(&q,&qd,&qt,0xff,0);
+ junction_approach(&q,&qd,&qt,0xff,0);
  update(&q,&qd,&qt,0x08,-1.8f,4);
  CHECK(q.state==ROUTE_EXECUTING && !q.line_exit_confirmed);
- RouteStep s[]={{1,50,LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+ RouteStep s[]={{1,50,LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
  RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
- junction(&p,&d,&t,0xff,0);update(&p,&d,&t,0x08,-.736f,2);
+ junction_approach(&p,&d,&t,0xff,0);update(&p,&d,&t,0x08,-.736f,2);
  update(&p,&d,&t,0,-.736f,1);update(&p,&d,&t,0x08,-.736f,2);
  CHECK(p.state==ROUTE_EXECUTING); /* Interrupted samples never add to three. */
  t+=JUNCTION_ACTION_TIMEOUT_MS;route_update(&p,mask(0x08),d,-.736f,t);
@@ -440,7 +464,7 @@ static void test_line_exit_guards(void)
 }
 static void test_final_leg_ramp(void)
 {
- RouteStep s[]={{1,50,LEFT,200,0,false,1000},{1,50,STOP,200,0,false,0}};
+ RouteStep s[]={{1,50,LEFT,200,0,false,1000, 0},{1,50,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t t;
  start(&f,&c,&t,s,2);
  f.startup_elapsed_s=STARTUP_RAMP_TIME_S;

@@ -1,0 +1,20 @@
+WebSocket server error: Port 24678 is already in use
+PASS: scheme 1, 10139 identical-input C/TS frames, max target error 0.0239 cm/s; final index 10
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: scheme 2 at 34965ms field 1: C=7,3,1,0,3,16,15.09668,729.472961,-4.73249197, TS=7,8,1,0,3,16,5.195592079712485,729.5187203179164,-4.732492117236881
+
+3 !== 8
+
+    at file:///Users/zhendong/Documents/stm32car_simulator/tests/firmware_parity.mjs:47:47 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 3,
+  expected: 8,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.12.0

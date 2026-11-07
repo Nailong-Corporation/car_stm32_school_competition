@@ -75,7 +75,7 @@ int main(void)
     CHECK(f.left_target_cm_s < f.right_target_cm_s && f.command.left < f.command.right);
 
     /* A supplied LEFT/STOP table must neither steer, set speed nor stop this mode. */
-    const RouteStep table[] = {{1, 6.0f, LEFT, 4, 0.0f, true, 0.0f},{1, 6.0f, STOP, 4, 0.0f, true, 0.0f}};
+    const RouteStep table[] = {{1, 6.0f, LEFT, 4, 0.0f, true, 0.0f, 0},{1, 6.0f, STOP, 4, 0.0f, true, 0.0f, 0}};
     start(&f,&c,&now,table,2);
     uint32_t began = now;
     while ((uint32_t)(now-began) <= 30000U)
@@ -88,7 +88,11 @@ int main(void)
     const uint8_t graphics[] = {wide,(uint8_t)(wide << (7U-SENSOR_MAX_REGION_WIDTH)),0xff,0x19,0};
     for (size_t i=0; i<sizeof(graphics); ++i) {
         tick(&f,&c,&now,3,3,graphics[i],false);
-        CHECK(f.state == LINE_GAP_HOLD && f.base <= HOLD_SPEED_CM_S);
+        CHECK(f.state == LINE_GAP_HOLD);
+        /* LINE_FOLLOW_SPEED_CM_S is now 50: full line loss uses HOLD_SPEED_CM_S,
+         * wide/multiple-region ambiguity is capped by AMBIGUOUS_SPEED_CM_S. */
+        CHECK(f.base <= (mask(graphics[i]).kind == GRAY_NONE ?
+                         HOLD_SPEED_CM_S : AMBIGUOUS_SPEED_CM_S));
         NEAR(f.pid.integral,integral); NEAR(f.pid.derivative,derivative);
     }
     CHECK(f.odometry.distance_cm > distance);

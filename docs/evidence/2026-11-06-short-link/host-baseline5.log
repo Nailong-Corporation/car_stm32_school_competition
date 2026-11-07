@@ -1,0 +1,99 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9321 checks)
+HEXAGON FSM: 9321 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9325 checks)
+HEXAGON FSM: 9325 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9321 checks)
+HEXAGON FSM: 9321 checks PASS
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9325 checks)
+HEXAGON FSM: 9325 checks PASS
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1535 checks)
+PASS: bounded component straight recovery, mirrored handoff, one-shot budget and angle/fault gates (1541 checks)
+PASS: mirrored post-turn narrow drift, wider real center branches, rearming, side/separated evidence and raw polarity 0 (7232 checks)
+PASS: mirrored post-turn narrow drift, wider real center branches, rearming, side/separated evidence and raw polarity 1 (7232 checks)
+PASS: slow measured entry, early same-side strong junction, continuous capture and bounded recovery (2332 checks)
+PASS: slow measured entry, early same-side strong junction, continuous capture and bounded recovery (2332 checks)
+PASS: slow measured entry, early same-side strong junction, continuous capture and bounded recovery (2342 checks)
+PASS: slow measured entry, early same-side strong junction, continuous capture and bounded recovery (2342 checks)
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: single-count START, transient inhibit, mirrored reverse time/distance/severe gates and lock
+PASS: MPU stationary median calibration and movement rejection; centered-line button START accepted; spike rejection; probe/bus faults; stationary/90deg integration
+PASS: production heading scale, distance/speed, pose and mirrored 90-degree control gates
+PASS: inverted/normal pitch 40deg, spike filtering, latched stop, level acknowledgement and repeat pickup
+PASS: MPU yaw, startup/runtime encoder fallback, continuous mirrored turns, sticky source and encoder fault lock; tilt restart gates
+GRAY_INVERT_ENABLED=1
+PASS: 256 masks, filtering/continuity, PID and PWM; 120976 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9087 checks)
+PASS: encoder line-only, route bypass, interference and safety; 45981 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+GRAY_INVERT_ENABLED=0
+PASS: 256 masks, filtering/continuity, PID and PWM; 120976 checks
+PASS: encoder HAL x4, 4 init/start failure paths, cleanup and snapshots
+PASS: simulated HAL motor startup, 5 init failure paths, directions, PWM and independent stop
+PASS: production START / IMU fallback; ambiguous 0x23 rejection, no queued start, explicit centered retry; no-line/route gates
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9087 checks)
+PASS: encoder line-only, route bypass, interference and safety; 45981 checks
+PASS: open-loop PWM, encoder bypass, interference, stop and timing; 5124 checks
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: loss stop switch, blind-start gate, prolonged loss and recovery/fault
+PASS: seam filter=1 polarity=1 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=1 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=1 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=1 encoder=1 route=1; 782 checks
+PASS: seam filter=1 polarity=0 encoder=0 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=0; 837 checks
+PASS: seam filter=1 polarity=0 encoder=1 route=1; 837 checks
+PASS: seam filter=0 polarity=0 encoder=0 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=0; 782 checks
+PASS: seam filter=0 polarity=0 encoder=1 route=1; 782 checks
+PASS: count navigation, short junctions, angle/entry/STOP safety, braking (9107 checks)
+PASS: total distance/count/zero, short-long speed, graphic passage, soft recovery/hard stops (1456 checks)
+PASS: review anchors/envelope/recovery PID/reliable-line semantics (698 checks)
+PASS: race review known-length envelope and spacing/count matrix (2013 checks)
+PASS: total distance/count/zero, short-long speed, graphic passage, soft recovery/hard stops (1456 checks)
+PASS: review anchors/envelope/recovery PID/reliable-line semantics (698 checks)
+PASS: race review known-length envelope and spacing/count matrix (2013 checks)
+PASS: total distance/count/zero, short-long speed, graphic passage, soft recovery/hard stops (1456 checks)
+PASS: review anchors/envelope/recovery PID/reliable-line semantics (698 checks)
+PASS: race review known-length envelope and spacing/count matrix (2013 checks)
+PASS: total distance/count/zero, short-long speed, graphic passage, soft recovery/hard stops (1456 checks)
+PASS: review anchors/envelope/recovery PID/reliable-line semantics (698 checks)
+PASS: race review known-length envelope and spacing/count matrix (2013 checks)
+entry-loss configuration: IMU=0 GRAY_INVERT=0
+PASS: confirmed entry loss/budget/reacquisition/guards (2993 checks)
+entry-loss configuration: IMU=0 GRAY_INVERT=1
+PASS: confirmed entry loss/budget/reacquisition/guards (2993 checks)
+entry-loss configuration: IMU=1 GRAY_INVERT=0
+PASS: confirmed entry loss/budget/reacquisition/guards (2993 checks)
+entry-loss configuration: IMU=1 GRAY_INVERT=1
+PASS: confirmed entry loss/budget/reacquisition/guards (2993 checks)
+maneuver-loss configuration: IMU=0 GRAY_INVERT=0
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9236 checks)
+maneuver-loss configuration: IMU=0 GRAY_INVERT=1
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9236 checks)
+maneuver-loss configuration: IMU=1 GRAY_INVERT=0
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9240 checks)
+maneuver-loss configuration: IMU=1 GRAY_INVERT=1
+PASS: maneuver loss ownership, IMU/encoder progress, bounded recovery, handoff and hard faults (9240 checks)
+PASS: Scheme 0 (debug) (steps=4, total_len=480.0 cm, short_links=0)
+PASS: Scheme 1 (dashed reference route) (steps=30, total_len=2570.0 cm, short_links=7)
+PASS: Scheme 2 (no dashed reference route) (steps=28, total_len=2600.0 cm, short_links=5)
+PASS: Scheme 3 (outer test loop) (steps=5, total_len=1165.0 cm, short_links=0)
+PASS: all four generated route tables valid (752 checks)

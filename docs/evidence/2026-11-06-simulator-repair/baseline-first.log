@@ -1,0 +1,38 @@
+PASS: one START moves the car 44.9 cm after one second
+PASS: pause / continue preserves controller progress
+PASS: single-step advances exactly 5 ms and starts after confirmation
+PASS: START works after time has already advanced in idle
+PASS: reset cancels stale START and a new click starts normally
+PASS: stable-line guard remains enforced; rejected START is not retried
+PASS: smooth center+branch drift is not a second junction in either polarity
+10:20:46 AM [vite] (ssr) Error when evaluating SSR module /tests/navigation.test.ts: expected at least two completed corners, index=1
+      at eval (/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-06-simulator-repair/baseline/tests/navigation.test.ts:170:32)
+      at async ESModulesEvaluator.runInlinedModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:807:3)
+      at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1262:59)
+      at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15941:20)
+      at async SSRCompatModuleRunner.cachedRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1169:73)
+      at async SSRCompatModuleRunner.import (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1124:10)
+      at async instantiateModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15913:10)
+      at async file:///Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-06-simulator-repair/baseline/tests/run.mjs:13:3
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: expected at least two completed corners, index=1
+    at eval (/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-06-simulator-repair/baseline/tests/navigation.test.ts:170:32)
+    at async ESModulesEvaluator.runInlinedModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:807:3)
+    at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1262:59)
+    at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15941:20)
+    at async SSRCompatModuleRunner.cachedRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1169:73)
+    at async SSRCompatModuleRunner.import (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1124:10)
+    at async instantiateModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15913:10)
+    at async file:///Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-06-simulator-repair/baseline/tests/run.mjs:13:3 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v26.12.0

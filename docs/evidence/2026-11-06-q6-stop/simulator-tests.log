@@ -1,0 +1,19 @@
+
+> stm32car-simulator@1.0.0 test
+> node tests/run.mjs
+
+PASS: one START moves the car 44.9 cm after one second
+PASS: pause / continue preserves controller progress
+PASS: single-step advances exactly 5 ms and starts after confirmation
+PASS: START works after time has already advanced in idle
+PASS: reset cancels stale START and a new click starts normally
+PASS: stable-line guard remains enforced; rejected START is not retried
+PASS: smooth center+branch drift is not a second junction in either lateral direction
+PASS: captured exit keeps the PID steering direction in both turns
+PASS: FOLLOW loss stops at 400 ms or 8 cm; ordinary maneuvers retain phase ownership
+PASS: first corners follow the top edge (index=2, x=44.2, y=14.7)
+PASS: mirrored four/five-channel Q4 branches override narrow drift suppression
+PASS: clearance timeout clears the borrowed exit axis on its entry frame
+PASS: scheme 1 counts Q4 then turns at Q6; reaches index 5
+PASS: scheme 2 counts Q4 then turns at Q6; reaches index 5
+PASS: scheme 3 counts Q4 then turns at Q6; reaches index 5

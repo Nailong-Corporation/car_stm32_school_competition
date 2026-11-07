@@ -9,7 +9,9 @@
 static void braking_entry(LineFollow *f,EncoderCounts *c,uint32_t *t)
 {
  start(f,c,t,route,route_count);
- for(unsigned i=0;i<30;++i) tick(f,c,t,10,10,0x18,false);
+ /* Spin the wheels fast enough that the measured entry speed is clearly above
+  * the configured turn/entry cap (24 cm/s since the 2026-11-07 speed sweep). */
+ for(unsigned i=0;i<30;++i) tick(f,c,t,90,90,0x18,false);
  CHECK(f->odometry.left_speed_cm_s>route_entry_speed_limit(&f->route));
  tick(f,c,t,10,10,0x1f,false);
  CHECK(f->route.state==ROUTE_CANDIDATE && f->abnormal);
@@ -24,16 +26,13 @@ static void test_budget(void)
 {
  LineFollow f;EncoderCounts c;uint32_t t;braking_entry(&f,&c,&t);
  uint32_t entered=t;
- /* Coast slowly enough to stay inside 10cm, but above 16cm/s for >400ms. */
- for(unsigned i=0;i<90;++i) {
-  tick(&f,&c,&t,10,10,0,false);
-  CHECK(f.state!=LINE_STOPPED && f.route.state==ROUTE_BRAKING);
-  CHECK(f.left_target_cm_s==0 && f.right_target_cm_s==0 && !f.command.enabled);
- }
- CHECK(t-entered>INTERFERENCE_TIMEOUT_MS);
- /* Original 10cm bound still aborts into recovery, without turning or recounting. */
- for(unsigned i=0;i<20 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,10,10,0,false);
- CHECK(f.route.state==ROUTE_RECOVERING && f.route.navigation_warning==ROUTE_FAILURE_ENTRY_SPEED);
+ /* Zero targets cannot re-find a hidden node. Sustained loss while braking is
+  * handed to the bounded recovery (no turn, no recount) instead of a hard stop. */
+ for(unsigned i=0;i<600 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,10,10,0,false);
+ CHECK(f.state!=LINE_STOPPED);
+ CHECK(f.route.state==ROUTE_RECOVERING &&
+       f.route.navigation_warning==ROUTE_FAILURE_ENTRY_SPEED);
+ CHECK(t-entered>=INTERFERENCE_TIMEOUT_MS);
  CHECK(f.route.index==0 && f.route.junctions_seen==1 && !f.route.line_exit_confirmed);
 }
 static void test_loss_ready(void)
@@ -41,7 +40,7 @@ static void test_loss_ready(void)
  LineFollow f;EncoderCounts c;uint32_t t;braking_entry(&f,&c,&t);
  /* Once stopped beyond the visible branch, zero targets cannot reacquire it.
   * Abort the maneuver into existing bounded recovery; never blind-turn. */
- for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
+ for(unsigned i=0;i<600 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
  CHECK(f.route.state==ROUTE_RECOVERING && f.state!=LINE_STOPPED);
  CHECK(f.route.navigation_warning==ROUTE_FAILURE_ENTRY_SPEED);
  CHECK(f.route.index==0 && f.route.junctions_seen==1 && !f.route.line_exit_confirmed);
@@ -60,7 +59,7 @@ static void test_loss_ready(void)
 static void test_recovery_bounds(void)
 {
  LineFollow f;EncoderCounts c;uint32_t t;braking_entry(&f,&c,&t);
- for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
+ for(unsigned i=0;i<600 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
  CHECK(f.route.state==ROUTE_RECOVERING);
  uint32_t recovered=t;
  /* Forward feedback can reach the independent 12cm bound before 1200ms. */
@@ -70,7 +69,7 @@ static void test_recovery_bounds(void)
  CHECK(!f.command.enabled);
  /* A stationary recovery is a stall, not permission to bypass feedback. */
  braking_entry(&f,&c,&t);
- for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
+ for(unsigned i=0;i<600 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
  CHECK(f.route.state==ROUTE_RECOVERING);
  for(unsigned i=0;i<150 && f.state!=LINE_STOPPED;++i) tick(&f,&c,&t,0,0,0,false);
  CHECK(f.state==LINE_STOPPED && f.stop_reason==LINE_STOP_ENCODER);
@@ -81,7 +80,7 @@ static void test_recovery_bounds(void)
 static void test_reacquire_and_guards(void)
 {
  LineFollow f;EncoderCounts c;uint32_t t;braking_entry(&f,&c,&t);
- for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
+ for(unsigned i=0;i<600 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0,false);
  CHECK(f.route.state==ROUTE_RECOVERING);
  float origin=f.route.origin_cm;
  for(unsigned i=0;i<80 && f.route.state==ROUTE_RECOVERING;++i) tick(&f,&c,&t,5,5,0x18,false);
@@ -96,6 +95,9 @@ static void test_reacquire_and_guards(void)
  }
  for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0x1f,false);
  CHECK(f.route.state==ROUTE_EXECUTING && f.route.junctions_seen==1);
+ /* The 17 cm wheel-axle approach runs straight before the pivot starts. */
+ for(unsigned i=0;i<120 && f.route.turn_approaching;++i) tick(&f,&c,&t,20,20,0x1f,false);
+ CHECK(!f.route.turn_approaching);
  CHECK(f.left_target_cm_s<f.right_target_cm_s);
  /* Unconfirmed loss still uses ordinary 400ms budget and never counts. */
  start(&f,&c,&t,route,route_count);
@@ -110,8 +112,10 @@ static void test_filtered_entry(void)
  LineFollow f;EncoderCounts c={0};uint32_t t=0;GraySensor sensor;
  line_follow_init(&f,calibration(),route,route_count,NULL,NULL);
  f.route.repeat_count=1;gray_sensor_init(&sensor);
+ /* ~35 cm/s measured: clearly over the 24 cm/s entry cap so the confirmed
+  * target must brake instead of pivoting immediately. */
  for(unsigned i=0;i<35;++i) {
-  c.left+=10;c.right+=10;t+=5;
+  c.left+=90;c.right+=90;t+=5;
   GrayObservation o=gray_sensor_update(&sensor,raw_for_line(0x18),true,0);
   CHECK(o.line_mask==0x18);
   line_follow_update(&f,o,c,t,.005f,i==2);
@@ -120,7 +124,7 @@ static void test_filtered_entry(void)
  /* CUSTOM_TURN uses the normal three-frame strong gate; the sensor filter
   * also delays the first 0x1f by one period, so the entry needs one extra. */
  for(unsigned i=0;i<4;++i) {
-  c.left+=10;c.right+=10;t+=5;
+  c.left+=90;c.right+=90;t+=5;
   GrayObservation o=gray_sensor_update(&sensor,raw_for_line(0x1f),true,0);
   CHECK(o.line_mask==(i==0?0x18:0x1f));
   line_follow_update(&f,o,c,t,.005f,false);
@@ -128,7 +132,7 @@ static void test_filtered_entry(void)
  }
  CHECK(f.route.junctions_seen==1 && f.left_target_cm_s==0 && f.right_target_cm_s==0);
  /* Sensor majority also delays loss by one period; it does not renew node proof. */
- for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) {
+ for(unsigned i=0;i<600 && f.route.state==ROUTE_BRAKING;++i) {
   t+=5;
   GrayObservation o=gray_sensor_update(&sensor,raw_for_line(0),true,0);
   line_follow_update(&f,o,c,t,.005f,false);

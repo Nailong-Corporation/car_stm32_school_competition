@@ -1,0 +1,14 @@
+
+> stm32car-simulator@1.0.0 build
+> tsc && vite build
+
+vite v8.3.6 building client environment for production...
+transforming...
+✓ 19 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                 11.67 kB │ gzip:  3.25 kB
+dist/assets/index-DK2pyUvS.css  10.23 kB │ gzip:  2.66 kB
+dist/assets/index-BrSHYcnx.js   92.75 kB │ gzip: 22.97 kB
+
+✓ built in 76ms

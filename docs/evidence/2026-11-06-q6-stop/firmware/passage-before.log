@@ -1,0 +1,2 @@
+Assertion failed: (mirror*(x.f.left_target_cm_s-x.f.right_target_cm_s)<0), function test_adjacent_pass, file test_pass_heading.c, line 86.
+test/run_pass_heading_tests.sh: line 15: 14746 Abort trap: 6           "$test_binary"

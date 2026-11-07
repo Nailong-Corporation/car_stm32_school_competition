@@ -1,0 +1,13 @@
+--- a/test/new_track_routes.json
++++ b/test/new_track_routes.json
+@@ -376,6 +376,6 @@
+    ]
+   }
+  },
+- "cruise_speed_cm_s": 60,
+- "turn_speed_cm_s": 16.0
+-}
+\ No newline at end of file
++ "cruise_speed_cm_s": 100,
++ "turn_speed_cm_s": 24.0
++}

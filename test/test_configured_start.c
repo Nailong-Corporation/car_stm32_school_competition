@@ -87,7 +87,7 @@ int main(void)
                                    i == LINE_CONFIRM_SAMPLES, false, 0.0f);
     assert(f.start_result == LINE_START_REJECTED_LINE && !f.command.enabled);
 #endif
-    RouteStep invalid[] = {{1, 6.0f, STOP, (int)WHEEL_TARGET_MAX_CM_S + 1, 0.0f, true, 0.0f}};
+    RouteStep invalid[] = {{1, 6.0f, STOP, (int)WHEEL_TARGET_MAX_CM_S + 1, 0.0f, true, 0.0f, 0}};
     line_follow_init(&f, calibration, invalid, 1, NULL, NULL);
     assert(!f.route.valid && f.route.failure == ROUTE_FAILURE_INVALID);
     request_start(&f, 0x18);

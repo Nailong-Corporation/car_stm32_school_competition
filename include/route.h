@@ -1,6 +1,8 @@
 #ifndef ROUTE_H
 #define ROUTE_H
 #include "gray_sensor.h"
+#include "motion_config.h"
+#include <math.h>
 #include <stddef.h>
 
 typedef enum { LEFT, RIGHT, STRAIGHT, STOP, CUSTOM_TURN, HEXAGON } Action;
@@ -12,6 +14,7 @@ typedef struct {
     float angle_deg;         /* CUSTOM_TURN / HEXAGON: clockwise positive, unwrapped. */
     bool corner_arc_enabled;
     float segment_length_cm; /* START / previous action completion -> target; 0 means unknown. */
+    float short_link_cm;     /* Explicit full corner-to-corner geometry, 0 disables; 20..40 cm. */
 } RouteStep;
 typedef enum {
     ROUTE_FOLLOW, ROUTE_CANDIDATE, ROUTE_EXECUTING, ROUTE_CLEARING,
@@ -49,6 +52,16 @@ typedef struct {
     float phase_cm, line_cm, branch_cm, center_cm, hold_heading;
     uint8_t line_samples, branch_samples, center_samples;
     bool line_seen, use_line, center_pending, exit_armed;
+    /* 2026-11-07 pose polygon drive (mirror of the simulator): the axle follows
+     * the known hexagon with 30/60 deg pivot headings; the 8-channel bar only
+     * centres the legs. */
+    float target_heading;
+    bool turning;
+    uint8_t turn_index;
+    float vertex_x_cm, vertex_y_cm;
+    float leg_from_x_cm, leg_from_y_cm;
+    float leg_start_cm;
+    float cross_cm;
 } HexagonNavigation;
 typedef struct {
     HexagonNavigation hexagon;
@@ -69,6 +82,16 @@ typedef struct {
     RouteFailure failure;
     float origin_cm, entry_cm, entry_heading, clear_cm, approach_center_cm;
     float action_start_heading;
+    float turn_approach_origin_cm;
+    bool turn_approaching; /* Front detection precedes axle turn-in by L-track/2. */
+    bool turn_rewind_active, turn_rewind_pending;
+    uint32_t turn_rewind_ms; /* Continuous near-target loss before one bounded rewind. */
+    /* Position relative to the preceding pivot, integrated in its outgoing axis. */
+    bool short_link_tracking, short_link_active;
+    float short_link_heading, short_link_forward_cm, short_link_lateral_cm;
+    float short_link_pivot_lead_cm; /* Prior pivot's measured lateral footprint, at least half-track. */
+    float short_link_last_cm, short_link_last_heading;
+    uint32_t short_link_ms;
     uint32_t segment_ms, phase_ms, approach_center_ms;
     uint32_t exit_candidate_ms;
     float exit_candidate_cm;
@@ -89,6 +112,9 @@ typedef struct {
     void *callback_context;
     bool turn_ended_on_line;
     uint8_t next_junction_samples;
+    /* 短段：转弯过程中前探头已越过的相邻节点证据（含本路口前经过的节点）。 */
+    uint8_t turn_branch_samples;
+    uint8_t turn_branch_sides;
     uint32_t next_junction_ms;
     float next_junction_cm;
     bool candidate_separated; /* 已在转弯离口中连续确认的新分离分支证据。 */
@@ -105,6 +131,24 @@ typedef struct {
     uint8_t component_recovery_line_samples;
     uint32_t component_recovery_ms;
     float component_recovery_cm, component_recovery_heading;
+    /* ===== 2026-11-07 pose (encoder/IMU) navigation, mirrors the simulator =====
+     * waypoint_x/y: absolute corner (track cm) of every row, derived in
+     * route_init from the start pose plus the cumulative table chain.
+     * pose_*: current axle pose, bar gap, bearing, cross-track (axle and 24 cm
+     * look-ahead bar), active segment heading; pose_valid is false when the
+     * caller has no pose (legacy grey-only contract / host tests). */
+    /* Track-frame pose the route table is anchored on (production: P heading
+     * north); a scenario may re-anchor it before route_start. */
+    float start_x_cm, start_y_cm, start_heading_rad;
+    bool pose_mode;
+    bool pose_valid, pose_cross_valid;
+    float pose_gap_bar_cm, pose_bearing_rad;
+    float pose_axle_x_cm, pose_axle_y_cm;
+    float pose_cross_cm, pose_cross_bar_cm, pose_seg_heading_rad;
+    float pose_trigger_late_cm, turn_approach_cm;
+    bool post_turn_slow;
+    uint8_t post_turn_samples;
+    float waypoint_x_cm[ROUTE_MAX_STEPS], waypoint_y_cm[ROUTE_MAX_STEPS];
 } RoutePlanner;
 
 /* Speed feedback must be updated before route_update in production. */
@@ -126,8 +170,17 @@ void route_start(RoutePlanner *planner, float distance_cm, uint32_t now_ms);
 /* Legacy entry point always returns false: explicit START is required. */
 bool route_resume(RoutePlanner *planner, RouteState failed_phase, float distance_cm,
                   float heading_rad, uint32_t now_ms);
-void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
-                   float heading_rad, uint32_t now_ms);
+/* Full entry point: axle pose in track cm (x east, y south, origin at P).
+ * Pass NaN/NaN (or build with POSE_NAV_ENABLED=0) for the legacy grey-only path. */
+void route_update_pose(RoutePlanner *planner, GrayObservation obs, float distance_cm,
+                       float heading_rad, uint32_t now_ms,
+                       float axle_x_cm, float axle_y_cm);
+/* Legacy wrapper keeps the historical five-argument call sites (host tests). */
+static inline void route_update(RoutePlanner *planner, GrayObservation obs, float distance_cm,
+                                float heading_rad, uint32_t now_ms)
+{
+    route_update_pose(planner, obs, distance_cm, heading_rad, now_ms, NAN, NAN);
+}
 /* 返回有效方向：CUSTOM_TURN / HEXAGON 按符号映射 LEFT/RIGHT；非末轮 STOP 使用闭合动作。 */
 Action route_current_action(const RoutePlanner *planner);
 /* Effective LEFT/RIGHT above includes CUSTOM_TURN direction; signed target stays unwrapped. */

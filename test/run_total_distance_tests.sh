@@ -7,7 +7,7 @@ trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 for imu in 0 1; do
     for invert in 0 1; do
         for suite in test_total_distance test_navigation_review test_race_review; do
-            "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g \
+            "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -pedantic -g -DPOSE_NAV_ENABLED=0 \
             -fsanitize=address,undefined -fno-omit-frame-pointer \
             -I"$project_dir/include" -DMPU6050_ENABLED="$imu" \
             -DGRAY_INVERT_ENABLED="$invert" -DODOMETRY_HEADING_SCALE=1.0f \

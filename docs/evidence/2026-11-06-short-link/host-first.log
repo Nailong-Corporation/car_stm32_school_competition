@@ -1,0 +1,61 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+In file included from /Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_distance_node_contract.c:3:
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:49:53: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+   49 |   RouteStep s[]={{2,6,mirror?LEFT:RIGHT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+      |                                                     ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:49:77: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+   49 |   RouteStep s[]={{2,6,mirror?LEFT:RIGHT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+      |                                                                             ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:80:43: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+   80 |  RouteStep s[]={{1,6,STRAIGHT,20,0,false,0},{1,6,STOP,20,0,false,0}};
+      |                                           ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:80:67: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+   80 |  RouteStep s[]={{1,6,STRAIGHT,20,0,false,0},{1,6,STOP,20,0,false,0}};
+      |                                                                   ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:98:40: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+   98 |  RouteStep s[]={{1,12,LEFT,40,0,false,0},{1,12,STOP,40,0,false,0}};
+      |                                        ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:98:65: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+   98 |  RouteStep s[]={{1,12,LEFT,40,0,false,0},{1,12,STOP,40,0,false,0}};
+      |                                                                 ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:120:39: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  120 |  RouteStep s[]={{1,6,LEFT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+      |                                       ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:120:63: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  120 |  RouteStep s[]={{1,6,LEFT,40,0,false,0},{1,6,STOP,40,0,false,0}};
+      |                                                               ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:136:83: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  136 |   RouteStep s[]={{1,6,CUSTOM_TURN,20,mirror?-(float)degrees:(float)degrees,false,0},{1,6,STOP,20,0,false,0}};
+      |                                                                                   ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:136:107: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  136 |   RouteStep s[]={{1,6,CUSTOM_TURN,20,mirror?-(float)degrees:(float)degrees,false,0},{1,6,STOP,20,0,false,0}};
+      |                                                                                                           ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:143:39: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  143 |  RouteStep s[]={{1,6,LEFT,20,0,false,0},{1,6,STOP,20,0,false,0}};
+      |                                       ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:143:63: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  143 |  RouteStep s[]={{1,6,LEFT,20,0,false,0},{1,6,STOP,20,0,false,0}};
+      |                                                               ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:161:55: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  161 |   RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+      |                                                       ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:161:81: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  161 |   RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+      |                                                                                 ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:190:55: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  190 |   RouteStep s[]={{1,50,mirror?RIGHT:LEFT,200,0,false,0},
+      |                                                       ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:191:42: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  191 |                  {4,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+      |                                          ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:191:68: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  191 |                  {4,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+      |                                                                    ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:263:40: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  263 |  RouteStep s[]={{1,6,LEFT,20,0,false,10},{1,6,STOP,20,0,false,0}};
+      |                                        ^
+/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/test/test_navigation.c:263:64: error: missing field 'short_link_cm' initializer [-Werror,-Wmissing-field-initializers]
+  263 |  RouteStep s[]={{1,6,LEFT,20,0,false,10},{1,6,STOP,20,0,false,0}};
+      |                                                                ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.

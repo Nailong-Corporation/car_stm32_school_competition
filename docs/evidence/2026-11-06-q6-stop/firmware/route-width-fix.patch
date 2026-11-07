@@ -1,0 +1,20 @@
+diff --git a/src/route.c b/src/route.c
+index 6232564..cd7ac30 100644
+--- a/src/route.c
++++ b/src/route.c
+@@ -550,7 +550,14 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
+         bool history=(p->state==ROUTE_CANDIDATE && d>=p->entry_cm) || recent_center;
+         uint8_t sides;
+         JunctionEvidence kind=junction_shape(o,&sides);
+-        bool smooth=kind==JUNCTION_EVIDENCE_EDGE && (sides&p->smooth_edge_sides);
++        /* The three-channel drift is a single sliding line, but a real branch
++         * adds at least a fourth channel before it can reach center. Keep the
++         * existing latch for narrow connected shapes; wider connected shapes
++         * retain the ordinary strong-branch confirmation. */
++        bool smooth=(kind==JUNCTION_EVIDENCE_EDGE ||
++            (kind==JUNCTION_EVIDENCE_CENTER_BRANCH &&
++             o.white_count<=JUNCTION_EDGE_MAX_WIDTH)) &&
++            (sides&p->smooth_edge_sides);
+         bool shape=history && kind!=JUNCTION_EVIDENCE_NONE && !smooth;
+         /* Real loss / single abrupt frames never count as junctions. */
+         if(!shape || !adjacent) {

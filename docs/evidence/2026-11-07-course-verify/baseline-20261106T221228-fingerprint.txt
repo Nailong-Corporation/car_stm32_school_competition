@@ -1,0 +1,98 @@
+# verify_course baseline
+captured_at_local: 2026-11-06T22:12:28+0800
+captured_at_utc: 2026-11-06T14:12:28Z
+car_stm32_head: 58b34fc (解决了路口计数 bug)
+sim_head: 9b48611 (first commit)
+
+## car_stm32 git status (src/include/test only)
+   M include/control_config.h
+   M include/gray_sensor.h
+   M include/line_follow.h
+   M include/motion_config.h
+   M include/route.h
+   M src/gray_sensor.c
+   M src/line_follow.c
+   M src/route.c
+   M src/route_table.c
+   M test/run_host_tests.sh
+   M test/test_component_recovery.c
+   M test/test_configured_start.c
+   M test/test_entry_loss.c
+   M test/test_floor_seam.c
+   M test/test_heading_scale.c
+   M test/test_hexagon.c
+   M test/test_imu_heading.c
+   M test/test_junction_evidence.c
+   M test/test_left_fail.c
+   M test/test_line_only.c
+   M test/test_logic.c
+   M test/test_loss_stop.c
+   M test/test_maneuver_loss.c
+   M test/test_mpu6050.c
+   M test/test_navigation.c
+   M test/test_navigation_review.c
+   M test/test_race_review.c
+   M test/test_total_distance.c
+   M test/test_turn_handoff.c
+   M test/test_turn_settling.c
+   M test/test_turn_speed_switches.c
+  ?? test/new_track_routes.json
+  ?? test/replay_controller.c
+  ?? test/run_distance_node_contract_tests.sh
+  ?? test/run_hexagon_entry_tests.sh
+  ?? test/run_pass_heading_tests.sh
+  ?? test/run_pending_rewrite_tests.sh
+  ?? test/run_short_link_tests.sh
+  ?? test/run_smooth_center_branch_tests.sh
+  ?? test/sync_new_track_routes.py
+  ?? test/test_axle_turn.c
+  ?? test/test_distance_node_contract.c
+  ?? test/test_hexagon_entry.c
+  ?? test/test_pass_heading.c
+  ?? test/test_route_schemes.c
+  ?? test/test_short_link.c
+  ?? test/test_smooth_center_branch.c
+
+## simulator git status (src tests package.json)
+   M src/main.ts
+   M src/sim/config.ts
+   M src/sim/gray_sensor.ts
+   M src/sim/line_follow.ts
+   M src/sim/physics.ts
+   M src/sim/route.ts
+   M src/sim/route_parser.ts
+   M src/sim/types.ts
+   M src/track/map_data.ts
+   M src/track/track_renderer.ts
+   M tests/navigation.test.ts
+   M tests/q4_q6.test.ts
+   M tests/replay.mjs
+   M tests/run.mjs
+  ?? src/.DS_Store
+  ?? tests/dbg/
+  ?? tests/debug_hooks.mjs
+  ?? tests/debug_replay.mjs
+  ?? tests/distance_node.test.ts
+  ?? tests/firmware_parity.mjs
+  ?? tests/hexagon_entry.test.ts
+  ?? tests/posecheck.mjs
+  ?? tests/run_hexagon_entry.mjs
+  ?? tests/run_short_link.mjs
+  ?? tests/short_link.test.ts
+
+## sha256 of simulator logic + firmware route table
+  7039f355b9c80933410d0c0b88970e21dc343b2d0cf6ae7af0df17c2b22096a6  /Users/zhendong/Documents/stm32car_simulator/src/sim/braking_planner.ts
+  c42d19dbd7760d5495dbd3105f34e67d1757fb06cfc314d97376bf41043dafee  /Users/zhendong/Documents/stm32car_simulator/src/sim/config.ts
+  16e1607b20a0b154e5b5b65c11c4d25f4abd380f2b43d54b15c452f9fe69a59f  /Users/zhendong/Documents/stm32car_simulator/src/sim/gray_sensor.ts
+  c7ced3bcb8b641f2addf84aed0372a1e15f4abc9a0264310837df825a0d8c4ec  /Users/zhendong/Documents/stm32car_simulator/src/sim/line_follow.ts
+  8807985d8e046c6b2c163c9f71d459015a092af2e87c60de43234d2a2ba79dbe  /Users/zhendong/Documents/stm32car_simulator/src/sim/odometry.ts
+  e43638aa40dc6746c9cf2ed47379d528c34e0df3094c5fded1d096631e94bafc  /Users/zhendong/Documents/stm32car_simulator/src/sim/physics.ts
+  69eb57173bbcf5aa5d1c9b0abe37c7462aed8e866937dfa82e63d2f9c7cc2afe  /Users/zhendong/Documents/stm32car_simulator/src/sim/pid.ts
+  8b59b8659bef3f2f7592a6e5b772830003215e1ae3c1c378e124ec447fe9928f  /Users/zhendong/Documents/stm32car_simulator/src/sim/route.ts
+  0e77002c1f0cebc085b0426cb5e97831357fe9356065bc2723b3c835dd7c06c5  /Users/zhendong/Documents/stm32car_simulator/src/sim/route_parser.ts
+  4b9a766c1f3490e97b03e60c83f715a66cc0d3361116bb32714d0c8fe6f69aa4  /Users/zhendong/Documents/stm32car_simulator/src/sim/speed_control.ts
+  c19d8adc9791ccba54485158e326d1892a330148bd322a32137e3329c46ded15  /Users/zhendong/Documents/stm32car_simulator/src/sim/types.ts
+  abba215deb5a5610da6fd479bf4cd3783a8ca358cc3316f41b0bbaab97914f45  /Users/zhendong/Documents/stm32car_simulator/src/track/map_data.ts
+  08cc727347cbf12d23851d3123c763b9f28cc215abebcfc65e26ad773ea27fa0  /Users/zhendong/Documents/stm32car_simulator/src/track/track_renderer.ts
+  25e76353faddc3d18ed060f7c2bcfb3549d0bf1d30ae2ac32ac7ac04238c0564  /Users/zhendong/Documents/stm32car_simulator/tests/replay.mjs
+  756d86887c325f5e11dc58bd1d10068c307d170f9d4876b74458178c7618c778  src/route_table.c

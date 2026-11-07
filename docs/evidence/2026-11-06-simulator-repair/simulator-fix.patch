@@ -1,0 +1,107 @@
+--- a/src/sim/route.ts
++++ b/src/sim/route.ts
+@@ -1000,7 +1000,13 @@
+ 
+       const history = (this.state === RouteState.ROUTE_CANDIDATE && d >= this.entry_cm) || recent_center;
+       const { kind, sides } = junctionShape(o);
+-      const smooth = kind === JunctionEvidence.JUNCTION_EVIDENCE_EDGE && (sides & this.smooth_edge_sides) !== 0;
++      // A gradually shifting single line can still include a center channel
++      // (e.g. 0x38 -> 0x30 -> 0x70). Keep its same-side suppression when
++      // classified CENTER_BRANCH; an abrupt or separated branch stays eligible.
++      const smooth =
++        (kind === JunctionEvidence.JUNCTION_EVIDENCE_EDGE ||
++          kind === JunctionEvidence.JUNCTION_EVIDENCE_CENTER_BRANCH) &&
++        (sides & this.smooth_edge_sides) !== 0;
+       const shape = history && kind !== JunctionEvidence.JUNCTION_EVIDENCE_NONE && !smooth;
+ 
+       if (!shape || !adjacent) {
+--- a/src/sim/line_follow.ts
++++ b/src/sim/line_follow.ts
+@@ -224,6 +224,15 @@
+     this.targets(base, correction, dt);
+   }
+ 
++  /** Ordinary maneuvers use route phase bounds; HEXAGON keeps its own loss rules. */
++  private routeOwnsGrayLoss(): boolean {
++    const r = this.route;
++    return r.state === RouteState.ROUTE_BRAKING ||
++      r.state === RouteState.ROUTE_RECOVERING ||
++      ((r.state === RouteState.ROUTE_EXECUTING || r.state === RouteState.ROUTE_CLEARING) &&
++        r.steps[r.index]?.action !== Action.HEXAGON);
++  }
++
+   public update(
+     observation: GrayObservation,
+     counts: EncoderCounts,
+@@ -279,8 +288,27 @@
+ 
+     this.startup_elapsed_s += dt;
+ 
++    // Route mode always bounds ordinary lost/ambiguous-line holding, even with
++    // LOST_LINE_STOP_ENABLED=0. Check before a late good sample can renew it.
++    const gray_loss_expired = this.abnormal &&
++      (now_ms - this.last_reliable_ms >= INTERFERENCE_TIMEOUT_MS ||
++        Math.abs(this.odometry.distance_cm - this.abnormal_origin_cm) >= INTERFERENCE_MAX_DISTANCE_CM);
++    const route_owned_gray_loss = this.routeOwnsGrayLoss();
+     this.route.setSpeed(this.odometry.left_speed_cm_s, this.odometry.right_speed_cm_s);
+     this.route.update(obs, this.odometry.distance_cm, this.odometry.heading_rad, now_ms);
++    // A real node confirmed on this frame may transfer ownership to its phase.
++    if (gray_loss_expired && !route_owned_gray_loss && !this.routeOwnsGrayLoss()) {
++      this.stop(LineStopReason.LINE_STOP_LOST);
++      return;
++    }
++    if (this.route.state === RouteState.ROUTE_CLEARING && previous_route === RouteState.ROUTE_EXECUTING) {
++      this.abnormal = false;
++      this.exit_accelerating = false;
++    }
++    if (this.route.state === RouteState.ROUTE_RECOVERING && previous_route !== RouteState.ROUTE_RECOVERING) {
++      this.pid.reset();
++      this.abnormal = false;
++    }
+ 
+     if (this.route.state === RouteState.ROUTE_FINISHED) {
+       this.route.dispatchStopCallback();
+@@ -521,7 +549,8 @@
+           ) {
+             correction = direction * Math.min(base, JUNCTION_CAPTURE_CENTER_BIAS_CM_S);
+           }
+-          if (turn < Math.abs(target)) {
++          // Visible exit: position PID owns both steering directions, as in C.
++          if (!this.route.turn_capturing && turn < Math.abs(target)) {
+             correction =
+               direction *
+               Math.max(direction * correction, Math.min(base, JUNCTION_CAPTURE_MIN_TURN_CM_S));
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -8,7 +8,7 @@
+   DEFAULT_ROUTE_TABLE_C,
+   type ParseResult,
+ } from './sim/route_parser';
+-import { Action, RouteState, HexagonState } from './sim/types';
++import { Action, RouteState, HexagonState, LineState, LineStopReason } from './sim/types';
+ import { CONTROL_PERIOD_S } from './sim/config';
+ 
+ // Global Simulator State
+@@ -250,11 +250,12 @@
+         <span class="status-text">已完成 (FINISHED)</span>
+       `;
+       playIcon.textContent = '▶';
+-    } else if (this.lineFollow.route.state === RouteState.ROUTE_FAILED) {
++    } else if (this.lineFollow.state === LineState.LINE_STOPPED ||
++      this.lineFollow.route.state === RouteState.ROUTE_FAILED) {
+       pill.className = 'status-pill stopped';
+       pill.innerHTML = `
+         <span class="status-dot"></span>
+-        <span class="status-text">故障停止 (STOPPED)</span>
++        <span class="status-text">停止: ${LineStopReason[this.lineFollow.stop_reason]} (复位后重试)</span>
+       `;
+       playIcon.textContent = '▶';
+     } else {
+@@ -591,6 +592,7 @@
+ 
+         // Auto pause on route finish or fail
+         if (
++          this.lineFollow.state === LineState.LINE_STOPPED ||
+           this.lineFollow.route.state === RouteState.ROUTE_FINISHED ||
+           this.lineFollow.route.state === RouteState.ROUTE_FAILED
+         ) {

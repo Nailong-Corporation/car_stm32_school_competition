@@ -6,11 +6,14 @@
 static void test_approach_and_entry(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
-  f.startup_elapsed_s=1;f.base=f.left_target_cm_s=f.right_target_cm_s=50;
+  f.startup_elapsed_s=1;f.braking_active=false;
+  f.base=f.left_target_cm_s=f.right_target_cm_s=50;
   tick(&f,&c,&t,0,0,0x18,false);
-  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_SETTLE_SPEED_CM_S+.001f);
+  /* Unknown-length short leg keeps its cruise; 16 cm/s is an entry/action
+   * gate, not a whole-approach cap. */
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)>50);
   RoutePlanner p;float d=0;init(&p,s,2);t=0;
   route_set_speed(&p,30,30);junction(&p,&d,&t,mirror?0xf8:0x1f,0);
   CHECK(p.junctions_seen==1 && p.state==ROUTE_BRAKING);
@@ -29,7 +32,7 @@ static void test_early_strong_evidence(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
   uint8_t branch=mirror?0xf8:0x1f;
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
   RoutePlanner p;float d=0;uint32_t t=0;init(&p,s,2);
   update(&p,&d,&t,0x18,0,4);
   update(&p,&d,&t,branch,0,1);CHECK(p.state==ROUTE_CANDIDATE && p.junctions_seen==0);
@@ -43,8 +46,10 @@ static void test_early_strong_evidence(void)
   update(&p,&d,&t,branch,0,2);CHECK(p.junctions_seen==0);
   update(&p,&d,&t,branch,0,1);CHECK(p.junctions_seen==1 && p.passing_junction);
   s[0].junction_count=1;init(&p,s,2);d=0;t=0;update(&p,&d,&t,0x18,0,4);
+  /* The outer-only weak edge was retired on the 2026-11-06 track: printed
+   * transistor V arms produce exactly that two-channel shape. */
   update(&p,&d,&t,mirror?0xc0:0x03,0,3);CHECK(p.junctions_seen==0);
-  update(&p,&d,&t,mirror?0xc0:0x03,0,1);CHECK(p.junctions_seen==1);
+  update(&p,&d,&t,mirror?0xc0:0x03,0,1);CHECK(p.junctions_seen==0);
   init(&p,s,2);d=0;t=0;update(&p,&d,&t,0x18,0,4);
   for(unsigned i=0;i<3;++i) {t+=5;route_update(&p,mask(branch),d,0,t);}
   CHECK(p.junctions_seen==0);
@@ -58,13 +63,16 @@ static void prepare_capture(LineFollow *f,EncoderCounts *c,uint32_t *t,const Rou
  start(f,c,t,s,2);f->startup_elapsed_s=1;
  f->base=f->left_target_cm_s=f->right_target_cm_s=16;
  f->route.state=ROUTE_EXECUTING;f->route.phase_ms=*t;
- f->route.entry_heading=f->route.action_start_heading=-sign*.80f;
+ /* Start just inside the exit-alignment band: a captured center line may
+  * then complete the action, matching the current 90-degree contract. */
+ f->route.entry_heading=f->route.action_start_heading=
+     -sign*(JUNCTION_TURN_TARGET_RAD-JUNCTION_EXIT_ALIGNMENT_RAD);
 }
 static void test_continuous_handoff(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
   float sign=mirror?1.0f:-1.0f;
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;prepare_capture(&f,&c,&t,s,sign);
   const uint8_t sweep[]={0x04,0x08,0x10,0x10};
   for(unsigned i=0;i<4;++i) {
@@ -81,9 +89,11 @@ static void test_continuous_handoff(void)
   f.odometry.heading_rad=anchor+sign*.1f;
   tick(&f,&c,&t,0,0,0,false);
   CHECK(f.abnormal && f.state==LINE_GAP_HOLD);
-  NEAR(f.hold_heading_rad,anchor);
+  /* Hold is biased toward the inside of the corner to re-find an exit line that the
+   * early pivot left just outside the bar (JUNCTION_EXIT_REWIND_RAD). */
+  NEAR(f.hold_heading_rad,anchor-sign*JUNCTION_EXIT_REWIND_RAD);
   CHECK(sign*f.correction<0);
-  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=16.001f);
+  CHECK(fmaxf(f.left_target_cm_s,f.right_target_cm_s)<=JUNCTION_EXIT_SPEED_CM_S+.001f);
   for(unsigned i=0;i<2;++i) tick(&f,&c,&t,0,0,0x18,false);
   CHECK(f.abnormal); /* no single-frame automatic recovery */
   tick(&f,&c,&t,0,0,0x18,false);CHECK(!f.abnormal && f.state==LINE_TRACKING);
@@ -96,24 +106,24 @@ static void test_continuous_handoff(void)
 }
 static void test_planned_entry_limits(void)
 {
- RouteStep s[]={{1,50,LEFT,200,0,false,1000},{1,50,STOP,50,0,false,0}};
+ RouteStep s[]={{1,50,LEFT,200,0,false,1000, 0},{1,50,STOP,50,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
  f.startup_elapsed_s=1;f.left_target_cm_s=f.right_target_cm_s=f.base=50;f.braking_active=false;
- tick(&f,&c,&t,0,0,0x18,false);CHECK(f.base>16); /* measured long leg may cruise */
+ tick(&f,&c,&t,0,0,0x18,false);CHECK(f.base>JUNCTION_SETTLE_SPEED_CM_S); /* measured long leg may cruise */
  f.route.final_segment_origin_cm=f.odometry.distance_cm-1000;
- tick(&f,&c,&t,0,0,0x18,false);CHECK(f.base<=16.001f);
- RoutePlanner p;init(&p,s,2);NEAR(route_entry_speed_limit(&p),16);
+ tick(&f,&c,&t,0,0,0x18,false);CHECK(f.base<=JUNCTION_SETTLE_SPEED_CM_S+0.001f);
+ RoutePlanner p;init(&p,s,2);NEAR(route_entry_speed_limit(&p),JUNCTION_SETTLE_SPEED_CM_S);
  s[0].turn_speed=6;init(&p,s,2);NEAR(route_entry_speed_limit(&p),6);
  s[0].turn_speed=50;s[0].action=STRAIGHT;init(&p,s,2);NEAR(route_entry_speed_limit(&p),50);
- s[0].action=CUSTOM_TURN;s[0].angle_deg=90;init(&p,s,2);NEAR(route_entry_speed_limit(&p),16);
+ s[0].action=CUSTOM_TURN;s[0].angle_deg=90;init(&p,s,2);NEAR(route_entry_speed_limit(&p),JUNCTION_SETTLE_SPEED_CM_S);
  p.index=1;NEAR(route_entry_speed_limit(&p),50); /* final STOP */
- p.repeat_count=0;p.repeat_action=LEFT;NEAR(route_entry_speed_limit(&p),16);
+ p.repeat_count=0;p.repeat_action=LEFT;NEAR(route_entry_speed_limit(&p),JUNCTION_SETTLE_SPEED_CM_S);
  p.repeat_action=STRAIGHT;NEAR(route_entry_speed_limit(&p),50);
 }
 static void test_reverse_evidence_at_handoff(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;prepare_capture(&f,&c,&t,s,mirror?1:-1);
   for(unsigned i=0;i<2;++i) tick(&f,&c,&t,0,0,0x18,false);
   if(mirror) {f.odometry.left_speed_cm_s=-.7f;f.speed.left_reverse_s=.045f;}
@@ -130,12 +140,13 @@ static void test_real_imu_handoff(void)
 {
  for(unsigned mirror=0;mirror<2;++mirror) {
   float sign=mirror?1:-1;
-  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0},{1,50,STOP,50,0,false,0}};
+  RouteStep s[]={{1,50,mirror?RIGHT:LEFT,50,0,false,0, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c={0};uint32_t t=0;
   line_follow_init(&f,calibration(),s,2,NULL,NULL);f.route.repeat_count=1;
   for(unsigned i=0;i<3;++i) {t+=5;line_follow_update_heading(&f,mask(0x18),c,t,.005f,i==2,true,0);}
   f.startup_elapsed_s=1;f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;
-  f.route.entry_heading=f.route.action_start_heading=-sign*.8f;
+  f.route.entry_heading=f.route.action_start_heading=
+      -sign*(JUNCTION_TURN_TARGET_RAD-JUNCTION_EXIT_ALIGNMENT_RAD);
   f.base=f.left_target_cm_s=f.right_target_cm_s=16;
   const uint8_t sequence[]={0x04,0x08,0x10,0x10};
   for(unsigned i=0;i<4;++i) {

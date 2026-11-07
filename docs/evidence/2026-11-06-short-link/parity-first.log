@@ -1,0 +1,15 @@
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: scheme 1 5340ms target error 0.3502458914187887: C=0,3,2,0,1,16,10.44713,118.615326,1.56921268, TS=0,3,2,0,1,16,10.797375891418788,118.61541212556995,1.569212646453272
+    at file:///Users/zhendong/Documents/stm32car_simulator/tests/firmware_parity.mjs:52:16 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v26.12.0

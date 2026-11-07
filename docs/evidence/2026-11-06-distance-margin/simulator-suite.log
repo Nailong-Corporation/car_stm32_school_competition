@@ -1,0 +1,16 @@
+PASS: distance OR maximum count, confirmed node required, resistor counted once
+PASS: finite drive/coast/brake inertia, encoder/pose consistency and moving turn onset
+PASS: one START moves the car 25.4 cm after one second
+PASS: pause / continue preserves controller progress
+PASS: single-step advances exactly 5 ms and starts after confirmation
+PASS: START works after time has already advanced in idle
+PASS: reset cancels stale START and a new click starts normally
+PASS: stable-line guard remains enforced; rejected START is not retried
+PASS: smooth center+branch drift is not a second junction in either lateral direction
+PASS: captured exit keeps the PID steering direction in both turns
+PASS: FOLLOW loss stops at 400 ms or 8 cm; ordinary maneuvers retain phase ownership
+PASS: first corners follow the new top edge (index=2, x=53.4, y=9.6)
+PASS: mirrored four/five-channel Q4 branches override narrow drift suppression
+PASS: clearance timeout clears the borrowed exit axis on its entry frame
+PROGRESS: reference route reached step 3/29 at (241.3,176.2); full lap still under calibration
+PASS: printed resistor counted (2 node(s)) with heading retained

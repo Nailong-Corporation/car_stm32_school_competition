@@ -1,0 +1,18 @@
+--- a/src/route.c
++++ b/src/route.c
+@@ -550,8 +550,13 @@
+         bool history=(p->state==ROUTE_CANDIDATE && d>=p->entry_cm) || recent_center;
+         uint8_t sides;
+         JunctionEvidence kind=junction_shape(o,&sides);
+-        /* Last-round broad connected-branch suppression, before Q4 fix. */
+-        bool smooth=(kind==JUNCTION_EVIDENCE_EDGE || kind==JUNCTION_EVIDENCE_CENTER_BRANCH) &&
++        /* The three-channel drift is a single sliding line, but a real branch
++         * adds at least a fourth channel before it can reach center. Keep the
++         * existing latch for narrow connected shapes; wider connected shapes
++         * retain the ordinary strong-branch confirmation. */
++        bool smooth=(kind==JUNCTION_EVIDENCE_EDGE ||
++            (kind==JUNCTION_EVIDENCE_CENTER_BRANCH &&
++             o.white_count<=JUNCTION_EDGE_MAX_WIDTH)) &&
+             (sides&p->smooth_edge_sides);
+         bool shape=history && kind!=JUNCTION_EVIDENCE_NONE && !smooth;
+         /* Real loss / single abrupt frames never count as junctions. */

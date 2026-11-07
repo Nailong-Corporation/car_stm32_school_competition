@@ -1,0 +1,17 @@
+diff --git a/src/route.c b/src/route.c
+index 6232564..cc9c3cf 100644
+--- a/src/route.c
++++ b/src/route.c
+@@ -550,7 +550,11 @@ void route_update(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now
+         bool history=(p->state==ROUTE_CANDIDATE && d>=p->entry_cm) || recent_center;
+         uint8_t sides;
+         JunctionEvidence kind=junction_shape(o,&sides);
+-        bool smooth=kind==JUNCTION_EVIDENCE_EDGE && (sides&p->smooth_edge_sides);
++        /* A drifting connected line can still touch a center channel (0x70 /
++         * 0x0e). Keep the same-side latch when EDGE becomes CENTER_BRANCH;
++         * disjoint branches retain their separate evidence contract. */
++        bool smooth=(kind==JUNCTION_EVIDENCE_EDGE || kind==JUNCTION_EVIDENCE_CENTER_BRANCH) &&
++            (sides&p->smooth_edge_sides);
+         bool shape=history && kind!=JUNCTION_EVIDENCE_NONE && !smooth;
+         /* Real loss / single abrupt frames never count as junctions. */
+         if(!shape || !adjacent) {

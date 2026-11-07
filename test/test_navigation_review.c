@@ -7,9 +7,9 @@ static void test_action_anchor(void)
 {
  for(unsigned mode=0;mode<5;++mode) {
   RouteStep s[]={{1,12,mode==1?STRAIGHT:mode==2?HEXAGON:mode==3?RIGHT:mode==4?CUSTOM_TURN:LEFT,200,
-                 mode==2?-300:mode==4?-120:0,false,0},{0,12,STOP,200,0,false,5}};
+                 mode==2?-300:mode==4?-120:0,false,0, 0},{0,12,STOP,200,0,false,5, 0}};
   RoutePlanner p;float d=0;uint32_t t=0;init(&p,s,2);
-  junction(&p,&d,&t,0xff,0);CHECK(p.state==ROUTE_EXECUTING);
+  junction_approach(&p,&d,&t,0xff,0);CHECK(p.state==ROUTE_EXECUTING);
   float heading=mode==1?0:mode==2?-6.0f:mode==3?1.6f:mode==4?-2.2f:-1.6f;
   if(mode==2) {
    /* The HEXAGON sub-FSM must earn its own exit before public clearance. */
@@ -24,22 +24,22 @@ static void test_action_anchor(void)
   /* Five cm after action completion includes the already traveled clearance. */
   d=anchor+5.05f;update(&p,&d,&t,0x18,heading,4);
   CHECK(p.search_pending && p.state==ROUTE_FOLLOW);
-  junction(&p,&d,&t,0xff,heading);CHECK(p.state==ROUTE_FINISHED);
+  junction_approach(&p,&d,&t,0xff,heading);CHECK(p.state==ROUTE_FINISHED);
  }
 }
 static void test_final_lap_preview(void)
 {
- RouteStep stop[]={{1,50,STOP,200,0,false,101}};
+ RouteStep stop[]={{1,50,STOP,200,0,false,101, 0}};
  RoutePlanner p;init(&p,stop,1);p.repeat_count=2;p.repeat_action=LEFT;
- float d=0;uint32_t t=0;junction(&p,&d,&t,0xff,0);
+ float d=0;uint32_t t=0;junction_approach(&p,&d,&t,0xff,0);
  update(&p,&d,&t,0x18,-1.6f,3);CHECK(p.state==ROUTE_CLEARING && p.lap_boundary);
- NEAR(route_entry_speed_limit(&p),16);NEAR(route_planning_entry_speed_limit(&p),50);
+ NEAR(route_entry_speed_limit(&p),JUNCTION_SETTLE_SPEED_CM_S);NEAR(route_planning_entry_speed_limit(&p),50);
  /* The next final STOP is on the same row but uses the next lap's contract. */
  NEAR(route_planning_origin(&p),p.clear_cm);
 }
 static void test_clearance_envelope(void)
 {
- RouteStep s[]={{5,12,LEFT,200,0,false,101},{1,12,STOP,200,0,false,0}};
+ RouteStep s[]={{5,12,LEFT,200,0,false,101, 0},{1,12,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
  f.startup_elapsed_s=1;f.base=f.left_target_cm_s=f.right_target_cm_s=100;
  /* Seed a legitimate intermediate clearance close to the total distance end. */
@@ -62,7 +62,7 @@ static void test_clearance_envelope(void)
  }
  CHECK(f.route.state==ROUTE_FOLLOW && f.route.search_pending && f.route.index==0);
  /* Target turn clearance previews the next segment from its exit point. */
- RouteStep turns[]={{1,12,LEFT,200,0,false,0},{0,12,STOP,200,0,false,101}};
+ RouteStep turns[]={{1,12,LEFT,200,0,false,0, 0},{0,12,STOP,200,0,false,101, 0}};
  start(&f,&c,&t,turns,2);f.startup_elapsed_s=1;
  f.route.state=ROUTE_EXECUTING;f.route.phase_ms=t;
  f.route.entry_heading=f.route.action_start_heading=1.6f;
@@ -72,7 +72,7 @@ static void test_clearance_envelope(void)
 }
 static void test_recovery_derivative(void)
 {
- RouteStep s[]={{3,12,LEFT,200,0,false,70},{1,12,STOP,200,0,false,0}};
+ RouteStep s[]={{3,12,LEFT,200,0,false,70, 0},{1,12,STOP,200,0,false,0, 0}};
  LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
  f.route.state=ROUTE_FAILED;f.route.failure=ROUTE_FAILURE_ACTION_TIMEOUT;
  tick(&f,&c,&t,1,1,0x18,false);CHECK(f.route.state==ROUTE_RECOVERING);
@@ -84,7 +84,7 @@ static void test_recovery_derivative(void)
 }
 static void test_reliable_recovery(void)
 {
- RouteStep s[]={{3,12,LEFT,200,0,false,70},{1,12,STOP,200,0,false,0}};
+ RouteStep s[]={{3,12,LEFT,200,0,false,70, 0},{1,12,STOP,200,0,false,0, 0}};
  RoutePlanner p;init(&p,s,2);p.state=ROUTE_FAILED;p.failure=ROUTE_FAILURE_TURN_LIMIT;
  CHECK(route_recover_navigation(&p,0,0,0));
  /* No displacement: reliable line cannot be classified as sustained loss.

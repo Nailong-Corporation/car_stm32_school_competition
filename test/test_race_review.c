@@ -12,8 +12,8 @@ static void test_known_length_envelope(void)
  for(unsigned l=0;l<sizeof(lengths)/sizeof(lengths[0]);++l)
  for(unsigned n=0;n<sizeof(counts)/sizeof(counts[0]);++n)
  for(unsigned a=0;a<sizeof(actions)/sizeof(actions[0]);++a) {
-  RouteStep s[]={{counts[n],12,actions[a],200,0,false,lengths[l]},
-                 {1,12,STOP,200,0,false,0}};
+  RouteStep s[]={{counts[n],12,actions[a],200,0,false,lengths[l],0},
+                 {1,12,STOP,200,0,false,0, 0}};
   size_t size=actions[a]==STOP?1:2;
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,size);
   f.startup_elapsed_s=1;
@@ -30,7 +30,7 @@ static void test_known_length_envelope(void)
 static void test_short_handoffs(void)
 {
  for(unsigned mode=0;mode<3;++mode) {
-  RouteStep s[]={{4,12,LEFT,200,0,false,200},{1,12,STOP,200,0,false,5}};
+  RouteStep s[]={{4,12,LEFT,200,0,false,200, 0},{1,12,STOP,200,0,false,5, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
   f.startup_elapsed_s=1;f.base=f.left_target_cm_s=f.right_target_cm_s=60;
   f.route.state=ROUTE_CLEARING;
@@ -62,17 +62,17 @@ static void test_spacing_and_node_matrix(void)
  for(unsigned l=0;l<sizeof(lengths)/sizeof(lengths[0]);++l)
  for(unsigned g=0;g<sizeof(spacings)/sizeof(spacings[0]);++g)
  for(unsigned n=0;n<sizeof(counts)/sizeof(counts[0]);++n) {
-  RouteStep s[]={{counts[n],12,STRAIGHT,200,0,false,lengths[l]},
-                 {1,12,STOP,200,0,false,0}};
+  RouteStep s[]={{counts[n],12,STRAIGHT,200,0,false,lengths[l],0},
+                 {1,12,STOP,200,0,false,0, 0}};
   RoutePlanner p;init(&p,s,2);float d=0;uint32_t t=0;
   for(unsigned node=1;node<=counts[n];++node) {
    float location=spacings[g]*(float)node;
    while(d<location) update(&p,&d,&t,0x18,0,1);
    junction(&p,&d,&t,node%2?0x1f:0xf8,0);
    CHECK(p.junctions_seen==node && p.index==0);
-   /* Segment length is a speed-planning bound, not a node authorization.
-    * Only the configured junction count may turn this step into a target. */
-   bool target=node>=counts[n];
+   /* Latest contract: the maximum node count OR the segment distance may
+    * authorize, but the action still waits for this confirmed node. */
+   bool target=node>=counts[n] || (lengths[l]>0 && d>=lengths[l]);
    CHECK(p.passing_junction==!target);
    CHECK(p.state==(target?ROUTE_EXECUTING:ROUTE_CLEARING));
    float origin=p.origin_cm;

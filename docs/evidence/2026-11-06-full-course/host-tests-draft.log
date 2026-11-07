@@ -1,0 +1,6 @@
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+PASS: low-speed outside-wheel regression (23360 checks)
+Assertion failed: (p.failure==ROUTE_FAILURE_WRONG_WAY), function test_angles_and_failures, file test_navigation.c, line 133.
+test/run_host_tests.sh: line 23: 31153 Abort trap: 6           "$test_binary"

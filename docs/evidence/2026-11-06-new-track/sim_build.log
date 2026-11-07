@@ -1,0 +1,13 @@
+
+> stm32car-simulator@1.0.0 build
+> tsc && vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 18 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                 11.68 kB │ gzip:  3.22 kB
+dist/assets/index-D1V700Jt.css  10.56 kB │ gzip:  2.74 kB
+dist/assets/index-DTPgYttk.js   87.60 kB │ gzip: 23.18 kB
+✓ built in 532ms

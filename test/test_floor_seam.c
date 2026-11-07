@@ -84,7 +84,7 @@ static void test_start_and_tracking(void)
 }
 static void test_junction_guard(void)
 {
-    const RouteStep steps[]={{1, 6.0f, LEFT, 20, 0, true, 0.0f},{1, 6.0f, STOP, 20, 0, true, 0.0f}};
+    const RouteStep steps[]={{1, 6.0f, LEFT, 20, 0, true, 0.0f, 0},{1, 6.0f, STOP, 20, 0, true, 0.0f, 0}};
     RoutePlanner p; route_init(&p,steps,2,NULL,NULL); p.repeat_count=1;
     route_start(&p,0,0);
     GraySensor sensor; gray_sensor_init(&sensor);

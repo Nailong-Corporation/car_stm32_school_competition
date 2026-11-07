@@ -3,7 +3,7 @@
 #undef main
 
 static const RouteStep evidence_steps[]={
- {1,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}
+ {1,50,LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}
 };
 
 static void test_branch_identity(void)
@@ -104,7 +104,7 @@ static void test_raw_filter_replay(void)
 
 static void test_adjacent_branch_identity(void)
 {
- RouteStep steps[]={{1,50,LEFT,50,0,false,0},{2,50,LEFT,200,0,false,0},{1,50,STOP,200,0,false,0}};
+ RouteStep steps[]={{1,50,LEFT,50,0,false,0, 0},{2,50,LEFT,200,0,false,0, 0},{1,50,STOP,200,0,false,0, 0}};
  for(unsigned mirror=0;mirror<2;++mirror) {
   RoutePlanner p;float d=0;uint32_t t=0;init(&p,steps,3);
   junction(&p,&d,&t,0xff,0);update(&p,&d,&t,0x18,-1.65f,3);

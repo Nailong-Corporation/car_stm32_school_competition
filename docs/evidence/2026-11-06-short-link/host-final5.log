@@ -1,0 +1,11 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+PASS: low-speed outside-wheel regression (5904 checks)
+Assertion failed: (p->hexagon.state==HEXAGON_ENTERING), function ring, file test_hexagon.c, line 17.
+test/run_host_tests.sh: line 25: 27656 Abort trap: 6           "$test_binary"

@@ -1,0 +1,7 @@
+PASS: C/TS route tables match geometric lengths minus 5 cm
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+PASS: distance OR maximum count, confirmed node required, resistor counted once (19 checks)
+Assertion failed: (outer_speed(f)<=16.001f), function capped, file test_left_fail.c, line 12.
+test/run_host_tests.sh: line 10: 13242 Abort trap: 6           "$test_binary"

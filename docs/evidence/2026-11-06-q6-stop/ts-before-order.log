@@ -1,0 +1,38 @@
+PASS: mirrored four/five-channel Q4 branches override narrow drift suppression
+11:43:26 AM [vite] (ssr) Error when evaluating SSR module /tests/q4_q6.test.ts: Expected values to be strictly equal:
+
+true !== false
+
+      at eval (/Users/zhendong/Documents/stm32car_simulator/tests/q4_q6.test.ts:102:32)
+      at async ESModulesEvaluator.runInlinedModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:807:3)
+      at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1262:59)
+      at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15941:20)
+      at async SSRCompatModuleRunner.cachedRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1169:73)
+      at async SSRCompatModuleRunner.import (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1124:10)
+      at async instantiateModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15913:10)
+      at async file:///Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-06-q6-stop/ts-before-order.mjs:18:3
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+    at eval (/Users/zhendong/Documents/stm32car_simulator/tests/q4_q6.test.ts:102:32)
+    at async ESModulesEvaluator.runInlinedModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:807:3)
+    at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1262:59)
+    at async SSRCompatModuleRunner.directRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15941:20)
+    at async SSRCompatModuleRunner.cachedRequest (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1169:73)
+    at async SSRCompatModuleRunner.import (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/module-runner.js:1124:10)
+    at async instantiateModule (file:///Users/zhendong/Documents/stm32car_simulator/node_modules/vite/dist/node/chunks/node.js:15913:10)
+    at async file:///Users/zhendong/Documents/PlatformIO/Projects/car_stm32/docs/evidence/2026-11-06-q6-stop/ts-before-order.mjs:18:3 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.12.0

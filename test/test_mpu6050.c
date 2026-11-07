@@ -139,7 +139,7 @@ int main(void)
     assert(imu.gyro_z_calibration_central_span_lsb == 200);
     /* Failed real driver initialization is not a retry-only START trap. */
     LineFollow degraded;
-    const RouteStep fallback_steps[]={{1,6,STOP,40,0,false,0}};
+    const RouteStep fallback_steps[]={{1,6,STOP,40,0,false,0, 0}};
     OdometryCalibration fallback_geometry={LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
     line_follow_init(&degraded,fallback_geometry,fallback_steps,1,NULL,NULL);
     for(unsigned i=0;i<LINE_CONFIRM_SAMPLES;++i) {
@@ -200,7 +200,7 @@ int main(void)
     float heading = 0;
     /* Full stationary-calibration driver-to-start path. */
     LineFollow follow;
-    const RouteStep steps[] = {{1, 6.0f, STOP, 40, 0, false, 0.0f}};
+    const RouteStep steps[] = {{1, 6.0f, STOP, 40, 0, false, 0.0f, 0}};
     OdometryCalibration geometry = {LEFT_WHEEL_DIAMETER_CM,RIGHT_WHEEL_DIAMETER_CM,1560,1560,WHEEL_TRACK_CM,-1,1,true};
     line_follow_init(&follow,geometry,steps,1,NULL,NULL);
     for (unsigned i = 0; i < LINE_CONFIRM_SAMPLES; ++i) {
