@@ -1,0 +1,1 @@
+[finalA2] 1:PASS(66.42s,cov 27/27,fail 0,idx 29/29,rec 0) 2:PASS(62.69s,cov 26/26,fail 0,idx 27/27,rec 0) 3:PASS(11.32s,cov 14/14,fail 0,idx 4/4,rec 0) 4:PASS(55.70s,cov 26/26,fail 0,idx 29/29,rec 0) 5:PASS(65.70s,cov 27/27,fail 0,idx 29/29,rec 0) 6:PASS(62.69s,cov 26/26,fail 0,idx 27/27,rec 0) 7:PASS(10.46s,cov 14/14,fail 0,idx 4/4,rec 0)

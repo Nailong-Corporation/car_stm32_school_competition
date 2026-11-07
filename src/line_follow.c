@@ -672,6 +672,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         }
 #if BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED
         if(decision.reverse_needed && !decision.distance_exhausted && narrow && stable &&
+           step.cruise_speed>=REVERSE_BRAKE_MIN_CRUISE_CM_S &&
            f->route.state==ROUTE_FOLLOW &&
            fminf(f->odometry.left_speed_cm_s,f->odometry.right_speed_cm_s)>
                BRAKING_REVERSE_MIN_SPEED_CM_S &&
@@ -695,16 +696,21 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
      * pre-slow before the known corner so the brake phase does not eat the
      * pivot approach distance. The window grows with v^2/(2*a_safe). */
     if(f->route.pose_mode) {
-        if(f->route.post_turn_slow)
+        /* 滚动转弯出弯后保持圆弧轮速：从 70 降到 20 的不对称减速会在圆弧
+         * 自身回落之外再多转几度，而出弯切点本来就在出弯线上。 */
+        bool rolled_corner=route_uses_corner_arc(&f->route) || f->route.arc_just_exited;
+        if(f->route.post_turn_slow && !rolled_corner)
             base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
         float brake_w=(f->odometry.left_speed_cm_s*f->odometry.left_speed_cm_s)/
             (2.0f*BRAKING_SAFE_DECEL_CM_S2);
         if(f->route.pose_gap_bar_cm<=fmaxf(ROUTE_WAYPOINT_SLOW_CM,brake_w+8.0f))
             base_speed=fminf(base_speed,entry_speed_limit);
     }
-    /* Exit handoff stays slow even while previewing the next distance envelope. */
+    /* Exit handoff stays slow even while previewing the next distance envelope;
+     * a rolling corner keeps its arc speed instead. */
     if(f->route.state==ROUTE_CLEARING && route_current_action(&f->route)!=STRAIGHT)
-        base_speed=fminf(base_speed,fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
+        base_speed=fminf(base_speed,(route_uses_corner_arc(&f->route)||f->route.arc_just_exited)
+            ? CORNER_ARC_SPEED_CM_S : fminf(step.turn_speed,JUNCTION_EXIT_SPEED_CM_S));
     if (f->route.state==ROUTE_CANDIDATE &&
         route_target_ready(&f->route,f->odometry.distance_cm,true))
         base_speed=fminf(base_speed,entry_speed_limit);
@@ -751,6 +757,9 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
         float desired=f->route.pose_seg_heading_rad+atan2f(-cross,POSE_PURSUIT_LOOKAHEAD_CM);
         float corr=HEADING_KP_CM_S_PER_RAD*atan2f(sinf(desired-f->odometry.heading_rad),
                                                   cosf(desired-f->odometry.heading_rad));
+        /* 滚动转弯刚交出时差速仍在回落，按实测横摆角速度押制漂移。 */
+        if(f->route.arc_just_exited || f->route.state==ROUTE_CLEARING)
+            corr-=CORNER_ARC_EXIT_DAMPING*f->turn_yaw_rate_rad_s;
         float cap=.5f*fmaxf(base_speed,1.0f);
         corr=fmaxf(-cap,fminf(cap,corr));
         f->state=usable?LINE_TRACKING:LINE_GAP_HOLD;
@@ -857,6 +866,24 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
             straight_targets(f,pass,HEADING_KP_CM_S_PER_RAD*
                 (f->route.entry_heading-f->odometry.heading_rad),dt);
         } else {
+            if(f->route.pose_mode && route_uses_corner_arc(&f->route)) {
+                /* 滚动转弯：轴速恒定在圆弧速度，轮差 = v*track/(2R) 做曲率，
+                 * 对切线航向的误差做反馈（目标航向由圆弧几何给出，
+                 * 所以是真正的路径跟随）。内轮不刹到 0。 */
+                pid_reset(&f->pid);
+                float axle=CORNER_ARC_SPEED_CM_S;
+                float err=atan2f(sinf(f->route.arc_desired_heading_rad-f->odometry.heading_rad),
+                                 cosf(f->route.arc_desired_heading_rad-f->odometry.heading_rad));
+                float differential=direction*f->route.arc_diff_cm_s+CORNER_ARC_HEADING_KP*err;
+                differential=fmaxf(-0.9f*axle,fminf(0.9f*axle,differential));
+                f->left_target_cm_s=fmaxf(0.0f,fminf(WHEEL_TARGET_MAX_CM_S,axle+differential));
+                f->right_target_cm_s=fmaxf(0.0f,fminf(WHEEL_TARGET_MAX_CM_S,axle-differential));
+                f->base=.5f*(f->left_target_cm_s+f->right_target_cm_s);
+                f->correction=.5f*(f->left_target_cm_s-f->right_target_cm_s);
+                f->startup_elapsed_s=fminf(STARTUP_RAMP_TIME_S,f->startup_elapsed_s+dt);
+                f->exit_accelerating=true;
+                goto arc_targets_done;
+            }
             if(f->route.pose_mode) {
                 /* Pose-mode pivot: saturated heading feedback towards the exact
                  * corner heading. The grey line is deliberately not used inside
@@ -899,6 +926,7 @@ static void line_follow_update_heading_impl(LineFollow *f, GrayObservation obs, 
                 correction-=JUNCTION_YAW_DAMPING*f->turn_yaw_rate_rad_s;
             } else pid_reset(&f->pid);
             turn_targets(f,outer,correction,dt);
+            arc_targets_done: ;
         }
     } else if(f->route.state==ROUTE_CLEARING && f->route.next_junction_samples>0) {
         /* Bounded new-graphic confirmation after a proven turn exit: freeze

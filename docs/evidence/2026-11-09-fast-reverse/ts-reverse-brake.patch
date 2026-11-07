@@ -1,0 +1,347 @@
+diff --git a/src/sim/config.ts b/src/sim/config.ts
+--- a/src/sim/config.ts
++++ b/src/sim/config.ts
+@@ -90,6 +90,12 @@
+ export const MOTOR_BRAKE_TAU_S = 0.080;
+ export const MOTOR_MAX_ACCEL_CM_S2 = 500.0;
+ export const MOTOR_MAX_DECEL_CM_S2 = 500.0;
++/* Reverse-torque plant assumption (simulator only, no firmware counterpart):
++ * driving the H-bridge against the direction of travel adds torque to the
++ * rolling friction, so the achievable deceleration is higher than coasting but
++ * still grip/current limited.  The model never lets a negative command spin the
++ * wheel backwards: speed is floored at zero.  Bench calibration pending. */
++export const MOTOR_REVERSE_BRAKE_DECEL_CM_S2 = 900.0;
+ 
+ /* Stall & Reverse Protection */
+ export const SPEED_STALL_TARGET_CM_S = 3.0;
+@@ -174,10 +180,34 @@
+ export const COMPONENT_RECOVERY_MAX_CM = 12.0;
+ export const COMPONENT_RECOVERY_TIMEOUT_MS = 1200;
+ 
++export const BRAKING_ACCEL_FILTER_TAU_S = 0.080;
+ export const BRAKING_CALIBRATION_CONFIRMED = 1;
+ export const BRAKING_SAFE_DECEL_CM_S2 = 250.0;
+ export const BRAKING_DISTANCE_MARGIN_CM = 2.0;
+ export const BRAKING_TARGET_JERK_CM_S3 = 800.0;
++
++/* Reverse (negative-PWM) approach braking.
++ * Mirrors include/motion_config.h: the switch is a compile-time constant in the
++ * firmware and a module constant here, so the default OFF state is bit-identical
++ * to the coast/short-brake plant.  A negative PWM command never becomes a
++ * reverse speed target: it is torque against positive motion and the plant model
++ * floors the wheel speed at zero (no reverse rotation). */
++export const MOTOR_REVERSE_BRAKE_ENABLED = 0;
++export const BRAKING_REVERSE_HARDWARE_CONFIRMED = 0;
++/* Cumulative reverse-torque time allowed per braking segment (ms). */
++export const BRAKING_REVERSE_MAX_MS = 250;
++/* Below this speed the reverse output is cut: it cannot stop the car, only
++ * start pushing it backwards. */
++export const BRAKING_REVERSE_MIN_SPEED_CM_S = 8.0;
++/* Distance/reaction reserve before the planned stop point. */
++export const BRAKING_REVERSE_GUARD_CM = 3.0;
++/* Only apply reverse torque when the measured speed is this far above target. */
++export const REVERSE_BRAKE_MARGIN_CM_S = 3.0;
++/* Documented in the firmware but not used by the current C PID branch (the
++ * shared speed PID gains do the mapping). Kept for parity. */
++export const REVERSE_BRAKE_KP = 4.0;
++/* Magnitude limit of the negative PWM command on the 255 scale. */
++export const REVERSE_BRAKE_MAX_PWM = 60.0;
+ export const JUNCTION_SEARCH_TIMEOUT_MS = 2000;
+ export const JUNCTION_SEARCH_MAX_CM = 12.0;
+ export const JUNCTION_ENTRY_BRAKE_TIMEOUT_MS = 2000;
+
+diff --git a/src/sim/physics.ts b/src/sim/physics.ts
+--- a/src/sim/physics.ts
++++ b/src/sim/physics.ts
+@@ -17,6 +17,7 @@
+   MOTOR_BRAKE_TAU_S,
+   MOTOR_MAX_ACCEL_CM_S2,
+   MOTOR_MAX_DECEL_CM_S2,
++  MOTOR_REVERSE_BRAKE_DECEL_CM_S2,
+ } from './config';
+ import { LineState, type EncoderCounts, type GrayObservation } from './types';
+ 
+@@ -33,8 +34,23 @@
+   active: boolean;
+ }
+ 
+-/** Lumped wheel + chassis inertia under rolling contact, all units cm/s. */
+-export function advanceWheel(speed: number, pwmFreeSpeed: number, enabled: boolean, dt: number): number {
++/** Lumped wheel + chassis inertia under rolling contact, all units cm/s.
++ *  `reverse` selects the negative-PWM branch: the H-bridge torque opposes the
++ *  current motion, so the wheel is pulled towards the (negative) free-run speed
++ *  of the command, limited by grip/current (MOTOR_REVERSE_BRAKE_DECEL_CM_S2) and
++ *  floored at zero. A reverse command can never spin the wheel backwards. */
++export function advanceWheel(
++  speed: number,
++  pwmFreeSpeed: number,
++  enabled: boolean,
++  dt: number,
++  reverse = false
++): number {
++  if (reverse && enabled) {
++    const decel = MOTOR_REVERSE_BRAKE_DECEL_CM_S2 * dt;
++    const change = (pwmFreeSpeed - speed) * (1 - Math.exp(-dt / MOTOR_RESPONSE_TAU_S));
++    return Math.max(0, speed + Math.max(-decel, Math.min(0.0, change)));
++  }
+   const tau = !enabled ? MOTOR_COAST_TAU_S : pwmFreeSpeed === 0 ? MOTOR_BRAKE_TAU_S : MOTOR_RESPONSE_TAU_S;
+   const equilibrium = enabled ? pwmFreeSpeed : 0;
+   const change = (equilibrium - speed) * (1 - Math.exp(-dt / tau));
+@@ -185,10 +201,14 @@
+     // Both-zero output means STBY low (coast); one zero wheel with STBY high
+     // selects TB6612 short brake. Neither can change wheel velocity instantly.
+     const enabled = cmd.standby && (cmd.left_pwm !== 0 || cmd.right_pwm !== 0);
++    // Negative PWM is the reverse-brake branch of the driver; the plant treats it
++    // as torque against motion, never as a reverse speed target.
++    const reverseLeft = enabled && cmd.left_pwm < 0;
++    const reverseRight = enabled && cmd.right_pwm < 0;
+     const oldLeft = this.actual_left_speed;
+     const oldRight = this.actual_right_speed;
+-    this.actual_left_speed = advanceWheel(oldLeft, target_v_left, enabled, dt);
+-    this.actual_right_speed = advanceWheel(oldRight, target_v_right, enabled, dt);
++    this.actual_left_speed = advanceWheel(oldLeft, target_v_left, enabled, dt, reverseLeft);
++    this.actual_right_speed = advanceWheel(oldRight, target_v_right, enabled, dt, reverseRight);
+     const leftTravel = (oldLeft + this.actual_left_speed) * 0.5 * dt;
+     const rightTravel = (oldRight + this.actual_right_speed) * 0.5 * dt;
+ 
+
+diff --git a/src/sim/speed_control.ts b/src/sim/speed_control.ts
+--- a/src/sim/speed_control.ts
++++ b/src/sim/speed_control.ts
+@@ -17,6 +17,10 @@
+   SPEED_REVERSE_CONFIRM_CM,
+   SPEED_REVERSE_IMMEDIATE_CM_S,
+   CONTROL_MAX_INTERVAL_MS,
++  MOTOR_REVERSE_BRAKE_ENABLED,
++  BRAKING_REVERSE_MIN_SPEED_CM_S,
++  REVERSE_BRAKE_MARGIN_CM_S,
++  REVERSE_BRAKE_MAX_PWM,
+ } from './config';
+ 
+ export enum SpeedFault {
+@@ -73,7 +77,8 @@
+     target: number,
+     measured: number,
+     dt: number,
+-    which: 'left' | 'right'
++    which: 'left' | 'right',
++    reverse_brake: boolean
+   ): { fault: SpeedFault; pwm: number } {
+     if (
+       !Number.isFinite(target) ||
+@@ -103,6 +108,28 @@
+       return { fault: SpeedFault.SPEED_FAULT_STALL, pwm: 0.0 };
+     }
+ 
++    if (
++      MOTOR_REVERSE_BRAKE_ENABLED &&
++      reverse_brake &&
++      measured > BRAKING_REVERSE_MIN_SPEED_CM_S &&
++      measured > target + REVERSE_BRAKE_MARGIN_CM_S
++    ) {
++      /* Same speed PID error and anti-windup as forward drive, but bounded to
++       * negative PWM: this is torque against positive motion, never a reverse
++       * speed target. */
++      const brake = pid.updateBounded(
++        target - measured,
++        dt,
++        -REVERSE_BRAKE_MAX_PWM,
++        0.0,
++        0.0
++      );
++      return {
++        fault: brake.success ? SpeedFault.SPEED_FAULT_NONE : SpeedFault.SPEED_FAULT_PID,
++        pwm: brake.output,
++      };
++    }
++
+     const res = pid.updateBounded(
+       target - measured,
+       dt,
+@@ -157,7 +184,8 @@
+     rt: number,
+     lm: number,
+     rm: number,
+-    dt: number
++    dt: number,
++    reverse_brake = false
+   ): { success: boolean; command: MotorCommand } {
+     const emptyCommand: MotorCommand = {
+       left_pwm: 0,
+@@ -204,13 +232,13 @@
+     let l = 0;
+     let r = 0;
+     if (fault === SpeedFault.SPEED_FAULT_NONE) {
+-      const res = this.wheel(this.left, lt, lm, dt, 'left');
++      const res = this.wheel(this.left, lt, lm, dt, 'left', reverse_brake);
+       fault = res.fault;
+       l = res.pwm;
+       failed_wheel = 1;
+     }
+     if (fault === SpeedFault.SPEED_FAULT_NONE) {
+-      const res = this.wheel(this.right, rt, rm, dt, 'right');
++      const res = this.wheel(this.right, rt, rm, dt, 'right', reverse_brake);
+       fault = res.fault;
+       r = res.pwm;
+       failed_wheel = 2;
+
+diff --git a/src/sim/line_follow.ts b/src/sim/line_follow.ts
+--- a/src/sim/line_follow.ts
++++ b/src/sim/line_follow.ts
+@@ -34,9 +34,16 @@
+   COMPONENT_CROSS_MS,
+   POSE_BOUNDED_LOSS_MS,
+   POSE_BOUNDED_LOSS_CM,
++  BRAKING_ACCEL_FILTER_TAU_S,
+   BRAKING_SAFE_DECEL_CM_S2,
+   BRAKING_DISTANCE_MARGIN_CM,
+   BRAKING_TARGET_JERK_CM_S3,
++  BRAKING_REVERSE_MAX_MS,
++  BRAKING_REVERSE_MIN_SPEED_CM_S,
++  BRAKING_REVERSE_GUARD_CM,
++  BRAKING_REVERSE_HARDWARE_CONFIRMED,
++  MOTOR_REVERSE_BRAKE_ENABLED,
++  REVERSE_BRAKE_MARGIN_CM_S,
+   JUNCTION_PASS_SPEED_CM_S,
+   JUNCTION_SETTLE_BAND_RAD,
+   JUNCTION_PASS_ALIGNED_RAD,
+@@ -122,6 +129,14 @@
+   public braking_origin_cm = 0;
+   public braking_active = false;
+   public braking_reverse_active = false;
++  /* Reverse-brake diagnostics, mirroring line_follow.c: cumulative reverse-torque
++   * time per braking segment, the planner's required deceleration and the
++   * filtered observed deceleration used to decide that reverse torque is needed. */
++  public braking_reverse_ms = 0;
++  public braking_required_cm_s2 = 0;
++  public braking_accel_cm_s2 = 0;
++  public braking_speed_primed = false;
++  public braking_previous_speed_cm_s = 0;
+   public have_reliable = false;
+   public abnormal = false;
+   public valid_count = 0;
+@@ -183,6 +198,11 @@
+ 
+     this.braking_active = false;
+     this.braking_reverse_active = false;
++    this.braking_reverse_ms = 0;
++    this.braking_required_cm_s2 = 0;
++    this.braking_accel_cm_s2 = 0;
++    this.braking_speed_primed = false;
++    this.braking_previous_speed_cm_s = 0;
+     this.have_reliable = false;
+     this.abnormal = false;
+     this.valid_count = 0;
+@@ -376,6 +396,12 @@
+         this.have_reliable = true;
+         this.last_reliable_ms = now_ms;
+         this.reliable_position = obs.position;
++        this.braking_slew.reset();
++        this.braking_active = false;
++        this.braking_speed_primed = false;
++        this.braking_reverse_ms = 0;
++        this.braking_reverse_active = false;
++        this.braking_required_cm_s2 = 0;
+         this.route.start(this.odometry.distance_cm, now_ms);
+       } else {
+         return;
+@@ -524,6 +550,9 @@
+         this.braking_slew.acceleration = 0;
+         this.braking_origin_cm = planning_origin;
+         this.braking_active = true;
++        this.braking_speed_primed = false;
++        this.braking_reverse_ms = 0;
++        this.braking_reverse_active = false;
+       }
+       const exitAdvance = this.route.planningIndex() > 0 ? WHEEL_TRACK_CM : 0;
+       const target_dist = Math.max(0, planning_step.segment_length_cm - GRAY_FORWARD_OFFSET_CM - exitAdvance);
+@@ -543,6 +572,58 @@
+       }
+       navigation_wheel_cap = Math.min(navigation_wheel_cap, plan.allowed_speed);
+       this.braking_active = true;
++      /* Reverse-brake arming, mirroring line_follow.c: the planner says the
++       * passive envelope (BRAKING_SAFE_DECEL_CM_S2) cannot meet the stop point,
++       * the line is a stable narrow centre, and both wheels are fast enough that
++       * reverse torque cannot push the car backwards.  It is an arming
++       * threshold, never a physical stopping boundary; the pump is capped by
++       * BRAKING_REVERSE_MAX_MS and cut below BRAKING_REVERSE_MIN_SPEED_CM_S.
++       * Gated on the two switches so the default (OFF) build executes nothing
++       * new here: the replay output stays bit-identical. */
++      if (BRAKING_REVERSE_HARDWARE_CONFIRMED && MOTOR_REVERSE_BRAKE_ENABLED) {
++        const braking_speed = Math.max(
++          Math.abs(this.odometry.left_speed_cm_s),
++          Math.abs(this.odometry.right_speed_cm_s)
++        );
++        const raw_accel = this.braking_speed_primed
++          ? (braking_speed - this.braking_previous_speed_cm_s) / dt
++          : 0;
++        this.braking_previous_speed_cm_s = braking_speed;
++        if (!this.braking_speed_primed) this.braking_accel_cm_s2 = raw_accel;
++        else {
++          this.braking_accel_cm_s2 +=
++            dt / (BRAKING_ACCEL_FILTER_TAU_S + dt) * (raw_accel - this.braking_accel_cm_s2);
++        }
++        this.braking_speed_primed = true;
++        const decision = brakingDecide(
++          braking_speed,
++          planning_entry_speed,
++          plan.remaining_cm,
++          -this.braking_accel_cm_s2,
++          BRAKING_SAFE_DECEL_CM_S2,
++          BRAKING_REVERSE_GUARD_CM
++        );
++        this.braking_required_cm_s2 = decision.required_decel;
++        this.braking_reverse_active = false;
++        if (decision.distance_exhausted && braking_speed > planning_entry_speed + REVERSE_BRAKE_MARGIN_CM_S) {
++          this.route.navigation_warning = RouteFailure.ROUTE_FAILURE_BRAKE_DISTANCE;
++        }
++        if (
++          decision.reverse_needed &&
++          !decision.distance_exhausted &&
++          narrow &&
++          stable &&
++          this.route.state === RouteState.ROUTE_FOLLOW &&
++          Math.min(this.odometry.left_speed_cm_s, this.odometry.right_speed_cm_s) >
++            BRAKING_REVERSE_MIN_SPEED_CM_S &&
++          this.braking_reverse_ms < BRAKING_REVERSE_MAX_MS
++        ) {
++          const frame_ms = Math.round(dt * 1000);
++          if (frame_ms <= BRAKING_REVERSE_MAX_MS - this.braking_reverse_ms) {
++            this.braking_reverse_active = true;
++          }
++        }
++      }
+       base_speed = brakingSlew(
+         this.braking_slew,
+         plan.allowed_speed,
+@@ -930,12 +1011,29 @@
+       this.correction = 0.5 * (this.left_target_cm_s - this.right_target_cm_s);
+     }
+ 
++    /* The reverse output is only valid while both wheels are measurably faster
++     * than their targets; once the PID has caught up (or the line is no longer
++     * a stable narrow centre) it must be released, otherwise the negative torque
++     * would start pushing the car backwards. */
++    if (
++      this.state !== LineState.LINE_TRACKING ||
++      Math.min(
++        this.odometry.left_speed_cm_s - this.left_target_cm_s,
++        this.odometry.right_speed_cm_s - this.right_target_cm_s
++      ) <= REVERSE_BRAKE_MARGIN_CM_S
++    ) {
++      this.braking_reverse_active = false;
++    }
++    if (this.braking_reverse_active) {
++      this.braking_reverse_ms += Math.round(dt * 1000);
++    }
+     const { success, command } = this.speed.update(
+       this.left_target_cm_s,
+       this.right_target_cm_s,
+       this.odometry.left_speed_cm_s,
+       this.odometry.right_speed_cm_s,
+-      dt
++      dt,
++      this.braking_reverse_active && this.state === LineState.LINE_TRACKING && narrow
+     );
+ 
+     if (!success) {

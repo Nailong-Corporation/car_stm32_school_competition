@@ -55,7 +55,7 @@ const DEFAULT_SIM = process.env.STM32_SIM_DIR || '/Users/zhendong/Documents/stm3
 const DEFAULT_ROUTE_TABLE =
   process.env.STM32_ROUTE_TABLE || '/Users/zhendong/Documents/PlatformIO/Projects/car_stm32/src/route_table.c';
 const DEFAULT_OUT = '/tmp/course-verify';
-const DEFAULT_SCHEMES = [1, 2];
+const DEFAULT_SCHEMES = [1, 2, 3, 4, 5, 6, 7];
 const DEFAULT_PASS_CM = 6.0;
 const DEFAULT_REPLAY_TIMEOUT_MS = 300000;
 const EXPECTED_COMPONENTS = 27;
@@ -521,10 +521,23 @@ function padStart(s, width) {
 /* Scheme 2 is the no-dashed-route reference figure: it intentionally skips the
  * dashed x=55 section, so the resistor printed on that dashed wire (R26) is not
  * on the route.  Every other printed item must still be covered. */
-const DASHED_ONLY_COMPONENT = 'r26';
+/* Printed items a scheme legitimately never reaches:
+ *  - r26 sits on the 5/5 cm dashed section, which scheme 2 (no dashed route) skips;
+ *  - r14 sits at the hexagon centre, so any "no ring" variant skips it;
+ *  - the outer test loop (scheme 3 / its fast twin) only runs the outer frame,
+ *    so every component on the inner branches is out of reach (measured set).
+ * The fast twins must match their normal-speed参考 exactly. */
+const SCHEME_SKIPPED_COMPONENTS = {
+  2: ['r26'],
+  4: ['r14'],
+  3: ['r3', 'r5', 'r14', 'r19', 'r23', 'r24', 'r25', 'r26', 'q18', 'q4', 'q13', 'q6', 'q11'],
+  6: ['r26'],
+  7: ['r3', 'r5', 'r14', 'r19', 'r23', 'r24', 'r25', 'r26', 'q18', 'q4', 'q13', 'q6', 'q11'],
+};
 function expectedCoveredCount(ev) {
-  const dashedOnly = ev.coverage.filter((c) => c.id === DASHED_ONLY_COMPONENT).length;
-  return ev.scheme === 2 && dashedOnly > 0 ? ev.componentCount - dashedOnly : ev.componentCount;
+  const skipped = new Set(SCHEME_SKIPPED_COMPONENTS[ev.scheme] || []);
+  const reachable = ev.coverage.filter((c) => !skipped.has(c.id)).length;
+  return reachable > 0 ? reachable : ev.componentCount;
 }
 function schemeVerdict(ev) {
   return ev.finished && ev.coveredCount === expectedCoveredCount(ev) &&

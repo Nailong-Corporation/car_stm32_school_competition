@@ -142,3 +142,18 @@ FW_DIR=/tmp/fw-rolling node tests/firmware_parity.mjs   # scheme 1/2/3 PASS
 | `along ≥ R−3` 与预测航向互斥，交出总是偏晚 | 完美圆弧在 φ=90° 才有 along=R | 门限放宽到 `R−6`，让回摆补完最后几度 |
 | 环岛入口 EXIT_LOST | 前面转角残留 4–5 cm，超过 3 cm 顶点闸门 | 闸门 3→6 cm（基线结果不变） |
 | parity scheme 2 多 2 个事件 | C 里程是 float32、仿真器 double，1.8 km 后差 0.06 cm，`gray_plausible` 阈值翻一帧 → 线态抖一帧 | 事件键去掉 `LineState`（route FSM 仍严格比对，逐帧目标速度仍比对） |
+
+## 9. 合入记录（Lead，2026-11-07）
+
+- 两个补丁已应用到主树：`git apply` 干净；`test/sync_new_track_routes.py` 增加 `arc_flag()` 谓词
+  （镜像 `corner_arc_row()`），生成表 38 行 `corner_arc_enabled=true`，`--check` 通过。
+- 合入时按建议删掉了 `config.ts` 的 `ARC_R/ARC_V/...` env 覆盖钩子（改为写死常数），并修了两处
+  TS 类型错误（`arc_active=false` 链式赋值、`arc_just_exited` 之外的死分支）。
+- 参数调整为 **R 15 → 13 cm**：R=15 时圆弧内切最近离角点 6.2 cm，超出验证脚本 6 cm 的元件通过半径，
+  方案 2 会漏计 Q6；R=13 → 5.4 cm，恢复 26/27 覆盖，整圈时间几乎不变。
+- 配合新电机（1:10/12 V）把 cruise 抬到 **160 cm/s**、仿真 plant 500/500、安全减速度 250：
+  最终方案 1 **66.42 s**、方案 2 **62.69 s**（原 71.20/66.98，再快 7%/7%），verify_course PASS。
+- cruise 180 时方案 2 在环岛入口失败（制动余量不足）——当前边界记录在此，避免重复试错。
+- 验证：`replay` 两方案完成、`verify_course` PASS、`firmware_parity`（事件序列严格一致，单帧最大
+  27.9 cm/s 的圆弧回摆阈值帧 1 次，均值 0.001）、`tests/run.mjs` 24 PASS、
+  `sh test/run_host_tests.sh` 93 PASS、`pio run` SUCCESS（Flash ≈50.5 KB / RAM ≈10.8 KB）。

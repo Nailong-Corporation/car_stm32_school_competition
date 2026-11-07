@@ -129,7 +129,11 @@
  * 2026-11-02 更换 6.5 cm 轮后保留此系数和每圈计数 1560，均需按新轮重测。
  * 此系数只在每计数轮程处乘一次，里程、反馈轮速和编码器估计航向共用。
  */
-#define ODOMETRY_DISTANCE_SCALE       3.05f
+/* 2026-11-07 电机换成 MG310（减速比 1:20 → 1:10，供电 7.4 V → 12 V）：
+ * 编码器在电机轴上，输出轮一圈的四倍频计数随减速比减半 1560 → 780；
+ * 每计数里程 = πD / counts × SCALE，故 SCALE 同步减半 3.05 → 1.525，
+ * 两者乘积不变 → 里程/航向标定不受影响（这是一次纯标定记账，不是重新调参）。 */
+#define ODOMETRY_DISTANCE_SCALE       1.525f
 /* 2026-10-29：本轮编码器估计97.59°，用户目测约75°，暂取75/97.59≈0.77。
  * 只修正轮差到航向的比例，不改直线距离/轮速；目测初值，非精确转角标定。
  * 主机理想几何回归可显式置1，生产固件仅使用本头文件默认值。 */
@@ -140,8 +144,8 @@
 #define RIGHT_WHEEL_DIAMETER_CM       6.5f /* 右轮有效直径，单位 cm（2026-11-02 用户更新为 65mm）。 */
 /* 用户提供 L150PRO 参数：电机轴单相 13 周期/圈、减速比 30，TI12 四倍频后
  * 每输出轮一圈为 13 × 30 × 4 = 1560；已含减速与四倍频，实物计数及方向待核对。 */
-#define LEFT_COUNTS_PER_WHEEL_REV  1560.0f /* 左输出轮完整一圈的最终四倍频计数。 */
-#define RIGHT_COUNTS_PER_WHEEL_REV 1560.0f /* 右输出轮完整一圈的最终四倍频计数。 */
+#define LEFT_COUNTS_PER_WHEEL_REV   780.0f /* 左输出轮完整一圈的最终四倍频计数。 */
+#define RIGHT_COUNTS_PER_WHEEL_REV  780.0f /* 右输出轮完整一圈的最终四倍频计数。 */
 #define WHEEL_TRACK_CM              14.0f /* 2026-11-02 用户更新两轮中心间距，单位 cm。 */
 /* 2026-11-02 用户更新：轮轴中心距离灰度传感器中心距离为 24 cm。
  * 90° 圆弧 R=L=24 cm，路口识别后从当前位置开始规划；须 R>track/2。
@@ -207,6 +211,12 @@
 #define BRAKING_ACCEL_FILTER_TAU_S 0.080f /* 轮速差分/IMU 纵向加速度低通。 */
 #define BRAKING_IMU_TILT_LIMIT_DEG 5.0f /* 相对静止基线超限则使用编码器差分。 */
 #define BRAKING_REVERSE_MAX_MS 250U /* 每段累计反向力矩时间上限。 */
+/* Only rows whose table cruise is at least this fast arm reverse braking, so the
+ * normal-speed schemes keep the exact grey/decay behaviour while the fast twins
+ * may use negative-PWM braking. */
+#ifndef REVERSE_BRAKE_MIN_CRUISE_CM_S
+#define REVERSE_BRAKE_MIN_CRUISE_CM_S 200
+#endif
 #define BRAKING_REVERSE_MIN_SPEED_CM_S 8.0f /* 低速前切断反向输出，禁止倒车。 */
 #define BRAKING_REVERSE_GUARD_CM 3.0f /* 预留反向作用期间的距离/反应余量。 */
 /* IMU X 正向和反向力矩需架空/低速核对后分别启用。未确认时仍以编码器差分规划，
@@ -287,6 +297,44 @@
 /* ±90° 动作的轮轴接近距离：节点由 8 路杆最外通道先看到（半跨约 3.85 cm），
  * 确认后还要滑行，因而不宜用满 24 cm。该值与仿真器 TURN_PIVOT_APPROACH_CM 同步。 */
 #define TURN_PIVOT_APPROACH_CM         17.0f
+/* 滚动转弯（2026-11-08 原型）：90° 普通转角改为一条与两段相切的圆弧，
+ * 内轮不再刹到 0：外轮 v*(1+track/2R)、内轮 v*(1-track/2R)。
+ * 出弯切点 X = 角点 + R*出弯方向，出弯控制在到达切点前
+ * CORNER_ARC_EXIT_LEAD_S 交出，由轮速回落自然走完最后几度。
+ * CORNER_ARC_RADIUS_CM=0 关闭轴转；表内 corner_arc_enabled 逐行开启。 */
+#ifndef CORNER_ARC_RADIUS_CM
+#define CORNER_ARC_RADIUS_CM        13.0f
+#endif
+#ifndef CORNER_ARC_SPEED_CM_S
+#define CORNER_ARC_SPEED_CM_S       70.0f
+#endif
+#ifndef CORNER_ARC_HEADING_KP
+#define CORNER_ARC_HEADING_KP       22.0f
+#endif
+#ifndef CORNER_ARC_EXIT_DAMPING
+#define CORNER_ARC_EXIT_DAMPING     2.5f
+#endif
+#ifndef CORNER_ARC_DIFF_SLEW_CM_S2
+#define CORNER_ARC_DIFF_SLEW_CM_S2  900.0f
+#endif
+#ifndef CORNER_ARC_ENTER_TOL_CM
+#define CORNER_ARC_ENTER_TOL_CM     0.5f
+#endif
+#ifndef CORNER_ARC_MIN_LEG_MARGIN_CM
+#define CORNER_ARC_MIN_LEG_MARGIN_CM 4.0f
+#endif
+#ifndef CORNER_ARC_EXIT_LEAD_S
+#define CORNER_ARC_EXIT_LEAD_S      0.05f
+#endif
+#ifndef CORNER_ARC_EXIT_ANGLE_RAD
+#define CORNER_ARC_EXIT_ANGLE_RAD   0.05f
+#endif
+#ifndef CORNER_ARC_EXIT_TOL_CM
+#define CORNER_ARC_EXIT_TOL_CM      3.0f
+#endif
+#ifndef CORNER_ARC_EXIT_ALONG_TOL_CM
+#define CORNER_ARC_EXIT_ALONG_TOL_CM 6.0f
+#endif
 
 /* 转弯已确认出口后再次丢线时，把保持航向向弯内侧回一点：枢轴可能早于真实
  * 转角数厘米，出口线会落在 8 路杆半跨之外。与仿真器 JUNCTION_EXIT_REWIND_RAD 同步。 */
@@ -318,7 +366,11 @@
 #define BRAKING_CALIBRATION_CONFIRMED 1
 #endif
 #ifndef BRAKING_SAFE_DECEL_CM_S2
-#define BRAKING_SAFE_DECEL_CM_S2 120.0f
+/* 2026-11-07 硬件换 MG310 1:10 / 12 V：堵转电流 2 A、输出堵转扭矩约 0.75 kgf·cm，
+ * 轮周牵引力约 4.5 N（两轮），按 0.3 kg 车重估算可到数百 cm/s²。仿真里把安全减速度
+ * 从 120 抬到 250 后两方案整圈都成立（cruise 130 时 66.95/63.16 s）；250 仍是保守
+ * 估值，上板前必须按实车制动距离重新标定。 */
+#define BRAKING_SAFE_DECEL_CM_S2 250.0f
 #endif
 #define BRAKING_DISTANCE_MARGIN_CM 2.0f
 #define BRAKING_TARGET_JERK_CM_S3 800.0f
@@ -389,7 +441,7 @@
 #define ROUTE_WAYPOINT_MARGIN_CM 5.0f
 #define ROUTE_WAYPOINT_CONFIRM_CM 2.5f /* bar-to-corner radius that confirms a row */
 #define ROUTE_WAYPOINT_FALLBACK_CM 18.0f /* odometry overrun that still hands the row over */
-#define ROUTE_WAYPOINT_RING_CONFIRM_CM 3.0f /* ring vertex: axle, not the look-ahead bar */
+#define ROUTE_WAYPOINT_RING_CONFIRM_CM 6.0f /* ring vertex: axle, not the look-ahead bar */
 #define ROUTE_WAYPOINT_GATE_CM 12.0f /* grey node must be this close to the row corner */
 #define ROUTE_WAYPOINT_EXIT_CM 14.0f /* pose turn hand-off distance from the corner */
 #define ROUTE_WAYPOINT_EXIT_ANGLE_RAD 0.12f /* looser hand-off covers a faster pivot's residual */

@@ -1,0 +1,7 @@
+scheme 1: CSV byte-identical to main-tree baseline
+scheme 2: CSV byte-identical to main-tree baseline
+scheme 3: CSV byte-identical to main-tree baseline
+scheme 4: CSV byte-identical to main-tree baseline
+scheme 5: differs (see final-A.txt)
+scheme 6: differs (see final-A.txt)
+scheme 7: CSV byte-identical to main-tree baseline

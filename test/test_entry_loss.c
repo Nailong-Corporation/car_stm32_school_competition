@@ -10,7 +10,7 @@ static void braking_entry(LineFollow *f,EncoderCounts *c,uint32_t *t)
 {
  start(f,c,t,route,route_count);
  /* Spin the wheels fast enough that the measured entry speed is clearly above
-  * the configured turn/entry cap (24 cm/s since the 2026-11-07 speed sweep). */
+  * the configured entry cap (the rolling-corner rows cap at CORNER_ARC_SPEED). */
  for(unsigned i=0;i<30;++i) tick(f,c,t,90,90,0x18,false);
  CHECK(f->odometry.left_speed_cm_s>route_entry_speed_limit(&f->route));
  tick(f,c,t,10,10,0x1f,false);
@@ -88,10 +88,12 @@ static void test_reacquire_and_guards(void)
  NEAR(f.route.origin_cm,origin);
  for(unsigned i=0;i<5;++i) tick(&f,&c,&t,5,5,0x18,false);
  CHECK(f.route.state==ROUTE_FOLLOW); /* Reacquisition alone does not turn. */
- /* No regression to measured entry gate: visible branch, speed still high. */
+ /* No regression to measured entry gate: visible branch, speed still high.
+  * The rolling-corner rows cap entry at CORNER_ARC_SPEED_CM_S (70 cm/s), so the
+  * synthetic feedback must stay clearly above it (~316 cm/s here). */
  braking_entry(&f,&c,&t);
  for(unsigned i=0;i<10;++i) {
-  tick(&f,&c,&t,10,10,0x1f,false);CHECK(f.route.state==ROUTE_BRAKING);
+  tick(&f,&c,&t,40,40,0x1f,false);CHECK(f.route.state==ROUTE_BRAKING);
  }
  for(unsigned i=0;i<30 && f.route.state==ROUTE_BRAKING;++i) tick(&f,&c,&t,0,0,0x1f,false);
  CHECK(f.route.state==ROUTE_EXECUTING && f.route.junctions_seen==1);

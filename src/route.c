@@ -16,6 +16,20 @@ static bool ordinary_right_angle(RouteStep s)
     return !s.corner_arc_enabled && (s.action==LEFT || s.action==RIGHT ||
         (s.action==CUSTOM_TURN && fabsf(fabsf(s.angle_deg)-90.0f)<0.001f));
 }
+/* 滚动转弯适用行：仅普通 90° 转角，且本段与下一段都不是显式短连接（短连接仍用枢轴）；
+ * 出弯切点在角点后 R 处，下一行的 24 cm 前伸会提前 ~21 cm 响应，
+ * 因此出弯段至少要留出 2R+margin 的直线。 */
+static bool corner_arc_row(const RouteStep *s,const RouteStep *next)
+{
+    if(!s || !s->corner_arc_enabled) return false;
+    if(s->short_link_cm>0.0f) return false;
+    if(next && next->short_link_cm>0.0f) return false;
+    if(next && next->segment_length_cm+ROUTE_WAYPOINT_MARGIN_CM <
+       2.0f*CORNER_ARC_RADIUS_CM+CORNER_ARC_MIN_LEG_MARGIN_CM) return false;
+    if(s->action==LEFT || s->action==RIGHT) return true;
+    return s->action==CUSTOM_TURN && fabsf(fabsf(s->angle_deg)-90.0f)<0.001f;
+}
+static float wrap_rad(float a) { return atan2f(sinf(a),cosf(a)); }
 static void fail(RoutePlanner *p, RouteFailure reason)
 {
     if (p->failure == ROUTE_FAILURE_NONE) p->failure = reason;
@@ -90,6 +104,13 @@ static void reset_evidence(RoutePlanner *p, uint32_t now)
     p->candidate_count=p->exit_count=p->approach_center_count=0;
     p->have_approach_center=p->exit_candidate_pending=false;
     p->turn_capturing=p->corner_arc_complete=false;
+    p->arc_active=false;p->arc_roll_cm=0.0f;p->arc_progress_rad=0.0f;
+    p->arc_radius_err_cm=0.0f;p->arc_diff_slew_cm_s=0.0f;
+    p->arc_desired_heading_rad=p->entry_heading;
+    p->arc_outer_cm_s=CORNER_ARC_SPEED_CM_S;p->arc_diff_cm_s=0.0f;
+    p->arc_lateral_cm=0.0f;p->arc_along_cm=0.0f;p->arc_across_cm=0.0f;
+    p->arc_heading_err_rad=0.0f;p->arc_yaw_rate_rad_s=0.0f;
+    p->arc_last_heading=p->entry_heading;p->arc_exit_lead_rad=0.0f;
     p->turn_rewind_active=p->turn_rewind_pending=false;
     p->line_exit_confirmed=p->turn_ended_on_line=p->capture_line_seen=false;
     p->capture_line_samples=0;
@@ -127,10 +148,12 @@ void route_init(RoutePlanner *p, const RouteStep *steps, size_t count,
              fabsf(s.angle_deg)>=60.0f && fabsf(s.angle_deg)<=HEXAGON_MAX_ANGLE_DEG &&
              !s.corner_arc_enabled)) &&
             (s.action!=STOP || i==count-1) &&
-            (!s.corner_arc_enabled || (isfinite(CORNER_RADIUS_CM) && CORNER_RADIUS_CM>WHEEL_TRACK_CM*.5f)) &&
+            (!s.corner_arc_enabled ||
+             (isfinite(CORNER_ARC_RADIUS_CM) && CORNER_ARC_RADIUS_CM>WHEEL_TRACK_CM*.5f)) &&
             isfinite(s.short_link_cm) && (s.short_link_cm==0 ||
              (i>0 && s.short_link_cm>=SHORT_LINK_MIN_CM && s.short_link_cm<=SHORT_LINK_MAX_CM &&
-              ordinary_right_angle(s) && ordinary_right_angle(steps[i-1])));
+              ordinary_right_angle(s) &&
+              (ordinary_right_angle(steps[i-1]) || steps[i-1].corner_arc_enabled)));
     }
     if(p->valid && steps[count-1].action!=STOP) p->valid=false;
     p->state=p->valid?ROUTE_FOLLOW:ROUTE_FAILED;
@@ -140,6 +163,7 @@ void route_start(RoutePlanner *p,float d,uint32_t now)
 {
     p->short_link_tracking=p->short_link_active=p->turn_approaching=false;
     p->post_turn_slow=false;p->post_turn_samples=0;
+    p->arc_just_exited=false;p->arc_active=false;
     /* Absolute corner waypoints: anchored start pose plus the cumulative table
      * chain (the table already subtracts the 5 cm margin, added back here). */
     {
@@ -183,7 +207,8 @@ Action route_current_action(const RoutePlanner *p)
 /* 普通左右转、闭合左右转及显式 ±90° 共用切角；其他自定义角度保持原策略。 */
 bool route_uses_corner_arc(const RoutePlanner *p)
 {
-    return p->steps[p->index].action!=HEXAGON && p->steps[p->index].corner_arc_enabled &&
+    return !p->passing_junction &&
+        corner_arc_row(&p->steps[p->index], p->index+1<p->count ? &p->steps[p->index+1] : NULL) &&
         fabsf(fabsf(route_turn_target_rad(p)) - JUNCTION_TURN_TARGET_RAD) < 0.0001f;
 }
 
@@ -240,6 +265,7 @@ static void begin_action(RoutePlanner *p,float d,float h,uint32_t now)
           fabsf(fabsf(route_turn_target_rad(p))-JUNCTION_TURN_TARGET_RAD)<0.0001f &&
           p->steps[p->index].action!=HEXAGON));
     reset_evidence(p,now);
+    p->last_arc_ms=now;p->arc_just_exited=false;
     if(p->steps[p->index].action==HEXAGON && !p->passing_junction) {
         p->hexagon=(HexagonNavigation){.state=HEXAGON_ENTERING,
             .phase_ms=now,.action_ms=now,.line_ms=now,.phase_cm=d,.line_cm=d,.branch_cm=d,
@@ -253,6 +279,9 @@ static float entry_speed_limit_at(const RoutePlanner *p,size_t index,bool active
         (a==STOP && ((active_action && p->lap_boundary) || another_lap(p)) && p->repeat_action!=STRAIGHT);
     float limit=p->steps[index].turn_speed;
     if(a==HEXAGON) limit=fminf(limit,HEXAGON_SPEED_CM_S);
+    /* 滚动转弯不刹内轮，入弯门槛用圆弧轴速而不是枢轴 settle 速度。 */
+    if(turn && corner_arc_row(&p->steps[index], index+1<p->count ? &p->steps[index+1] : NULL))
+        return CORNER_ARC_SPEED_CM_S;
     return turn?fminf(limit,JUNCTION_SETTLE_SPEED_CM_S):limit;
 }
 float route_entry_speed_limit(const RoutePlanner *p)
@@ -600,6 +629,74 @@ bool route_recover_navigation(RoutePlanner *p,float d,float h,uint32_t now)
     p->capture_line_ms=now;p->capture_line_cm=d;
     return true;
 }
+/* \u6eda\u52a8\u8f6c\u5f2f\u51e0\u4f55\uff1a\u89d2\u70b9 K \u4e0e\u5165\u5f2f\u6bb5\u65b9\u5411 u \u51b3\u5b9a\u4e00\u6761\u4e0e\u4e24\u6bb5\u76f8\u5207\u7684\u5706\u5f27
+ *   \u5165\u5f2f\u5207\u70b9 E = K - R*u
+ *   \u51fa\u5f2f\u5207\u70b9 X = K + R*o        o = u \u6309\u8f6c\u5411\u65cb\u8f6c 90\u00b0
+ *   \u5706\u5fc3     C = K - R*u + R*o
+ * \u8f74\u8ddf\u8fd9\u4e2a\u5706\uff1b\u76ee\u6807\u822a\u5411\u53d6\u5207\u7ebf\uff0c\u6240\u4ee5\u5b83\u662f\u771f\u6b63\u7684\u8def\u5f84\u8ddf\u968f\u800c\u4e0d\u662f\u5e03\u5c14\u67a2\u8f74\u3002 */
+static void corner_arc_update(RoutePlanner *p,float h,float px,float py,float dt)
+{
+    float dir=route_turn_target_rad(p)<0.0f?-1.0f:1.0f;
+    const float R=CORNER_ARC_RADIUS_CM, track=WHEEL_TRACK_CM;
+    float Kx=p->waypoint_x_cm[p->index], Ky=p->waypoint_y_cm[p->index];
+    float Px=p->index>0?p->waypoint_x_cm[p->index-1]:p->start_x_cm;
+    float Py=p->index>0?p->waypoint_y_cm[p->index-1]:p->start_y_cm;
+    float ux=Kx-Px, uy=Ky-Py;
+    float len=hypotf(ux,uy);
+    if(len>1e-3f) { ux/=len; uy/=len; }
+    else { float w=p->entry_heading-(float)M_PI*.5f; ux=cosf(w); uy=sinf(w); }
+    float ox=dir>0.0f?-uy:uy, oy=dir>0.0f?ux:-ux;
+    float Cx=Kx-R*ux+R*ox, Cy=Ky-R*uy+R*oy;
+    float Ex=Kx-R*ux, Ey=Ky-R*uy;
+    float proj=(Kx-px)*ux+(Ky-py)*uy;
+    p->arc_roll_cm=proj-R;
+    p->arc_lateral_cm=(px-Ex)*ox+(py-Ey)*oy;
+    if(!p->arc_active && proj<=R+CORNER_ARC_ENTER_TOL_CM &&
+       fabsf(p->arc_lateral_cm)<=CORNER_ARC_EXIT_TOL_CM*4.0f) {
+        p->arc_active=true;
+        p->arc_last_heading=h;
+        p->arc_yaw_rate_rad_s=0.0f;
+    }
+    float rx=px-Cx, ry=py-Cy;
+    float alpha=atan2f(ry,rx);
+    float alpha_in=atan2f(Ey-Cy,Ex-Cx);
+    p->arc_radius_err_cm=hypotf(rx,ry)-R;
+    float dphi=wrap_rad(alpha-alpha_in)*dir;
+    p->arc_progress_rad=dphi<0.0f?0.0f:(dphi>(float)M_PI*.5f?(float)M_PI*.5f:dphi);
+    float seg_heading=atan2f(uy,ux)+(float)M_PI*.5f;
+    p->arc_desired_heading_rad=p->arc_active
+        ? alpha+dir*(float)M_PI*.5f+(float)M_PI*.5f
+        : seg_heading;
+    float v=CORNER_ARC_SPEED_CM_S;
+    p->arc_outer_cm_s=p->arc_active?v*(1.0f+track/(2.0f*R)):v;
+    float diff_target=p->arc_active?(v*track)/(2.0f*R):0.0f;
+    float step=CORNER_ARC_DIFF_SLEW_CM_S2*dt;
+    if(diff_target>p->arc_diff_slew_cm_s)
+        p->arc_diff_slew_cm_s=fminf(diff_target,p->arc_diff_slew_cm_s+step);
+    else
+        p->arc_diff_slew_cm_s=fmaxf(diff_target,p->arc_diff_slew_cm_s-step);
+    p->arc_diff_cm_s=p->arc_diff_slew_cm_s;
+    float target=fabsf(route_turn_target_rad(p));
+    p->arc_along_cm=(px-Kx)*ox+(py-Ky)*oy;
+    p->arc_across_cm=(px-Kx)*ux+(py-Ky)*uy;
+    float out_heading=atan2f(oy,ox)+(float)M_PI*.5f;
+    p->arc_heading_err_rad=wrap_rad(h-out_heading);
+    if(dt>0.0f) {
+        float raw=wrap_rad(h-p->arc_last_heading)/dt;
+        float a=dt/(JUNCTION_YAW_FILTER_TAU_S+dt);
+        p->arc_yaw_rate_rad_s+=a*(raw-p->arc_yaw_rate_rad_s);
+    }
+    p->arc_last_heading=h;
+    p->arc_exit_lead_rad=p->arc_yaw_rate_rad_s*CORNER_ARC_EXIT_LEAD_S;
+    float predicted=wrap_rad(p->arc_heading_err_rad+p->arc_exit_lead_rad);
+    if(p->arc_active && fabsf(predicted)<=CORNER_ARC_EXIT_ANGLE_RAD &&
+       p->arc_along_cm>=R-CORNER_ARC_EXIT_ALONG_TOL_CM &&
+       fabsf(p->arc_across_cm)<=CORNER_ARC_EXIT_TOL_CM) {
+        p->corner_arc_complete=true;
+    }
+    (void)target;
+}
+
 void route_update_pose(RoutePlanner *p,GrayObservation o,float d,float h,uint32_t now,
                        float axle_x_cm,float axle_y_cm)
 {
@@ -888,12 +985,31 @@ void route_update_pose(RoutePlanner *p,GrayObservation o,float d,float h,uint32_
      * look-ahead bar a few cm after the pivot, so the grey-only contract would
      * time out.  When the axle has reached the pivot angle at the known corner,
      * hand the next row over immediately. */
+    bool arc_row=p->pose_mode && action!=STRAIGHT && !p->passing_junction &&
+        route_uses_corner_arc(p);
+    if(arc_row && p->state==ROUTE_EXECUTING) {
+        float arc_dt=(float)(uint32_t)(now-p->last_arc_ms)/1000.0f;
+        if(arc_dt<0.001f) arc_dt=0.001f;
+        if(arc_dt>0.020f) arc_dt=0.020f;
+        corner_arc_update(p,h,axle_x_cm,axle_y_cm,arc_dt);
+        p->last_arc_ms=now;
+    }
     if(p->pose_mode && action!=STRAIGHT && !p->passing_junction) {
-        float gap=hypotf(axle_x_cm-p->waypoint_x_cm[p->index],
-                         axle_y_cm-p->waypoint_y_cm[p->index]);
-        if(gap<=ROUTE_WAYPOINT_EXIT_CM && turn>=target-ROUTE_WAYPOINT_EXIT_ANGLE_RAD) {
-            p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
-            enter_clear(p,d,now);return;
+        if(arc_row) {
+            /* 滚动转弯按自己的切线交出，不用“轴距角点 14 cm”的枢轴交接
+             * （那个会提前 ~7° 接管）；且只在 EXECUTING 内，否则会每帧重置 CLEARING 计时。 */
+            if(p->state==ROUTE_EXECUTING && p->corner_arc_complete) {
+                p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+                p->arc_just_exited=true;
+                enter_clear(p,d,now);return;
+            }
+        } else {
+            float gap=hypotf(axle_x_cm-p->waypoint_x_cm[p->index],
+                             axle_y_cm-p->waypoint_y_cm[p->index]);
+            if(gap<=ROUTE_WAYPOINT_EXIT_CM && turn>=target-ROUTE_WAYPOINT_EXIT_ANGLE_RAD) {
+                p->line_exit_confirmed=true;p->line_exit_heading_rad=h;
+                enter_clear(p,d,now);return;
+            }
         }
     }
     if(action!=STRAIGHT && (turn < -JUNCTION_WRONG_WAY_RAD ||

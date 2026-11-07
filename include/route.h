@@ -102,6 +102,24 @@ typedef struct {
     bool have_approach_center;
     bool valid, stop_pending, callback_dispatched;
     bool corner_arc_complete; /* 90° 轨迹完成后保持捕线，避免纠偏回落时重进圆弧。 */
+    /* 滚动转弯（位姿模式）状态：圆弧几何由行内角点与入弯段方向重建。 */
+    bool arc_active;          /* 轴已到达入弯切点，开始走圆弧 */
+    bool arc_just_exited;     /* 圆弧交出后到下一行动作开始前：保持出弯轮速并押制残余横摆速度 */
+    float arc_roll_cm;        /* 距入弯切点的剩余直走距离（>0 = 还没到） */
+    float arc_progress_rad;   /* 已走过的圆弧角度 0..pi/2 */
+    float arc_radius_err_cm;  /* 实测半径 - R（>0 = 轴在圆外） */
+    float arc_desired_heading_rad; /* 圆弧切线目标航向（直走阶段为入弯段航向） */
+    float arc_outer_cm_s;     /* 外轮目标速度 */
+    float arc_diff_cm_s;      /* 已限幅的差速（正 = 外轮在左） */
+    float arc_diff_slew_cm_s;
+    float arc_lateral_cm;     /* 轴偏离入弯段线的横向距离 */
+    float arc_along_cm;       /* 轴在出弯段方向上的投影（距角点） */
+    float arc_across_cm;      /* 轴偏离出弯段线的横向距离（带符号） */
+    float arc_heading_err_rad;
+    float arc_yaw_rate_rad_s;
+    float arc_last_heading;
+    float arc_exit_lead_rad;
+    uint32_t last_arc_ms;
     bool turn_capturing, lap_boundary; /* 出口线捕获 / 非末轮 STOP 的闭合动作。 */
     bool capture_line_seen, line_exit_confirmed;
     uint8_t capture_line_samples;

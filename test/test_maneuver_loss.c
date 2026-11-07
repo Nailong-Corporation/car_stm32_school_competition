@@ -80,11 +80,11 @@ static void handoff_deadline(void)
  for(unsigned speed=0;speed<2;++speed) {
   RouteStep s[]={{1,50,LEFT,50,0,false,65, 0},{1,50,STOP,50,0,false,0, 0}};
   LineFollow f;EncoderCounts c;uint32_t t;start(&f,&c,&t,s,2);
-  for(unsigned i=0;i<30;++i) tick(&f,&c,&t,speed?50:6,speed?50:6,0x18,false);
-  tick(&f,&c,&t,speed?50:6,speed?50:6,0x1f,false);
+  for(unsigned i=0;i<30;++i) tick(&f,&c,&t,speed?20:6,speed?20:6,0x18,false);
+  tick(&f,&c,&t,speed?20:6,speed?20:6,0x1f,false);
   CHECK(f.route.state==ROUTE_CANDIDATE);
   f.abnormal=true;f.last_reliable_ms=t+5-INTERFERENCE_TIMEOUT_MS;
-  tick(&f,&c,&t,speed?50:6,speed?50:6,0x1f,false);
+  tick(&f,&c,&t,speed?20:6,speed?20:6,0x1f,false);
   CHECK(f.state!=LINE_STOPPED && f.route.junctions_seen==1);
   CHECK(f.route.state==(speed?ROUTE_BRAKING:ROUTE_EXECUTING));
   if(speed) CHECK(f.left_target_cm_s==0 && f.right_target_cm_s==0);

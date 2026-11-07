@@ -31,29 +31,57 @@ header = '''#include "route.h"
 const RouteStep route[] = {
 '''
 
-def row(count, angle, geometric, note, turn=None, cruise=60, short_link=0):
+# Rolling corner (2026-11-08): ordinary 90 degree rows may run a tangent arc of
+# radius CORNER_ARC_RADIUS_CM instead of a stopped pivot.  The predicate mirrors
+# src/route.c corner_arc_row(): no explicit short link on this row or the next,
+# and the next row must leave room for the arc exit tangent (2R + margin).
+CORNER_ARC_RADIUS_CM = 15.0
+CORNER_ARC_MIN_LEG_MARGIN_CM = 4.0
+
+
+def arc_flag(angle, length, next_length, short_link, next_short_link):
+    if short_link or next_short_link:
+        return False
+    if next_length is not None and next_length + margin < 2.0 * CORNER_ARC_RADIUS_CM + CORNER_ARC_MIN_LEG_MARGIN_CM:
+        return False
+    return abs(angle) == 90
+
+
+def row(count, angle, geometric, note, turn=None, cruise=60, short_link=0, arc=False, action=None):
     if turn is None:
         turn = globals().get('turn_speed_default', 16)
-    action = 'STOP' if angle == 0 else 'HEXAGON' if abs(angle) > 180 else 'CUSTOM_TURN'
+    if action is None:
+        action = 'STOP' if angle == 0 else 'HEXAGON' if abs(angle) > 180 else 'CUSTOM_TURN'
     length = geometric - margin
     assert length > 0
-    return (f'    {{ {count}, {turn:.1f}f, {action:11s}, {cruise:3}, {angle:7.1f}f, false, {length:6.1f}f, {short_link:.1f}f}},'
+    arc_text = 'true ' if arc else 'false'
+    return (f'    {{ {count}, {turn:.1f}f, {action:11s}, {cruise:3}, {angle:7.1f}f,{arc_text}, {length:6.1f}f, {short_link:.1f}f}},'
             f' /* {note}；几何 {geometric:g} - 5 = {length:g} cm */\n')
 
 body = '#if (ROUTE_SCHEME_SELECT == 0)\n'
-for n, (count, cruise, angle, length) in enumerate([(1,50,-90,60),(4,200,-90,180),(2,200,-90,60),(3,200,0,200)]):
-    body += row(count, angle, length, f'调试 {n}', turn=50, cruise=cruise)
+debug_rows = [(1,50,-90,60),(4,200,-90,180),(2,200,-90,60),(3,200,0,200)]
+for n, (count, cruise, angle, length) in enumerate(debug_rows):
+    nxt = debug_rows[n+1][3] - margin if n+1 < len(debug_rows) else None
+    body += row(count, angle, length, f'调试 {n}', turn=50, cruise=cruise,
+                arc=arc_flag(angle, length, nxt, 0, 0))
 for key, scheme in manifest['schemes'].items():
     body += f'\n#elif (ROUTE_SCHEME_SELECT == {key})\n    /* {scheme["name"]} */\n'
-    for n, (count, angle, geometric, note) in enumerate(scheme['steps']):
-        short_link = geometric if n in scheme.get('short_link_steps', []) else 0
+    scheme_cruise = int(scheme.get('cruise_speed_cm_s', cruise_default))
+    scheme_turn = float(scheme.get('turn_speed_cm_s', turn_default))
+    steps = scheme['steps']
+    short_steps = scheme.get('short_link_steps', [])
+    for n, step in enumerate(steps):
+        count, angle, geometric, note = step[0], step[1], step[2], step[3]
+        action = step[4] if len(step) > 4 else None
+        short_link = geometric if n in short_steps else 0
         if short_link:
             assert n > 0 and 20 <= geometric <= 40 and abs(angle) == 90
-            assert abs(scheme['steps'][n-1][1]) == 90
-        body += row(count, angle, geometric, f'{n}: {note}', turn=turn_default, cruise=cruise_default, short_link=short_link)
-body += '\n#elif (ROUTE_SCHEME_SELECT == 3)\n    /* 外框测试圈，保留用于基本回归。 */\n'
-for n, (count, angle, length) in enumerate([(2,90,110),(11,90,375),(5,90,220),(6,90,375),(2,0,110)]):
-    body += row(count, angle, length, f'外框 {n}')
+            assert abs(steps[n-1][1]) == 90
+        nxt = (steps[n+1][2] - margin) if n+1 < len(steps) else None
+        next_short = (steps[n+1][2] if (n+1) in short_steps else 0) if n+1 < len(steps) else 0
+        body += row(count, angle, geometric, f'{n}: {note}', turn=scheme_turn, cruise=scheme_cruise,
+                    short_link=short_link, arc=arc_flag(angle, geometric-margin, nxt, short_link, next_short),
+                    action=action)
 c_source = header + body + '\n#endif\n};\n\nconst size_t route_count = sizeof(route) / sizeof(route[0]);\n'
 parser_path = simulator / 'src/sim/route_parser.ts'
 parser = parser_path.read_text()
